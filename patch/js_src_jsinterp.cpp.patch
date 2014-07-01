@@ -1,0 +1,1811 @@
+--- mozilla-esr17-orig/js/src/jsinterp.cpp	2013-02-15 14:59:22.000000000 -0600
++++ mozilla-esr17/js/src/jsinterp.cpp	2014-06-25 15:43:05.162777749 -0500
+@@ -38,6 +38,10 @@
+ #include "jsscope.h"
+ #include "jsscript.h"
+ #include "jsstr.h"
++#ifdef TxJS
++#include "jstransaction.h"
++#include "jsjam.h"
++#endif
+ 
+ #include "builtin/Eval.h"
+ #include "gc/Marking.h"
+@@ -321,8 +325,12 @@
+     JS_ASSERT(args.length() <= StackSpace::ARGS_LENGTH_MAX);
+     JS_ASSERT(!cx->compartment->activeAnalysis);
+ 
++#ifdef TxJS
++    // %%% This assertion is being triggered nondeterministically.
++#else
+     /* We should never enter a new script while cx->iterValue is live. */
+     JS_ASSERT(cx->iterValue.isMagic(JS_NO_ITER_VALUE));
++#endif
+ 
+     /* MaybeConstruct is a subset of InitialFrameFlags */
+     InitialFrameFlags initial = (InitialFrameFlags) construct;
+@@ -490,6 +498,51 @@
+         return false;
+     TypeScript::SetThis(cx, script, efg.fp()->thisValue());
+ 
++#ifdef TxJS
++    // Descend the stack to find the first dynamic introspector.
++    Value ispect = UndefinedValue();
++    StackFrame * prevfp = cx->fp();
++    while (ispect.isUndefined()) {
++        ispect = prevfp->script()->getIntrospector();
++        prevfp = prevfp->prev();
++        if (!prevfp) break;
++    }
++    if (ispect.isUndefined()) {
++    }
++
++    if (!ispect.isUndefined()) {
++        if (!BeginTx(cx, ispect))
++            return false;
++        TxContext *tx = cx->getTxContext();
++
++        Probes::startExecution(cx, script);
++        bool ok = RunScript(cx, script, efg.fp());
++        Probes::stopExecution(cx, script);
++
++        /* Propgate the return value out. */
++        if (result)
++            *result = efg.fp()->returnValue();
++
++        if (!ok) {
++            // Destroy the transaction in the error case.
++            cx->setTxContext(tx->getNext());
++            tx->finish(cx);
++            cx->free_(tx);
++            return false;
++        }
++
++        // Force non-inline execution.
++        int path = 1;
++        // Not used.
++        bool newType;
++        //RootedScript s(cx, cx->fp()->script());
++        if (!IntrospectTx(cx, tx, true, script, &path, &newType))
++            return false;
++        JS_ASSERT(path == 1);
++        return true;
++    }
++#endif
++
+     Probes::startExecution(cx, script);
+     bool ok = RunScript(cx, script, efg.fp());
+     Probes::stopExecution(cx, script);
+@@ -532,6 +585,221 @@
+                          NULL /* evalInFrame */, rval);
+ }
+ 
++bool
++js::BeginTx(JSContext *cx, const Value &tx_handler) {
++    // Throw exception if handler is not a function value.
++    if (!tx_handler.isObject() || !tx_handler.toObject().isFunction()) {
++        ReportIsNotFunction(cx, tx_handler, NO_CONSTRUCT);
++        return false;
++    }
++
++    // Noop if a transaction with the same handler function is active.
++#ifdef TxJS_TRANSPARENT
++    bool enterTx = true;
++    TxContext *curtx = cx->getRunningTx();
++    while (curtx != NULL) {
++        if (curtx->getHandler() == tx_handler) {
++            enterTx = false;
++            break;
++        }
++        curtx = curtx->getNext();
++    }
++#endif
++
++    // Create the tx context and place it on top of the tx stack.
++    TxContext *tx = (TxContext*)cx->malloc_(sizeof(TxContext));
++    TxContext::initTx(cx, tx, tx_handler);
++    // TX_INIT -> TX_RUNNING
++    JS_ASSERT(tx->inState(TX_INIT));
++#ifdef TxJS_TRANSPARENT
++    if (!enterTx) {
++        tx->setState(TX_DUMMY);
++    } else {
++#endif
++        tx->advanceState();
++#ifdef TxJS_TRANSPARENT
++    }
++#endif
++
++    tx = cx->setTxContext(tx);
++#ifdef TxJS_PROFILE_TX
++    js_jam_profileTxEntry(cx, tx);
++#endif
++
++    return true;
++}
++
++bool
++js::IntrospectTx(JSContext *cx, TxContext *tx, bool isEnd, HandleScript script, int *path, bool *newType) {
++    JS_ASSERT(tx->inState(TX_RUNNING));
++
++    FrameRegs &regs = cx->regs();
++
++    if (isEnd) {  
++#ifdef TxJS_PROFILE_TX
++        js_jam_profileTxEnding(cx, tx);
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++        js_jam_profileActions(cx, tx);
++#endif
++        tx->setState(TX_ENDING);
++    } else {
++#ifdef TxJS_PROFILE_TX
++        js_jam_profileTxSuspension(cx, tx);
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++        js_jam_profileActions(cx, tx);
++#endif
++        tx->setState(TX_SUSPENDING);
++    }
++
++    Value tx_handler = tx->getHandler();
++    // BEGIN_TX should ensure this and throw an exception otherwise.
++    JS_ASSERT(tx_handler.isObject() && tx_handler.toObject().isFunction());
++    /*
++    // %%% Attempt to fix the compartment mismatch problem.
++    JSObject *hdlrObj = &tx_handler.toObject();
++    while (IsFunctionProxy(hdlrObj)) {
++        if (!GetProxyPrivate(hdlrObj).isObjectOrNull()) {
++            js_ReportIsNotDefined(cx, "Deleting property of undefined object");
++            return false;
++        }
++        hdlrObj = GetProxyTargetObject(hdlrObj);
++        if (!hdlrObj) {
++            js_ReportIsNotDefined(cx, "Deleting property of undefined object");
++            return false;
++        }
++        tx_handler = ObjectValue(*hdlrObj);
++    }
++    JSAutoCompartment autoComp(cx, &tx_handler.toObject());
++    */
++    cx->compartment->wrap(cx, &tx_handler);
++    do { *regs.sp++ = tx_handler; assertSameCompartment(cx, regs.sp[-1]); } while (0);
++    regs.sp++->setUndefined();
++    // Create a Tx Object and push it as the argument.
++    RootedObject txObj(cx, js_NewTxObject(cx, tx));
++    do { regs.sp++->setObject(*txObj.get()); assertSameCompartment(cx, regs.sp[-1]); } while (0);
++
++    //JS_SetOperationCallback(cx, NULL);
++
++    // Invoke the handler function.
++
++    // TX_SUSPENDING|TX_ENDING -> TX_SUSPEND0|TX_END0
++    JS_ASSERT(tx->inState(TX_SUSPENDING | TX_ENDING));
++    tx->advanceState();
++
++    CallArgs args = CallArgsFromSp(1, regs.sp);
++    //args.clearUsedRval();
++    //args.argv_ = regs.sp - 1;
++    // Don't incorrectly getting the number of arguments from
++    // |regs.pc|.
++    //args.argc_ = 1;
++
++    RootedFunction fun(cx);
++    /* Don't bother trying to fast-path calls to scripted non-constructors. */
++    if (*path == 1 || !IsFunctionObject(args.calleev(), fun.address()) || !fun->isInterpretedConstructor()) {
++        if (!InvokeKernel(cx, args))
++            return false;
++        Value *newsp = args.spAfterCall();
++        TypeScript::Monitor(cx, script, regs.pc, newsp[-1]);
++        regs.sp = newsp;
++            
++        if (tx->inState(TX_END0 | TX_SUSPEND0)) {
++            // This means that a native function was used as the 
++            // transaction handler, so execution doesn't go through
++            // JSOP_STOP. So we need to advance the transaction state
++            // twice.
++
++            // TX_END0|TX_SUSPEND0 -> TX_END1|TX_SUSPEND1
++            JS_ASSERT(tx->inState(TX_END0 | TX_SUSPEND0));
++            tx->advanceState();
++
++            // TX_END1|TX_SUSPEND1 -> TX_DONE|TX_RESUME
++            JS_ASSERT(tx->inState(TX_END1 | TX_SUSPEND1));
++            tx->advanceState();
++        }
++
++        JS_ASSERT(tx->inState(TX_RESUME | TX_DONE));
++        if (tx->inState(TX_RESUME)) {
++
++            // This serves the purpose of both the switch statements
++            // in JSOP_STOP in setting or suppressing the return value
++            // of the call.
++            switch (tx->getSuspend()->type) {
++              case AX_CALL:
++              case AX_WRITE:
++              case AX_READ:
++                // Write the handler frame's return value to the stack.
++                JS_ASSERT(regs.stackDepth() >= 1);
++                regs.sp[-1] = tx->getReturnValue();
++                break;
++              case AX_FORIN:
++                {
++                    // Pop the top value which is not used.
++                    regs.sp--;
++                    JS_ASSERT(regs.stackDepth() >= 1);
++                    // Create the iterator.
++                    uint8_t flags = GET_UINT8(regs.pc);
++                    MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
++                    if (!ValueToIterator(cx, flags, res))
++                        return false;
++                    JS_ASSERT(!res.isPrimitive());
++                }
++                break;
++              default:
++                break;
++            }
++
++            // TX_RESUME -> TX_RUNNING
++            tx->advanceState();
++        } else {
++            JS_ASSERT(tx->inState(TX_DONE));
++            // Pop the current transaction context.
++            TxContext *doneTx = tx;
++            tx = cx->setTxContext(tx->getNext());
++            doneTx->finish(cx);
++            cx->free_(doneTx);
++
++#ifdef TxJS_NOEXPR
++            // Pop the unwanted return value.
++            regs.sp--;
++#endif
++        }
++
++        *path = 1;
++        return true;
++    }
++
++    if (!TypeMonitorCall(cx, args, false))
++        return false;
++
++    InitialFrameFlags initial = INITIAL_NONE;
++
++    *newType = cx->typeInferenceEnabled() && UseNewType(cx, script, regs.pc);
++
++    JSScript *newScript = fun->script();
++
++    if (newScript->compileAndGo && newScript->hasClearedGlobal()) {
++        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CLEARED_SCOPE);
++        return false;
++    }
++
++    if (!cx->stack.pushInlineFrame(cx, regs, args, *fun, newScript, initial))
++        return false;
++        
++    // Save a transaction that is in the process of suspending,
++    // so we can automatically resume when this frame returns.
++    JS_ASSERT(regs.fp()->suspendedTx() == NULL);
++    regs.fp()->setSuspendedTx(tx);
++
++    // TX_SUSPEND0|TX_END0 -> TX_SUSPEND1|TX_END1;
++    JS_ASSERT(tx->inState(TX_SUSPEND0 | TX_END0));
++    tx->advanceState();
++
++    *path = 2;
++    return true;
++}
++
+ JSBool
+ js::HasInstance(JSContext *cx, HandleObject obj, const Value *v, JSBool *bp)
+ {
+@@ -1090,8 +1358,7 @@
+                                 op = (JSOp) *(regs.pc += (n));                \
+                                 DO_OP();                                      \
+                             JS_END_MACRO
+-
+-# define BEGIN_CASE(OP)     L_##OP:
++# define BEGIN_CASE(OP)     L_##OP: 
+ # define END_CASE(OP)       DO_NEXT_OP(OP##_LENGTH);
+ # define END_VARLEN_CASE    DO_NEXT_OP(len);
+ # define ADD_EMPTY_CASE(OP) BEGIN_CASE(OP)                                    \
+@@ -1212,6 +1479,11 @@
+     FrameRegs regs = cx->regs();
+     PreserveRegsGuard interpGuard(cx, regs);
+ 
++#ifdef TxJS
++    // Variables used in transaction processing.
++    TxContext *tx = NULL;
++#endif
++
+     /*
+      * Help Debugger find frames running scripts that it has put in
+      * single-step mode.
+@@ -1548,9 +1820,154 @@
+     CHECK_BRANCH();
+ 
+     interpReturnOK = true;
++
+     if (entryFrame != regs.fp())
+   inline_return:
+     {
++#ifdef TxJS
++        // If we're currently in transaction, we no longer need to
++        // (or are able to) apply |tSlot| type writes for the
++        // current frame. This applies to both the suspended case
++        // (if the suspension handler is executing within an outer
++        // transaction) or in the normal transaction case.
++#ifdef TxJS_LOCAL
++        TxContext::clearFrameLocals(cx, regs.fp());
++#endif
++
++        // Resume the transaction if the frame that is returning is a
++        // transaction handler function.
++        if (regs.fp()->suspendedTx()) {
++            
++            if (cx->compartment->debugMode())
++                interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
++
++            if (!regs.fp()->isYielding())
++                regs.fp()->epilogue(cx);
++            else
++                Probes::exitScript(cx, script, script->function(), regs.fp());
++            // Unsuspend the transaction.
++            tx = regs.fp()->suspendedTx();
++
++            // The TX_RESUME state indicates that further steps are
++            // needed before handing control back to the guest. It
++            // doesn't serve much of a purpose in the inline case, but
++            // is needed for communication in the |Invoke| case.
++            // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
++            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++            tx->advanceState();
++            regs.fp()->setSuspendedTx(NULL);
++                
++            // Perform actions prior to popping based on suspend type.
++            if (tx->inState(TX_RESUME)) {
++                switch (tx->getSuspend()->type) {
++                  case AX_CALL:
++                  case AX_WRITE:
++                  case AX_READ:
++                    // Push the return value of the handler frame.
++                    regs.fp()->setReturnValue(tx->getReturnValue());
++                    break;
++                  default:
++                    break;
++                }
++            }
++#ifndef TxJS_NOEXPR
++            else if (tx->inState(TX_DONE)) {
++                regs.fp()->setReturnValue(tx->getReturnValue());
++            }
++#endif
++
++            /* The results of lowered call/apply frames need to be shifted. */
++            bool shiftResult = regs.fp()->loweredCallOrApply();
++
++            cx->stack.popInlineFrame(regs);
++            SET_SCRIPT(regs.fp()->script());
++
++            // Removed the JS_ASSERT on |regs.pc| type here, since anything
++            // can potentially suspend and cause a call to the handler.
++
++#ifdef JS_METHODJIT
++            // JIT can foul things up when returning from a suspend.
++            useMethodJIT = false;
++#endif
++            /* Resume execution in the calling frame. */
++            if (JS_LIKELY(interpReturnOK)) {
++                TypeScript::Monitor(cx, script, regs.pc, regs.sp[-1]);
++
++                if (shiftResult) {
++                    regs.sp[-2] = regs.sp[-1];
++                    regs.sp--;
++                }
++
++                // Some suspend types need actions after popping.
++                if (tx->inState(TX_RESUME)) {
++                    switch (tx->getSuspend()->type) {
++                      case AX_FORIN:
++                        {
++                            // Pop the Tx object off the stack.
++                            regs.sp--;
++                            // Create the iterator.
++                            JS_ASSERT(regs.stackDepth() >= 1);
++                            uint8_t flags = GET_UINT8(regs.pc);
++                            MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
++                            if (!ValueToIterator(cx, flags, res))
++                                goto error;
++                            JS_ASSERT(!res.isPrimitive());
++                        }
++                        break;
++                      default:
++                        break;
++                    }
++
++                    // All necessary synchronization has occured and we can
++                    // resume the guest code.
++                    // TX_RESUME -> TX_RUNNING
++                    tx->advanceState();
++                } else {
++                    JS_ASSERT(tx->inState(TX_DONE));
++                    TxContext *doneTx = tx;
++                    tx = cx->setTxContext(tx->getNext());
++                    doneTx->finish(cx);
++                    cx->free_(doneTx);
++#ifdef TxJS_NOEXPR
++                    // Pop the return value from the handler function
++                    // that is ignored.
++                    regs.sp--;
++#endif
++
++                    if (cx->isExceptionPending()) {
++                        // The end of a transaction within a try block
++                        // was triggered by an exception and we're now
++                        // jumping into the catch/finally.
++                        goto error;
++                    }
++                }
++
++                //len = JSOP_CALL_LENGTH;
++                //DO_NEXT_OP(len);
++                op = (JSOp)*regs.pc;
++                len = js_CodeSpec[op].length;
++                DO_NEXT_OP(len);
++            }
++
++            /* Increment pc so that |sp - fp->slots == ReconstructStackDepth(pc)|. */
++
++            if (tx->inState(TX_RESUME | TX_DONE)) {
++                // An exception occurred within a transaction handler.
++                // If the transaction was suspended, we need to restart
++                // it here.
++                if (tx->inState(TX_RESUME)) {
++                    // TX_RESUME -> TX_RUNNING
++                    JS_ASSERT(tx->inState(TX_RESUME));
++                    tx->advanceState();
++                } else {
++                    //regs.pc += JSOP_END_TX_LENGTH;
++                }
++            } else
++
++            regs.pc += JSOP_CALL_LENGTH;
++            goto error;
++        }
++#endif
+         if (cx->compartment->debugMode())
+             interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
+ 
+@@ -1563,6 +1980,126 @@
+ #ifdef JS_METHODJIT
+   jit_return:
+ #endif
++#ifdef TxJS
++        if (regs.fp()->suspendedTx()) {
++            // Unsuspend the transaction.
++            tx = regs.fp()->suspendedTx();
++
++            // The TX_RESUME state indicates that further steps are
++            // needed before handing control back to the guest. It
++            // doesn't serve much of a purpose in the inline case, but
++            // is needed for communication in the |Invoke| case.
++            // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
++            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++            tx->advanceState();
++            regs.fp()->setSuspendedTx(NULL);
++                
++            // Perform actions prior to popping based on suspend type.
++            if (tx->inState(TX_RESUME)) {
++                switch (tx->getSuspend()->type) {
++                  case AX_CALL:
++                  case AX_WRITE:
++                  case AX_READ:
++                    // Push the return value of the handler frame.
++                    regs.fp()->setReturnValue(tx->getReturnValue());
++                    break;
++                  default:
++                    break;
++                }
++            } else if (tx->inState(TX_DONE)) {
++                regs.fp()->setReturnValue(tx->getReturnValue());
++            }
++
++            /* The results of lowered call/apply frames need to be shifted. */
++            bool shiftResult = regs.fp()->loweredCallOrApply();
++
++            cx->stack.popInlineFrame(regs);
++            SET_SCRIPT(regs.fp()->script());
++
++            // Removed the JS_ASSERT on |regs.pc| type here, since anything
++            // can potentially suspend and cause a call to the handler.
++
++            // JIT can foul things up when returning from a suspend.
++#ifdef JS_METHODJIT
++            useMethodJIT = false;
++#endif
++            /* Resume execution in the calling frame. */
++            if (JS_LIKELY(interpReturnOK)) {
++                TypeScript::Monitor(cx, script, regs.pc, regs.sp[-1]);
++
++                if (shiftResult) {
++                    regs.sp[-2] = regs.sp[-1];
++                    regs.sp--;
++                }
++
++                // Some suspend types need actions after popping.
++                if (tx->inState(TX_RESUME)) {
++                    switch (tx->getSuspend()->type) {
++                      case AX_FORIN:
++                        {
++                            // Pop the Tx object off the stack.
++                            regs.sp--;
++                            // Create the iterator.
++                            JS_ASSERT(regs.stackDepth() >= 1);
++                            uint8_t flags = GET_UINT8(regs.pc);
++                            MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
++                            if (!ValueToIterator(cx, flags, res))
++                                goto error;
++                            JS_ASSERT(!res.isPrimitive());
++                        }
++                        break;
++                      default:
++                        break;
++                    }
++
++                    // All necessary synchronization has occured and we can
++                    // resume the guest code.
++                    // TX_RESUME -> TX_RUNNING
++                    tx->advanceState();
++                } else {
++                    JS_ASSERT(tx->inState(TX_DONE));
++                    TxContext *doneTx = tx;
++                    tx = cx->setTxContext(tx->getNext());
++                    doneTx->finish(cx);
++                    cx->free_(doneTx);
++                    // Pop the return value from the handler function
++                    // that is ignored.
++                    regs.sp--;
++
++                    if (cx->isExceptionPending()) {
++                        // The end of a transaction within a try block
++                        // was triggered by an exception and we're now
++                        // jumping into the catch/finally.
++                        goto error;
++                    }
++                }
++
++                //len = JSOP_CALL_LENGTH;
++                //DO_NEXT_OP(len);
++                op = (JSOp)*regs.pc;
++                len = js_CodeSpec[op].length;
++                DO_NEXT_OP(len);
++            }
++
++            /* Increment pc so that |sp - fp->slots == ReconstructStackDepth(pc)|. */
++
++            if (tx->inState(TX_RESUME | TX_DONE)) {
++                // An exception occurred within a transaction handler.
++                // If the transaction was suspended, we need to restart
++                // it here.
++                if (tx->inState(TX_RESUME)) {
++                    // TX_RESUME -> TX_RUNNING
++                    JS_ASSERT(tx->inState(TX_RESUME));
++                    tx->advanceState();
++                } else {
++                    //regs.pc += JSOP_END_TX_LENGTH;
++                }
++            } else
++
++            regs.pc += JSOP_CALL_LENGTH;
++            goto error;
++        }
++#endif
+ 
+         /* The results of lowered call/apply frames need to be shifted. */
+         bool shiftResult = regs.fp()->loweredCallOrApply();
+@@ -1570,8 +2107,14 @@
+         cx->stack.popInlineFrame(regs);
+         SET_SCRIPT(regs.fp()->script());
+ 
++#ifdef TxJS
++        JS_ASSERT(*regs.pc == JSOP_NEW || *regs.pc == JSOP_CALL ||
++                  *regs.pc == JSOP_END_TX ||
++                  *regs.pc == JSOP_FUNCALL || *regs.pc == JSOP_FUNAPPLY);
++#else
+         JS_ASSERT(*regs.pc == JSOP_NEW || *regs.pc == JSOP_CALL ||
+                   *regs.pc == JSOP_FUNCALL || *regs.pc == JSOP_FUNAPPLY);
++#endif
+ 
+         /* Resume execution in the calling frame. */
+         RESET_USE_METHODJIT();
+@@ -1583,6 +2126,13 @@
+                 regs.sp--;
+             }
+ 
++#ifdef TxJS
++            if (tx && tx->inState(TX_END1)) {
++                // Pop the return value that isn't used or expected.
++                regs.sp--;
++                len = JSOP_END_TX_LENGTH;
++            } else
++#endif
+             len = JSOP_CALL_LENGTH;
+             DO_NEXT_OP(len);
+         }
+@@ -1591,6 +2141,26 @@
+         regs.pc += JSOP_CALL_LENGTH;
+         goto error;
+     } else {
++#ifdef TxJS
++#ifdef TxJS_LOCAL
++        TxContext::clearFrameLocals(cx, regs.fp());
++#endif
++        // Resume the transaction if the frame that is returning is a
++        // transaction handler function.
++        if (regs.fp()->suspendedTx()) {
++
++            // Unsuspend the transaction.
++            tx = regs.fp()->suspendedTx();
++            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++
++            // Tell the code that changes the frame pointer after the
++            // return to do any necessary processing for the suspend.
++            // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
++            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++            tx->advanceState();
++            regs.fp()->setSuspendedTx(NULL);
++        }
++#endif
+         JS_ASSERT(regs.stackDepth() == 0);
+     }
+     interpReturnOK = true;
+@@ -1703,6 +2273,39 @@
+ BEGIN_CASE(JSOP_ITER)
+ {
+     JS_ASSERT(regs.stackDepth() >= 1);
++#ifdef TxJS
++    // In leiu of a more robust way to coordinate iterators with
++    // speculatively written and deleted properties we suspend here
++    // to sync the transaction with the real heap.
++    tx = cx->getRunningTx();
++    if (tx) {
++        Value val = regs.sp[-1];
++
++        JSObject *obj;
++        if (val.isObject()) {
++            obj = RootedObject(cx, &val.toObject()).get();
++        } else {
++            if (val.isNullOrUndefined()) {
++                // |null| and |undefined| are treated as empty objects.
++                // %%% Should really check the flag.
++                obj = NewDenseEmptyArray(cx);
++            } else if (!js_PrimitiveToObject(cx, &val)) {
++                goto error;
++            }
++        }
++
++        // %%% No real meaning; somehow get the iteration id?
++        jsid id;
++        IndexToId(cx, 0, &id); 
++
++        JSString *desc = Atomize(cx, "forin", 5);
++        tx->recordSuspend(cx, obj, id, val, desc, AX_FORIN);
++
++        // Leave the stack intact, since we'll carry out this operation
++        // after the suspend returns.
++        goto handle_tx;
++    }
++#endif
+     uint8_t flags = GET_UINT8(regs.pc);
+     MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
+     if (!ValueToIterator(cx, flags, res))
+@@ -2134,6 +2737,43 @@
+     RootedObject &scope = rootObject1;
+     RootedObject &pobj = rootObject2;
+     RootedShape &prop = rootShape0;
++
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        RootedId &id = rootId0;
++        id = NameToId(name);
++
++        RootedValue &preval = rootValue0;
++        if (tx->lookupName(cx, name, scopeObj, &scope, &pobj, &preval)) {
++            // %%% Should probably record the read also.
++            PUSH_BOOLEAN(true);
++        } else if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop)) {
++            goto error;
++        } else {
++            if (prop) {
++                //prop->get(cx, scope, scopeObj, scope, &preval);
++                //JSObject::getProperty(cx, scopeObj, scope, name, &preval)) {
++                // Add to the read set since the deleting code can
++                // now tell whether the property existed.
++                tx->recordAction(cx, scopeObj, id, JSVAL_VOID, AX_READ);
++                PUSH_BOOLEAN(true);
++            } else {
++                PUSH_BOOLEAN(false);
++            }
++        }
++
++        if (pobj) {
++            // Add to the action sequence as a deletion.
++            RootedValue &delval = rootValue1;
++            delval.setMagic(JS_ARRAY_HOLE);
++            tx->recordAction(cx, scope, id, delval, AX_DELETE);
++        }
++
++        END_CASE(JSOP_DELNAME)
++    }
++#endif
++
+     if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop))
+         goto error;
+ 
+@@ -2157,6 +2797,74 @@
+ 
+     RootedObject &obj = rootObject0;
+     FETCH_OBJECT(cx, -1, obj);
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        jsid id = NameToId(name);
++        RootedObject &pobj = rootObject2;
++        RootedShape &prop = rootShape0;
++
++        // Retrieve the current value.
++        RootedValue &preval = rootValue0;
++        if (tx->lookupProperty(cx, obj, id, &pobj, &preval)) {
++        } else if (!JSObject::lookupProperty(cx, obj, name, &pobj, &prop)) {
++            goto error;
++        } else {
++            if (prop) {
++                //prop->get(cx, pobj, obj, pobj, &preval);
++
++                // Check for an empty-proxy case that was causing crashes.
++                // %%% This is not doing the trick. Look down inside
++                // %%% |JSObject::deleteProperty|.
++                JSObject *sobj = obj;
++                while (IsProxy(sobj)) {
++                    if (!GetProxyPrivate(sobj).isObjectOrNull()) {
++                        js_ReportIsNotDefined(cx, "Deleting property of undefined object");
++                        goto error;
++                    }
++                    sobj = GetProxyTargetObject(sobj);
++                    if (!sobj) {
++                        js_ReportIsNotDefined(cx, "Deleting property of undefined object");
++                        goto error;
++                    }
++                }
++                /*
++                RootedObject &pobj = rootObject2;
++                if (!JSObject::getProperty(cx, obj, pobj, name, &preval)) {
++                    delval.setMagic(JS_ARRAY_HOLE);
++                }
++                */
++
++                // Add a read to the action sequence, since deleting a
++                // property leaks the information that either
++                // 1) the property exists and is not configurable or
++                // 2) the property doesn't exist or is configurable.
++                //
++                // var o = { p1: 1 };
++                // Object.defineProperty(o, "p2", { configurable: false; });
++                // delete p1; // evaluates to |true|
++                // delete p2; // evaluates to |false|
++                // delete p9; // also evaluates to |true|
++                //
++                // %%% Use the actual value.
++                tx->recordAction(cx, obj, id, JSVAL_VOID, AX_READ);
++            }
++        }
++
++        // Add to the action sequence as a deletion.
++        MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
++        if (pobj) {
++            RootedValue &delval = rootValue1;
++            delval.setMagic(JS_ARRAY_HOLE);
++            tx->recordAction(cx, pobj, id, delval, AX_DELETE);
++            res.setBoolean(true);
++        } else {
++            res.setBoolean(false);
++        }
++
++        END_CASE(JSOP_DELPROP)
++    }
++#endif
+ 
+     MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
+     if (!JSObject::deleteProperty(cx, obj, name, res, script->strictModeCode))
+@@ -2173,6 +2881,40 @@
+     RootedValue &propval = rootValue0;
+     propval = regs.sp[-1];
+ 
++#ifdef TxJS
++    // %%% Test this.
++    tx = cx->getRunningTx();
++    if (tx) {
++        jsid id;
++        ValueToId(cx, propval, &id);
++
++        RootedValue &delval = rootValue0;
++        /* %%% Caused crashes on |getName|. Disabling for now.
++        if (tx->getProperty(cx, obj, id, &delval)) {
++        } else {
++            RootedObject &pobj = rootObject2;
++            // %%% Shouldn't be using PropertyName/getProperty here.
++            RootedPropertyName &name = rootName0;
++            name = script->getName(regs.pc);
++            if (!JSObject::getProperty(cx, obj, pobj, name, &delval)) {
++                // %%% Correct/needed?
++                delval = JSVAL_VOID;
++            }
++        }
++        */
++        delval.setMagic(JS_ARRAY_HOLE);
++        
++        // Add to the read set (per logic explained in DELPROP).
++        tx->recordAction(cx, obj, id, delval, AX_READ);
++
++        // Add to the action sequence as a deletion.
++        tx->recordAction(cx, obj, id, delval, AX_DELETE);
++
++        regs.sp--;
++        END_CASE(JSOP_DELELEM)
++    }
++#endif
++
+     MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
+     if (!JSObject::deleteByValue(cx, obj, propval, res, script->strictModeCode))
+         goto error;
+@@ -2247,6 +2989,9 @@
+ BEGIN_CASE(JSOP_ARGINC)
+ {
+     unsigned i = GET_ARGNO(regs.pc);
++#ifdef TxJS
++    // %%% Implement transaction logic.
++#endif
+     if (script->argsObjAliasesFormals()) {
+         const Value &arg = regs.fp()->argsObj().arg(i);
+         Value v;
+@@ -2268,9 +3013,47 @@
+ BEGIN_CASE(JSOP_LOCALINC)
+ {
+     unsigned i = GET_SLOTNO(regs.pc);
++#ifdef TxJS_LOCAL
++    tx = cx->getRunningTx();
++    if (tx) {
++        // Obtain the value for the unaliased local and add it to the
++        // read set (same for all cases).
++        RootedValue &local = rootValue0;
++        if (tx->getUnaliasedLocal(cx, regs.fp(), i, &local)) {
++        } else {
++            local = regs.fp()->unaliasedLocal(i);
++            tx->recordAction(cx, regs.fp(), i, local.get(), AX_READ);
++        }
++
++        // Add it to the write set, with new value (calculated
++        // differently for INC vs. DEC cases).
++        const JSCodeSpec &cs = js_CodeSpec[*regs.pc];
++        if (local.isInt32()) {
++            int32_t vn = local.toInt32();
++            if (vn > JSVAL_INT_MIN && vn < JSVAL_INT_MAX) {
++                int32_t sum = vn + (cs.format & JOF_INC ? 1 : -1);
++                tx->recordAction(cx, regs.fp(), i, Int32Value(sum), AX_WRITE);
++                regs.sp[0] = (cs.format & JOF_POST) ? Int32Value(vn) : Int32Value(sum);
++            }
++        } else {
++            double d;
++            if (!ToNumber(cx, local, &d))
++                goto error;
++
++            double sum = d + (cs.format & JOF_INC ? 1 : -1);
++            tx->recordAction(cx, regs.fp(), i, NumberValue(sum), AX_WRITE);
++            regs.sp[0] = (cs.format & JOF_POST) ? NumberValue(d) : NumberValue(sum);
++            TypeScript::MonitorOverflow(cx, script, regs.pc);
++        }
++
++    } else {
++#endif
+     Value &local = regs.fp()->unaliasedLocal(i);
+     if (!DoIncDec(cx, script, regs.pc, local, &local, &regs.sp[0]))
+         goto error;
++#ifdef TxJS_LOCAL
++    }
++#endif
+     regs.sp++;
+ }
+ END_CASE(JSOP_LOCALINC)
+@@ -2290,13 +3073,115 @@
+     lval = regs.sp[-1];
+ 
+     RootedValue rval(cx);
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        PropertyName *name = GetNameFromBytecode(cx, script, regs.pc, op);
++        jsid id = NameToId(name);
++
++        if (op == JSOP_LENGTH && IsOptimizedArguments(regs.fp(), lval.address())) {
++            // %%% Eeesh, needs refactoring.
++            rval.setInt32(cx->fp()->numActualArgs());
++        } else {
++            if (!lval.isObject()) {
++                // Convert |lval| to an object.
++                if (lval.isNullOrUndefined() || !js_PrimitiveToObject(cx, &lval.get())) {
++                    js_ReportIsNullOrUndefined(cx, JSDVG_SEARCH_STACK, lval, NullPtr());
++                    goto error;
++                }
++            }
++                      
++            JS_ASSERT(lval.isObject());
++            RootedObject &lobj = rootObject0;
++            lobj = &lval.toObject();
++            if (lobj->isArray() && name == cx->runtime->atomState.lengthAtom) {
++                uint32_t len = tx->getArrayLength(cx, lobj);
++                rval.setNumber(len);
++            } else if (tx->getProperty(cx, lobj, id, &rval)) {
++            } else {
++                // Suspend on getters.
++                bool hasGetter = false;
++                if (lobj->isNative()) {
++                    // This call is apparently only for native objects.
++                    // We use this lookup to see if we need to suspend,
++                    // so this should only apply to natives.
++                    //if (!LookupPropertyWithFlags(cx, lobj, HandleId::fromMarkedLocation(&id), cx->resolveFlags, &pobj, &shape))
++                    //    goto error;
++
++                    /* Search scopes starting with lobj and following the prototype link. */
++                    RootedObject current(cx, lobj);
++                    while (true) {
++                        Shape *shape = current->nativeLookup(cx, id);
++                        if (shape) {
++                            if (shape->hasGetterValue())
++                                hasGetter = true;
++                            break;
++                        }
++
++                        /* Try obj's class resolve hook if id was not found in obj's scope. */
++                        Class *clasp = current->getClass();
++                        if (clasp->resolve != JS_ResolveStub) {
++                            // Check some exceptions that can bypass suspension.
++                            if (clasp == &FunctionClass || clasp == &StringClass || clasp == &ErrorClass) {
++                                hasGetter = false;
++                            } else {
++                                hasGetter = true;
++                            }
++                            break;
++                        }
++
++                        RootedObject proto(cx, current->getProto());
++                        if (!proto)
++                            break;
++                        if (!proto->isNative()) {
++                            RootedObject &objp = rootObject1;
++                            RootedShape &propp = rootShape0;
++                            if (!JSObject::lookupGeneric(cx, proto, HandleId::fromMarkedLocation(&id), &objp, &propp))
++                                goto error;
++                            if (propp && propp->hasGetterValue())
++                                hasGetter = true;
++                            break;
++                        }
++
++                        current = proto;
++                    }
++                } else {
++                    RootedShape &shape = rootShape0;
++                    RootedObject &pobj = rootObject1;
++                    if (!JSObject::lookupProperty(cx, lobj, name, &pobj, &shape))
++                        goto error;
++                    if (shape && shape->hasGetterValue()) {
++                        hasGetter = true;
++                    }
++                }
++                if (hasGetter) {
++                    //fprintf(stderr, "Suspending due to getter\n");
++                    JSString *desc = (JSString *)name;
++                    // The value has not been read yet, so pass
++                    // |undefined| rather than |rval|.
++                    tx->recordSuspend(cx, lobj, id, JSVAL_VOID, desc, AX_READ);
++
++                    regs.sp -= 1; // %%% Not sure
++                    goto handle_tx;
++                }
++
++                if (!GetPropertyOperation(cx, regs.pc, &lval, &rval))
++                    goto error;
++            }
++            tx->recordAction(cx, lobj, id, rval.get(), AX_READ);
++        }
++    } else
++#endif
+     if (!GetPropertyOperation(cx, regs.pc, &lval, &rval))
+         goto error;
+ 
++
+     TypeScript::Monitor(cx, script, regs.pc, rval);
+ 
+     regs.sp[-1] = rval;
++#ifndef TxJS
+     assertSameCompartment(cx, regs.sp[-1]);
++#endif
+ }
+ END_CASE(JSOP_GETPROP)
+ 
+@@ -2308,6 +3193,15 @@
+ 
+     HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+ 
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        RootedPropertyName name(cx, script->getName(regs.pc));
++        RootedId &id = rootId0;
++        id = NameToId(name);
++        tx->recordAction(cx, scope, id, value.get(), AX_WRITE);
++    } else
++#endif
+     if (!SetNameOperation(cx, script, regs.pc, scope, value))
+         goto error;
+ 
+@@ -2321,6 +3215,49 @@
+     HandleValue lval = HandleValue::fromMarkedLocation(&regs.sp[-2]);
+     HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+ 
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        RootedObject obj(cx, ToObjectFromStack(cx, lval));
++        if (!obj)
++            goto error;
++        RootedPropertyName name(cx, script->getName(regs.pc));
++
++        RootedShape &shape = rootShape0;
++        RootedId &id = rootId0;
++        id = NameToId(name);
++        RootedObject &pobj = rootObject1;
++        if (obj->isNative()) {
++            // This call is apparently only for native objects. We use
++            // this lookup to see if we need to suspend, so this should
++            // only apply to natives.
++            if (!LookupPropertyWithFlags(cx, obj, id, cx->resolveFlags, &pobj, &shape))
++                goto error;
++        } else {
++            if (!JSObject::lookupProperty(cx, obj, name, &pobj, &shape))
++                goto error;
++        }
++        // Urrgh, the |Shape| system doesn't seem to maintain the 
++        // |suspend_| flag that is conditionally set at creation.
++        // For now, manually check for suspending property names.
++        // %%% It would be better to check the class/constructor of the
++        // %%% object also.
++        // %%% Might need to create a new table that hashes on an
++        // %%% object/property pair and stores a flag for suspend.
++        if (shape && (shape->hasSetterValue() || !shape->hasDefaultSetter()))
++        {
++            // %%% This should get some intrinsic identifier for the
++            // %%% native property.
++            JSString *desc = (JSString *)name;
++            tx->recordSuspend(cx, obj, id, rval.get(), desc, AX_WRITE);
++
++            regs.sp -= 2;
++            goto handle_tx;
++        }
++
++        tx->recordAction(cx, obj, id, rval.get(), AX_WRITE);
++    } else
++#endif
+     if (!SetPropertyOperation(cx, regs.pc, lval, rval))
+         goto error;
+ 
+@@ -2336,9 +3273,127 @@
+     HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
+ 
+     MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        if (lval.isString() && rval.isInt32()) {
++            JSString *fullstr = lval.toString();
++            JSString *charstr = NULL;
++            int32_t i = rval.toInt32();
++            if (size_t(i) < fullstr->length()) {
++                charstr = cx->runtime->staticStrings.getUnitStringForElement(cx, fullstr, size_t(i));
++                if (!charstr)
++                    goto error;
++                res.setString(charstr);
++                jsid id;
++                IndexToId(cx, i, &id);
++                // %%% Record this
++                //tx->recordAction(cx, StringObject(fullstr), id, res.get(), AX_READ);
++                goto foundelem;
++            }
++        }
++
++        StackFrame *fp = cx->fp();
++        if (IsOptimizedArguments(fp, lval.address())) {
++            if (rval.isInt32()) {
++                int32_t i = rval.toInt32();
++                if (i >= 0 && uint32_t(i) < fp->numActualArgs()) {
++                    res.set(fp->unaliasedActual(i));
++                    goto foundelem;
++                }
++            }
++
++            if (!JSScript::argumentsOptimizationFailed(cx, fp->script()))
++                goto error;
++
++            lval.set(ObjectValue(fp->argsObj()));
++            // %%% Record 
++            //tx->recordAction(cx, StringObject(fullstr), id, res.get(), AX_READ);
++        }
++
++        //bool isObject = lval.isObject();
++        RootedObject lobj(cx, ToObjectFromStack(cx, lval));
++        if (!lobj)
++            goto error;
++
++        jsid id = AtomToId(ToAtom(cx, rval));
++        if (tx->getProperty(cx, lobj, HandleId::fromMarkedLocation(&id), res)) {
++        } else {
++            // Suspend on getters.
++            bool hasGetter = false;
++            if (lobj->isNative()) {
++                // This call is apparently only for native objects.
++                // We use this lookup to see if we need to suspend,
++                // so this should only apply to natives.
++                //if (!LookupPropertyWithFlags(cx, lobj, HandleId::fromMarkedLocation(&id), cx->resolveFlags, &pobj, &shape))
++                //    goto error;
++
++                /* Search scopes starting with lobj and following the prototype link. */
++                RootedObject current(cx, lobj);
++                while (true) {
++                    Shape *shape = current->nativeLookup(cx, id);
++                    if (shape) {
++                        if (shape->hasGetterValue() || !shape->hasDefaultGetter())
++                            hasGetter = true;
++                        break;
++                    }
++
++                    // Try obj's class resolve hook if id was not found
++                    // in obj's scope.
++                    if (current->getClass()->resolve != JS_ResolveStub) {
++                        hasGetter = true;
++                        break;
++                    }
++
++                    // Climb the prototype chain to find the property.
++                    RootedObject proto(cx, current->getProto());
++                    if (!proto)
++                        break;
++                    if (!proto->isNative()) {
++                        RootedObject &objp = rootObject1;
++                        RootedShape &propp = rootShape0;
++                        if (!JSObject::lookupGeneric(cx, proto, HandleId::fromMarkedLocation(&id), &objp, &propp))
++                            goto error;
++                        if (propp && propp->hasGetterValue())
++                            hasGetter = true;
++                        break;
++                    }
++
++                    current = proto;
++                }
++            } else {
++                RootedShape &shape = rootShape0;
++                RootedObject &pobj = rootObject1;
++                if (!JSObject::lookupGeneric(cx, lobj, HandleId::fromMarkedLocation(&id), &pobj, &shape))
++                    goto error;
++                if (shape && shape->hasGetterValue()) {
++                    hasGetter = true;
++                }
++            }
++            if (hasGetter) {
++                //fprintf(stderr, "Suspending due to getter\n");
++                JSString *desc = ToAtom(cx, rval);
++                // The value has not been read yet, so pass
++                // |undefined| rather than |rval|.
++                tx->recordSuspend(cx, lobj, id, JSVAL_VOID, desc, AX_READ);
++
++                regs.sp -= 2; // %%% Not sure
++                goto handle_tx;
++            }
++
++            if (!tx_GetElementOperation(cx, tx, op, lval, rval, res))
++                goto error;
++        }
++    } else {
++        // %%% The TypeScript check caused a crash, so bypass it.
++#endif
+     if (!GetElementOperation(cx, op, lval, rval, res))
+         goto error;
+     TypeScript::Monitor(cx, script, regs.pc, res);
++#ifdef TxJS
++    }
++#endif
++  foundelem:
+     regs.sp--;
+ }
+ END_CASE(JSOP_GETELEM)
+@@ -2350,6 +3405,21 @@
+     RootedId &id = rootId0;
+     FETCH_ELEMENT_ID(obj, -2, id);
+     Value &value = regs.sp[-1];
++
++    tx = cx->getRunningTx();
++    if (tx && obj->isTypedArray())
++    {
++        // Typed array objects (e.g. Int32Array) may share a buffer, so
++        // index writes must suspend.
++        // %%% Is there a way to determine if it's shared?
++        // %%% Need to suspend for ArrayBuffer also?
++        JSString *desc = ToAtom(cx, IdToValue(id));
++        tx->recordSuspend(cx, obj, id, value, desc, AX_WRITE);
++
++        regs.sp -= 3;
++        goto handle_tx;
++    }
++
+     if (!SetObjectElementOperation(cx, obj, id, value, script->strictModeCode))
+         goto error;
+     regs.sp[-3] = value;
+@@ -2376,6 +3446,19 @@
+ BEGIN_CASE(JSOP_EVAL)
+ {
+     CallArgs args = CallArgsFromSp(GET_ARGC(regs.pc), regs.sp);
++#ifdef TxJS
++    // Suspend if within a transaction.
++    // %%% Is this right for direct and indirect eval?
++    tx = cx->getRunningTx();
++    if (tx) {
++        JSString *desc = cx->runtime->atomState.evalAtom;
++        tx->recordSuspend(cx, &args, desc);
++
++        Value *newsp = args.spAfterCall();
++        regs.sp = newsp - 1;
++        goto handle_tx;
++    }
++#endif
+     if (IsBuiltinEvalForScope(regs.fp()->scopeChain(), args.calleev())) {
+         if (!DirectEval(cx, args))
+             goto error;
+@@ -2408,11 +3491,216 @@
+     /* Don't bother trying to fast-path calls to scripted non-constructors. */
+     if (!IsFunctionObject(args.calleev(), fun.address()) || !fun->isInterpretedConstructor()) {
+         if (construct) {
++#ifdef TxJS
++            // %%% Presumably there will be some constructors that
++            // %%% should suspend.
++#endif
+             if (!InvokeConstructorKernel(cx, args))
+                 goto error;
+         } else {
++#ifdef TxJS
++            // Suspend on output/code generating function calls.
++            tx = cx->getRunningTx();
++            if (tx) {
++                // Suspend transactions on native function calls.
++                Value calleev = args.calleev();
++                if (calleev.isObject()) {
++                    // Strip a proxy to allow correct comparison to 
++                    // |apply| and |call|.
++                    JSObject *callee = &calleev.toObject();
++                    while (IsFunctionProxy(callee)) {
++                        callee = GetProxyTargetObject(callee);
++                        if (callee->isFunction()) {
++                            calleev = ObjectValue(*callee);
++                        }
++                    }
++                    JSFunction *fun;
++                    if (IsNativeFunction(calleev, js_fun_apply)) {
++
++                        Value funv = args.thisv();
++                        if (funv.isObject() && IsSuspendingFunction(cx, funv.toObject(), &fun)) {
++
++                            // Refactor the stack to create a new
++                            // CallArgs, and pass that to recordAction.
++                            //fprintf(stderr, "Suspending due to apply\n");
++
++                            // Hopefully this is 2: the receiver and
++                            // the arguments array.
++                            uint32_t argc = args.length();
++
++                            //Value recv = args.array()[0];
++
++                            uint32_t newargc;
++                            if (argc >= 2) {
++                                if (args.array()[1].isMagic(JS_OPTIMIZED_ARGUMENTS)) {
++                                    // Conversion necessary if the second
++                                    // arg is the arguments object.
++                                    newargc = cx->fp()->numActualArgs();
++                                    JS_ASSERT(newargc <= StackSpace::ARGS_LENGTH_MAX);
++
++                                    // Knock the |arguments| object off the
++                                    // stack and push the appropriate number
++                                    // of undefined values so there is space
++                                    // for the actual arguments.
++                                    regs.sp--;
++                                    for (uint32_t i=0; i<newargc; i++) {
++                                        PUSH_UNDEFINED();
++                                    }
++
++                                    if (newargc > 0) {
++                                        cx->fp()->forEachUnaliasedActual(CopyTo(regs.sp - newargc));
++                                    }
++                                } else {
++                                    RootedObject aobj(cx, &args.array()[1].toObject());
++                                    if (!GetLengthProperty(cx, aobj, &newargc))
++                                        goto error;
++
++                                    // Knock the arguments array off the stack
++                                    // and push the appropriate number of
++                                    // undefined values so there is space for
++                                    // the actual arguments.
++                                    regs.sp--;
++                                    for (uint32_t i=0; i<newargc; i++) {
++                                        PUSH_UNDEFINED();
++                                    }
++                                    // Fill the stack with the actual arguments.
++                                    if (newargc > 0) {
++                                        if (!GetElements(cx, aobj, newargc, regs.sp - newargc))
++                                            goto error;
++                                    }
++                                }
++                            } else {
++                                newargc = 0;
++                            }
++                                
++                            // Now we can generate the new CallArgs.
++                            CallArgs newargs = CallArgsFromSp(newargc, regs.sp);
++
++                            JSString *desc = fun->atom();
++
++                            tx->recordSuspend(cx, &newargs, desc);
++
++                            // Reset the stack pointer based on the
++                            // original CallArgs.
++                            Value *newsp = args.spAfterCall();
++                            regs.sp = newsp - 1;
++                            goto handle_tx;
++                        }
++                        // If we get here, this should be a call to
++                        // |apply| for a user-defined function, let the
++                        // normal code handle it.
++                    } else if (IsNativeFunction(calleev, js_fun_call)) {
++                        //if (args.callee().isBoundFunction()) {
++                        //    fprintf(stderr, "GOTTA DO SOMETHING!\n");
++                        //}
++                        Value funv = args.thisv();
++                        if (funv.isObject() && IsSuspendingFunction(cx, funv.toObject(), &fun)) {
++
++                            // Refactor the stack to create a new
++                            // CallArgs, and pass that to recordAction.
++
++                            // Ostensibly this is >= 2: the receiver and
++                            // the arguments.
++                            uint32_t argc = args.length();
++
++                            //Value recv = args.array()[0];
++
++                            uint32_t newargc = argc - 1;
++                            /*
++                            if (argc >= 2) {
++                                if (args.array()[1].isMagic(JS_OPTIMIZED_ARGUMENTS)) {
++                                    // Conversion necessary if the second
++                                    // arg is the arguments object.
++                                    newargc = cx->fp()->numActualArgs();
++                                    JS_ASSERT(newargc <= StackSpace::ARGS_LENGTH_MAX);
++
++                                    // Knock the |arguments| object off the
++                                    // stack and push the appropriate number
++                                    // of undefined values so there is space
++                                    // for the actual arguments.
++                                    regs.sp--;
++                                    for (int i=0; i<newargc; i++) {
++                                        PUSH_UNDEFINED();
++                                    }
++
++                                    if (newargc > 0) {
++                                        cx->fp()->forEachUnaliasedActual(CopyTo(regs.sp - newargc));
++                                    }
++                                } else {
++                                    RootedObject aobj(cx, &args.array()[1].toObject());
++                                    if (!GetLengthProperty(cx, aobj, &newargc))
++                                        goto error;
++
++                                    // Knock the arguments array off the stack
++                                    // and push the appropriate number of
++                                    // undefined values so there is space for
++                                    // the actual arguments.
++                                    regs.sp--;
++                                    for (int i=0; i<newargc; i++) {
++                                        PUSH_UNDEFINED();
++                                    }
++                                    // Fill the stack with the actual arguments.
++                                    if (newargc > 0) {
++                                        if (!GetElements(cx, aobj, newargc, regs.sp - newargc))
++                                            return false;
++                                    }
++                                }
++                            }
++                            */
++                                
++                            // Now we can generate the new CallArgs.
++                            CallArgs newargs = CallArgsFromSp(newargc, regs.sp);
++
++                            JSString *desc = fun->atom();
++
++                            tx->recordSuspend(cx, &newargs, desc);
++
++                            // Reset the stack pointer based on the
++                            // original CallArgs.
++                            Value *newsp = args.spAfterCall();
++                            regs.sp = newsp - 1;
++                            goto handle_tx;
++                        }
++                        // If we get here, this should be a call to
++                        // |call| for a user-defined function, let the
++                        // normal code handle it.
++                    } else if (IsSuspendingFunction(cx, args.callee(), &fun)) {
++                        //JSAutoByteString bytes;
++                        //js_AtomToPrintableString(cx, fun->atom(), &bytes);
++                        //fprintf(stderr, "Suspending due to native call: %s\n", bytes.ptr());
++                        JSString *desc = fun->atom();
++                        tx->recordSuspend(cx, &args, desc);
++
++                        Value *newsp = args.spAfterCall();
++                        regs.sp = newsp - 1;
++                        goto handle_tx;
++                    }
++                    // Rewrap the function value if it was undone.
++                    cx->compartment->wrap(cx, &callee);
++                }
++                tx->recordAction(cx, &args);
++            }
++#endif
+             if (!InvokeKernel(cx, args))
+                 goto error;
++#ifdef TxJS
++            /*
++            // %%% This code was here for the case in which it was
++            // %%% determined inside InvokeKernel that a suspend is
++            // %%% necessary. It sets args.suspend_ to true and returns.
++            if (tx && args.suspend()) {
++                suspendDescription = args.callee().toFunction()->atom();
++                suspendType = AX_CALL;
++                suspendArgc = args.length();
++                suspendReceiver = args.thisv().address();
++                suspendValue = args.base();
++                suspendArgs = args.array();
++                suspendId = AtomToId(args.callee().toFunction()->atom()));
++                args.setSuspend(false);
++                goto handle_tx;
++            }
++            */
++#endif
+         }
+         Value *newsp = args.spAfterCall();
+         TypeScript::Monitor(cx, script, regs.pc, newsp[-1]);
+@@ -2437,6 +3725,13 @@
+ 
+     if (!cx->stack.pushInlineFrame(cx, regs, args, *fun, newScript, initial))
+         goto error;
++        
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        tx->recordAction(cx, &args);
++    }
++#endif
+ 
+     SET_SCRIPT(regs.fp()->script());
+     RESET_USE_METHODJIT();
+@@ -2780,6 +4075,19 @@
+ BEGIN_CASE(JSOP_CALLLOCAL)
+ {
+     unsigned i = GET_SLOTNO(regs.pc);
++#ifdef TxJS_LOCAL
++    tx = cx->getRunningTx();
++    if (tx) {
++        RootedValue &val = rootValue0;
++        if (tx->getUnaliasedLocal(cx, regs.fp(), i, &val)) {
++            // %%% Compartment assertion violated? Maybe just use
++            // %%% PUSH_COPY_SKIP_CHECK and hope for the best?
++            PUSH_COPY(val);
++            END_CASE(JSOP_GETLOCAL)
++        }
++        tx->recordAction(cx, regs.fp(), i, regs.fp()->unaliasedLocal(i), AX_READ);
++    }
++#endif
+     PUSH_COPY_SKIP_CHECK(regs.fp()->unaliasedLocal(i));
+ 
+     /*
+@@ -2788,14 +4096,22 @@
+      * method JIT, and a GETLOCAL followed by POP is not considered to be
+      * a use of the variable.
+      */
++#ifndef TxJS
+     if (regs.pc[JSOP_GETLOCAL_LENGTH] != JSOP_POP)
+         assertSameCompartment(cx, regs.sp[-1]);
++#endif
+ }
+ END_CASE(JSOP_GETLOCAL)
+ 
+ BEGIN_CASE(JSOP_SETLOCAL)
+ {
+     unsigned i = GET_SLOTNO(regs.pc);
++#ifdef TxJS_LOCAL
++    tx = cx->getRunningTx();
++    if (tx) {
++        tx->recordAction(cx, regs.fp(), i, regs.sp[-1], AX_WRITE);
++    } else
++#endif
+     regs.fp()->unaliasedLocal(i) = regs.sp[-1];
+ }
+ END_CASE(JSOP_SETLOCAL)
+@@ -2817,6 +4133,21 @@
+     RootedPropertyName &name = rootName0;
+     name = script->getName(regs.pc);
+ 
++#ifdef TxJS
++    /*
++    tx = cx->getRunningTx();
++    if (tx) {
++        // %%% A separate case for the global object is unhandled.
++        RootedId &id = rootId0;
++        id = NameToId(name);
++        // %%% Want a new AX_DEF type?
++        tx->recordAction(cx, obj, id, JSVAL_VOID, AX_WRITE);
++
++        END_CASE(JSOP_DEFVAR)
++    }
++    */
++#endif
++
+     if (!DefVarOrConstOperation(cx, obj, name, attrs))
+         goto error;
+ }
+@@ -2880,6 +4211,19 @@
+     rval = ObjectValue(*fun);
+ 
+     do {
++#ifdef TxJS
++        /*
++        tx = cx->getRunningTx();
++        if (tx) {
++            // Treat a function definition just like a write.
++            RootedId &id = rootId0;
++            id = NameToId(name);
++            tx->recordAction(cx, parent, id, rval, AX_WRITE);
++            continue;
++        }
++        */
++#endif
++
+         /* Steps 5d, 5f. */
+         if (!shape || pobj != parent) {
+             if (!JSObject::defineProperty(cx, parent, name, rval,
+@@ -2932,6 +4276,13 @@
+     RootedFunction &fun = rootFunction0;
+     fun = script->getFunction(GET_UINT32_INDEX(regs.pc));
+ 
++#if 0//def TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        fprintf(stderr, "Need to do something here?\n");
++    }
++#endif
++
+     JSFunction *obj = CloneFunctionObjectIfNotSingleton(cx, fun, regs.fp()->scopeChain());
+     if (!obj)
+         goto error;
+@@ -3046,6 +4397,9 @@
+ {
+     uint8_t i = GET_UINT8(regs.pc);
+     JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
++#ifdef TxJS
++    tx = cx->getRunningTx();
++#endif
+ 
+     RootedObject &obj = rootObject0;
+     if (i == JSProto_Array) {
+@@ -3121,6 +4475,13 @@
+                                 JSPROP_ENUMERATE, 0, 0, 0)) {
+         goto error;
+     }
++#ifdef TxJS
++    // %%% Test this
++    tx = cx->getRunningTx();
++    if (tx) {
++        tx->recordAction(cx, obj, id, rval, AX_WRITE);
++    }
++#endif
+ 
+     regs.sp--;
+ }
+@@ -3144,6 +4505,17 @@
+     RootedId &id = rootId0;
+     FETCH_ELEMENT_ID(obj, -2, id);
+ 
++#ifdef TxJS
++    tx = cx->getRunningTx();
++    if (tx) {
++        // %%% Test this
++        tx->recordAction(cx, obj, id, rref, AX_WRITE);
++        regs.sp -= 2;
++        // %%% Need to do more here?
++        END_CASE(JSOP_INITELEM)
++    }
++#endif
++
+     /*
+      * If rref is a hole, do not call JSObject::defineProperty. In this case,
+      * obj must be an array, so if the current op is the last element
+@@ -3732,6 +5104,87 @@
+ END_CASE(JSOP_ARRAYPUSH)
+ #endif /* JS_HAS_GENERATORS */
+ 
++#ifdef TxJS
++BEGIN_CASE(JSOP_BEGIN_TX)
++{
++    // Get the transaction suspend/end handler.
++    // %%% Need to root?
++    Value tx_handler;
++    POP_COPY_TO(tx_handler);
++
++    if (!BeginTx(cx, tx_handler))
++        goto error;
++}
++END_CASE(JSOP_BEGIN_TX)
++
++BEGIN_CASE(JSOP_END_TX)
++{
++    // Invariant: only the innermost running/dummy transaction can end.
++    tx = cx->getClosingTx();
++    // BEGIN_TX and END_TX should always be matched.
++    JS_ASSERT(tx);
++
++#ifdef TxJS_TRANSPARENT
++    if (tx->inState(TX_DUMMY)) {
++        // Pop the current transaction context.
++        TxContext *doneTx = tx;
++        tx = cx->setTxContext(tx->getNext());
++        // A dummy transaction should never be top-level.
++        JS_ASSERT(tx != NULL);
++        doneTx->finish(cx);
++        cx->free_(doneTx);
++
++        len = JSOP_END_TX_LENGTH;
++        DO_NEXT_OP(len);
++    }
++#endif
++    // Fall through...
++
++  // This label is also used when suspending. The suspending code must
++  // make sure that |tx| is set properly.
++  handle_tx:
++
++    int path = 0;
++    bool newType;
++    if (!IntrospectTx(cx, tx, JSOp(*regs.pc) == JSOP_END_TX, script, &path, &newType))
++        goto error;
++
++    /* Load first op and dispatch it (safe since JSOP_STOP). */
++    if (path == 2) {
++        SET_SCRIPT(regs.fp()->script());
++        RESET_USE_METHODJIT();
++
++#ifdef JS_METHODJIT
++        useMethodJIT = false;
++#endif
++
++        if (!regs.fp()->prologue(cx, newType))
++            return false;
++        if (cx->compartment->debugMode()) {
++            switch (ScriptDebugPrologue(cx, regs.fp())) {
++              case JSTRAP_CONTINUE:
++                break;
++              case JSTRAP_RETURN:
++                interpReturnOK = true;
++                goto forced_return;
++              case JSTRAP_THROW:
++              case JSTRAP_ERROR:
++                return false;
++              default:
++                JS_NOT_REACHED("bad ScriptDebugPrologue status");
++            }
++        }
++        op = (JSOp) *regs.pc;
++        DO_OP();
++    }
++
++    op = (JSOp)*regs.pc;
++    len = js_CodeSpec[op].length;
++    DO_NEXT_OP(len);
++}
++END_CASE(JSOP_END_TX)
++#endif
++
+ #if JS_THREADED_INTERP
+   L_JSOP_BACKPATCH:
+   L_JSOP_BACKPATCH_POP:
+@@ -3867,6 +5320,18 @@
+                 len = 0;
+                 DO_NEXT_OP(len);
+ 
++#ifdef TxJS
++              // Note that the JSTRY_ITER case falls through, so this
++              // case needs to stay above that one.
++              case JSTRY_TX: {
++                // Apply the transaction handler to the speculative
++                // execution up to the point of the exception.
++                JS_ASSERT(JSOp(*regs.pc) == JSOP_END_TX);
++                tx = cx->getClosingTx();
++                goto handle_tx;
++              }
++#endif
++
+               case JSTRY_ITER: {
+                 /* This is similar to JSOP_ENDITER in the interpreter loop. */
+                 JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
+@@ -3904,6 +5369,61 @@
+         goto inline_return;
+ 
+   exit:
++#ifdef TxJS
++#ifdef TxJS_LOCAL
++    TxContext::clearFrameLocals(cx, regs.fp());
++#endif
++    // Resume the transaction if the frame that is returning is a
++    // transaction handler function.
++    if (regs.fp()->suspendedTx()) {
++        
++        // Unsuspend the transaction.
++        tx = regs.fp()->suspendedTx();
++
++        // The TX_RESUME state indicates that further steps are
++        // needed before handing control back to the guest. It
++        // doesn't serve much of a purpose in the inline case, but
++        // is needed for communication in the |Invoke| case.
++        // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
++        JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++        tx->advanceState();
++        regs.fp()->setSuspendedTx(NULL);
++            
++        // Perform actions prior to popping based on suspend type.
++        if (tx->inState(TX_RESUME)) {
++            switch (tx->getSuspend()->type) {
++              case AX_CALL:
++              case AX_WRITE:
++              case AX_READ:
++                // Push the return value of the handler frame.
++                regs.fp()->setReturnValue(tx->getReturnValue());
++                break;
++              default:
++                break;
++            }
++        }
++#ifndef TxJS_NOEXPR
++        else if (tx->inState(TX_DONE)) {
++            regs.fp()->setReturnValue(tx->getReturnValue());
++        }
++#endif
++
++#ifdef TxJS
++        if (tx->inState(TX_RESUME | TX_DONE)) {
++            // An exception occurred within a transaction handler.
++            // If the transaction was suspended, we need to restart
++            // it here.
++            if (tx->inState(TX_RESUME)) {
++                // TX_RESUME -> TX_RUNNING
++                JS_ASSERT(tx->inState(TX_RESUME));
++                tx->advanceState();
++            } else {
++                //regs.pc += JSOP_END_TX_LENGTH;
++            }
++        }
++#endif
++    }
++#endif
+     if (cx->compartment->debugMode())
+         interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
+     if (!regs.fp()->isYielding())

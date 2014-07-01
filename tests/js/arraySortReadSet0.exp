@@ -1,0 +1,4 @@
+0: [object global] / a / B,D,A,C
+1: B,D,A,C / sort / function sort() {
+    [native code]
+}

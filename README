@@ -1,0 +1,75 @@
+
+######## ACKNOWLEDGEMENTS #########
+
+This project is based heavily on the Transcript system built and
+designed by Mohan Dhawan and Vinod Ganapathy at Rutgers University,
+and Chung-chieh Shan at the University of Tsukuba. Many thanks to them
+for their helpfulness along the way.
+
+######## OVERVIEW #########
+
+This directory contains the files necessary to extend the SpiderMonkey
+JavaScript interpreter found in Firefox version 17.0.3esr with support
+for transactions. (The same patch files can be applied to version
+17.0.5esr also.) 
+
+The following subdirectories are included in this package.
+
+doc/: various documentation, hopefully to be expanded
+patch/: diffs for patching the source; see doc/INSTALL for instructions
+txjs/: contains libTx.js, a JS library used for processing transactions
+tests/: a suite of tests; see below for information on running
+snote/: the Secure Note application, pre-instrumented
+
+
+######## GETTING STARTED #########
+
+See the file doc/INSTALL for instructions on obtaining, patching and
+running the supported version of Firefox.
+
+
+######## TESTING #########
+
+The tests/js/ directory contains a myriad of small JavaScript files and
+the expected output in the corresponding .exp files. These tests can
+be run with the Python script at tests/run.py as follows.
+
+./tests/run.py
+
+You may (probably will) need to alter some of the paths in
+tests/config.py to conform with your system. The script was tested with
+this repository checked out as a subdirectory of the $JAMPKG called
+jamscript/, and the current settings reflect that.
+
+There is also an in-browser test suite within tests/ff/. These tests
+must be run manually by setting up a web server to serve that directory
+and accessing the following form of URL (assuming you're using domain
+name fftest).
+
+http://fftest/test.php?script=testcase.js
+
+Each testcase defines a runTest function that does something involving
+transactions when the button is clicked.
+
+
+######### SECURE NOTE ###########
+
+Likewise, the snote/ directory can be set up as a web server to test
+the instrumented Secure Note application. The following is an example
+URL.
+
+http://snote/SNoteDemo.php?script=snote.js
+
+The libTx.js library and the policy.js scripts are included by default.
+The following primary scripts can be provided as the script parameter.
+
+snote.js: the original (uninstrumented) Secure Note application,
+    aggregated with the Midori and AES libraries
+snote.jam.js: Secure Note as instrumented by JAM (after a translation
+    of the instrumentation; this will be automated soon)
+snote.module.js: Secure Note instrumented with modular transactions; this
+    represents how the original Transcript system was envisioned and is
+    how a site administrator might attempt to manually protect a page
+
+
+

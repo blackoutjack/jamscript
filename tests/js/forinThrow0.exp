@@ -1,0 +1,7 @@
+TypeError: a[p] is not a function
+okp1
+okp2
+0
+function concat(s1, s2) {
+  return s1 + s2;
+}

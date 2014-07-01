@@ -1,0 +1,5 @@
+mozilla-esr17/
+tests/browser/
+packages/
+*.pyc
+.svn/

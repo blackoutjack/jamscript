@@ -1,0 +1,50 @@
+--- mozilla-esr17-orig/js/src/jsjam.h	1969-12-31 18:00:00.000000000 -0600
++++ mozilla-esr17/js/src/jsjam.h	2014-05-02 14:57:37.606561652 -0500
+@@ -0,0 +1,47 @@
++/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef jsjam_h___
++#define jsjam_h___
++
++#ifdef TxJS
++
++/*
++ * Built-in JAM functions.
++ */
++extern js::Class JAMClass;
++
++extern JSObject *
++js_InitJAMClass(JSContext *cx, JSObject *obj);
++
++#ifdef TxJS_PROFILE_TX
++JSBool
++js_jam_profileTxEntry(JSContext *cx, TxContext *tx);
++
++JSBool
++js_jam_profileTxEnding(JSContext *cx, TxContext *tx);
++
++JSBool
++js_jam_profileTxSuspension(JSContext *cx, TxContext *tx);
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++JSBool
++js_jam_profileActions(JSContext *, TxContext *);
++
++JSBool
++js_jam_profileActionRetrieval(JSContext *, uint32_t, TxActionType);
++
++JSBool
++js_jam_profileActionCommit(JSContext *, uint32_t, TxActionType);
++
++JSBool
++js_jam_profileActionLookup(JSContext *, uint32_t, TxActionType);
++#endif
++
++#endif
++
++#endif /* jsjam_h___ */

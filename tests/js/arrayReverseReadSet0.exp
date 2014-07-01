@@ -1,0 +1,8 @@
+0: [object global] / a / A,B,C,D
+1: A,B,C,D / reverse / function reverse() {
+    [native code]
+}
+undefined
+D,C,B,A
+D,C,B,A
+D,C,B,A

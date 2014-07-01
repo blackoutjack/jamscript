@@ -1,0 +1,14 @@
+--- mozilla-esr17-orig/js/src/jsatom.tbl	2013-02-15 14:59:21.000000000 -0600
++++ mozilla-esr17/js/src/jsatom.tbl	2014-05-02 14:57:37.602561653 -0500
+@@ -152,3 +152,11 @@
+ DEFINE_ATOM(unwatch, "unwatch")
+ DEFINE_ATOM(watch, "watch")
+ DEFINE_ATOM(_CallFunction, "_CallFunction")
++#ifdef TxJS
++DEFINE_ATOM(type, "type")
++DEFINE_ATOM(obj, "obj")
++DEFINE_ATOM(id, "id")
++DEFINE_ATOM(argc, "argc")
++DEFINE_ATOM(args, "args")
++DEFINE_ATOM(description, "description")
++#endif

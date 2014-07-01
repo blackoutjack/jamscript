@@ -1,0 +1,62 @@
+
+######## INCLUDED JAVASCRIPT SOURCE ########
+
+The following subdirectories contain benchmarks applications and test
+cases for the JAMScript interpreter. These can hopefully be consolidated
+further in the future.
+
+tests/js/ - Contains test cases to exercise the command line interpreter
+  (which is much easier to automate and debug than the browser). These
+  tests can be run with tests/run.py -d DIR, where DIR is the build
+  directory in which the interpreter can be found (e.g.
+  mozilla-esr17/obj-release/browser).
+
+tests/ff/ - This directory contains tests cases and benchmarks to be run
+  in the Firefox browser; you can point a web server to this directory
+  and loading the root URI will invoke index.php, which creates a
+  clickable list of tests cases. I've yet to find a good way to automate
+  these. Adding new test cases involves adding a .js file that defines
+  the runTest() function, and optionally you can provide files with the
+  same base name and extensions .policy.js, .html, .head.html,
+  .profile.js, and .result (which defines a predicate that should be
+  true after the execution of runTest).
+
+jsqrcode/, mwwidgets/, snote/ - These contain output files from the JAM
+  static analysis related to the three applications provided by MIT-LL.
+
+JavaScript source files (with extension .js) found in various
+subdirectories (particularly those listed above) represent the output of
+the JAM weaver under various configurations, or related files for
+comparison. The following is a description of the meaning of each
+extension.
+
+.jam - this extension indicates that the file was output of the weaver,
+  instrumented with transactions as necessary
+
+.seeded - output of the weaver analysis that is "seeded" with some
+  predicates that help rule out spurious instrumentation; this is kind
+  of cheating in lieu of better predicate learning methodology, but
+  demonstrate a potential that exists
+
+.opt - this indicates that the code has been passed through Closure's
+  optimization/minification as a post-processing step
+
+.preprocessed - this is the application run through an initial statement
+  splitting step, but without any instrumentation
+
+.modular - this is a manually-instrumented version of the code; the
+  entire program is enclosed in a transaction rather than targeted
+  transactions placed by the weaver; one goal of the weaving methodology
+  is to show that these files execute more slowly than .jam files
+
+.profile - this indicates that the file has calls to the JAMScript
+  profiling functionality surrounding certain user actions; out-of-box,
+  the time taken between calls to JAMScript.startProfile and
+  JAMScript.stopAndLogProfile (with the same identifier as an argument)
+  will be printed to the stderr stream of the browser; to enable further
+  information (e.g. how many transactions are triggered, etc.) you can
+  uncomment the lines defining TxJS_PROFILE_TX and TxJS_PROFILE_ACTIONS
+  in js/src/jstx.h within your Mozilla source base and rebuild. 
+
+
+%%% Explain profiling in depth

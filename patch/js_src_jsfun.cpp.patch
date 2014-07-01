@@ -1,0 +1,12 @@
+--- mozilla-esr17-orig/js/src/jsfun.cpp	2013-02-15 14:59:22.000000000 -0600
++++ mozilla-esr17/js/src/jsfun.cpp	2014-05-02 14:57:37.606561652 -0500
+@@ -639,7 +639,9 @@
+         // Functions created with the constructor should not be using the
+         // expression body extension.
+         JS_ASSERT_IF(funCon, !exprBody);
++#ifndef TxJS
+         JS_ASSERT_IF(!funCon, src->length() > 0 && chars[0] == '(');
++#endif
+ 
+         // If a function inherits strict mode by having scopes above it that
+         // have "use strict", we insert "use strict" into the body of the

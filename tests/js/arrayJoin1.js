@@ -1,0 +1,10 @@
+// Testcase for array.slice
+var a = new Array("A", "B", "C", "D");
+introspect(JAMScript.process) {
+  var j = a.join("|");
+}
+// The original array is unchanged.
+print(a); // A,B,C,D
+// Prints a string joined by the separator "|"
+print(j); // A|B|C|D
+

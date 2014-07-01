@@ -1,0 +1,5 @@
+0: [object global] / a / 3,4
+1: 3,4 / unshift / function unshift() {
+    [native code]
+}
+A,B,3,4

@@ -1,0 +1,300 @@
+--- mozilla-esr17-orig/js/src/jsinterpinlines.h	2013-02-15 14:59:22.000000000 -0600
++++ mozilla-esr17/js/src/jsinterpinlines.h	2014-06-18 18:11:27.320803262 -0500
+@@ -17,6 +17,10 @@
+ #include "jsnum.h"
+ #include "jsprobes.h"
+ #include "jsstr.h"
++#ifdef TxJS
++#include "jsmath.h"
++#include "jstransaction.h"
++#endif
+ #include "methodjit/MethodJIT.h"
+ 
+ #include "jsfuninlines.h"
+@@ -112,6 +116,29 @@
+     return vp->isMagic(JS_OPTIMIZED_ARGUMENTS);
+ }
+ 
++#ifdef TxJS
++static inline bool
++IsSuspendingFunction(JSContext *cx, JSObject &callee, JSFunction **fun) {
++    if (callee.isFunction()) {
++        *fun = callee.toFunction();
++    } else if (IsFunctionProxy(&callee)) {
++        JSObject *calleep = GetProxyTargetObject(&callee);
++        if (!calleep->isFunction())
++            return false;
++        *fun = calleep->toFunction();
++    }
++
++    if (*fun != NULL && (*fun)->isNative()) {
++        // Implement whitelisting.
++        if (JS_GetFunctionFlags(*fun) & JSFUN_TX_NOSUSPEND)
++            return false;
++        // Suspend on all (unwhitelisted) native calls.
++        return true;
++    }
++    return false;
++}
++#endif
++
+ /*
+  * One optimized consumer of MagicValue(JS_OPTIMIZED_ARGUMENTS) is f.apply.
+  * However, this speculation must be guarded before calling 'apply' in case it
+@@ -270,7 +297,6 @@
+         if (!GetPropertyHelper(cx, obj, id, JSGET_CACHE_RESULT, vp))
+             return false;
+     }
+-
+ #if JS_HAS_NO_SUCH_METHOD
+     if (op == JSOP_CALLPROP &&
+         JS_UNLIKELY(vp.isPrimitive()) &&
+@@ -386,6 +412,15 @@
+      */
+ 
+     RootedObject scope(cx), pobj(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        if (tx->lookupName(cx, name, scopeChain, &scope, &pobj, MutableHandleValue::fromMarkedLocation(vp))) {
++            // Return the value previously assigned to the name.
++            return true;
++        }
++    }
++#endif
+     RootedShape shape(cx);
+     if (!LookupName(cx, name, scopeChain, &scope, &pobj, &shape))
+         return false;
+@@ -418,6 +453,18 @@
+             return false;
+     }
+ 
++#ifdef TxJS
++    if (tx) {
++        // Update the already-created read set node to reflect the value
++        // and the scope in which it was found.
++        //node->obj = pobj.get();
++        // Add the property to the read set, with the head of the scope
++        // chain as the object, and an undefined value.
++        // %%% Need to root?
++        tx->recordAction(cx, scope.get(), NameToId(name), *vp, AX_READ);
++    }
++#endif
++
+     return true;
+ }
+ 
+@@ -660,6 +707,87 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++static JS_ALWAYS_INLINE bool
++tx_GetObjectElementOperation(JSContext *cx, TxContext *tx, JSOp op, HandleObject obj, const Value &rref, MutableHandleValue res)
++{
++#if JS_HAS_XML_SUPPORT
++    // %%% Need to implement
++    if (op == JSOP_CALLELEM && JS_UNLIKELY(obj->isXML())) {
++        jsid id;
++        if (!FetchElementId(cx, obj, rref, &id, res))
++            return false;
++        return js_GetXMLMethod(cx, obj, id, res);
++    }
++#endif
++
++    uint32_t index;
++    if (IsDefinitelyIndex(rref, &index)) {
++        do {
++            // TxJS begin
++            jsid id;
++            IndexToId(cx, index, &id);
++            if (tx->getProperty(cx, obj, HandleId::fromMarkedLocation(&id), res)) {
++                break;
++            } else
++            // TxJS end
++            if (obj->isDenseArray()) {
++                if (index < obj->getDenseArrayInitializedLength()) {
++                    res.set(obj->getDenseArrayElement(index));
++                    if (!res.isMagic())
++                        break;
++                }
++            } else if (obj->isArguments()) {
++                if (obj->asArguments().maybeGetElement(index, res))
++                    break;
++            }
++
++            if (!JSObject::getElement(cx, obj, obj, index, res))
++                return false;
++        } while(0);
++    } else {
++        JSScript *script;
++        jsbytecode *pc;
++        types::TypeScript::GetPcScript(cx, &script, &pc);
++
++        if (script->hasAnalysis())
++            script->analysis()->getCode(pc).getStringElement = true;
++
++        // %%% Not sure what's going on here.
++        SpecialId special;
++        res.set(rref);
++        if (ValueIsSpecial(obj, res, &special, cx)) {
++            // %%% Not handled yet
++            if (!JSObject::getSpecial(cx, obj, obj, special, res))
++                return false;
++            // %%% Not recorded either
++            //tx->recordAction(cx, obj, id, res.get(), AX_READ);
++        } else {
++            JSAtom *name = ToAtom(cx, res);
++            if (!name)
++                return false;
++            // TxJS begin
++            jsid id = AtomToId(name);
++            if (tx->getProperty(cx, obj, HandleId::fromMarkedLocation(&id), res)) {
++            } else
++            // TxJS end
++            if (name->isIndex(&index)) {
++                if (!JSObject::getElement(cx, obj, obj, index, res))
++                    return false;
++            } else {
++                if (!JSObject::getProperty(cx, obj, obj, name->asPropertyName(), res))
++                    return false;
++            }
++            tx->recordAction(cx, obj, id, res.get(), AX_READ);
++        }
++    }
++
++
++    assertSameCompartment(cx, res);
++    return true;
++}
++#endif
++
+ static JS_ALWAYS_INLINE bool
+ GetObjectElementOperation(JSContext *cx, JSOp op, HandleObject obj, const Value &rref, MutableHandleValue res)
+ {
+@@ -720,6 +848,65 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++static JS_ALWAYS_INLINE bool
++tx_GetElementOperation(JSContext *cx, TxContext *tx, JSOp op, MutableHandleValue lref, HandleValue rref,
++                    MutableHandleValue res)
++{
++    JS_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
++
++    if (lref.isString() && rref.isInt32()) {
++        JSString *fullstr = lref.toString();
++        JSString *charstr = NULL;
++        int32_t i = rref.toInt32();
++        if (size_t(i) < fullstr->length()) {
++            charstr = cx->runtime->staticStrings.getUnitStringForElement(cx, fullstr, size_t(i));
++            if (!charstr)
++                return false;
++            res.setString(charstr);
++            jsid id;
++            IndexToId(cx, i, &id);
++            // %%% Record this
++            //tx->recordAction(cx, StringObject(fullstr), id, res.get(), AX_READ);
++            return true;
++        }
++    }
++
++    StackFrame *fp = cx->fp();
++    if (IsOptimizedArguments(fp, lref.address())) {
++        if (rref.isInt32()) {
++            int32_t i = rref.toInt32();
++            if (i >= 0 && uint32_t(i) < fp->numActualArgs()) {
++                res.set(fp->unaliasedActual(i));
++                return true;
++            }
++        }
++
++        if (!JSScript::argumentsOptimizationFailed(cx, fp->script()))
++            return false;
++
++        lref.set(ObjectValue(fp->argsObj()));
++        // %%% Record 
++        //tx->recordAction(cx, StringObject(fullstr), id, res.get(), AX_READ);
++    }
++
++    bool isObject = lref.isObject();
++    RootedObject obj(cx, ToObjectFromStack(cx, lref));
++    if (!obj)
++        return false;
++    if (!tx_GetObjectElementOperation(cx, tx, op, obj, rref, res))
++        return false;
++
++#if JS_HAS_NO_SUCH_METHOD
++    if (op == JSOP_CALLELEM && JS_UNLIKELY(res.isPrimitive()) && isObject) {
++        if (!OnUnknownMethod(cx, obj, rref, res))
++            return false;
++    }
++#endif
++    return true;
++}
++#endif
++
+ static JS_ALWAYS_INLINE bool
+ GetElementOperation(JSContext *cx, JSOp op, MutableHandleValue lref, HandleValue rref,
+                     MutableHandleValue res)
+@@ -774,7 +961,9 @@
+ SetObjectElementOperation(JSContext *cx, Handle<JSObject*> obj, HandleId id, const Value &value, bool strict)
+ {
+     types::TypeScript::MonitorAssign(cx, obj, id);
+-
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++#endif
+     do {
+         if (obj->isDenseArray() && JSID_IS_INT(id)) {
+             uint32_t length = obj->getDenseArrayInitializedLength();
+@@ -783,9 +972,25 @@
+                 if (obj->getDenseArrayElement(i).isMagic(JS_ARRAY_HOLE)) {
+                     if (js_PrototypeHasIndexedProperties(cx, obj))
+                         break;
++#ifdef TxJS
++                    // Update the length property if needed.
++                    if (tx) {
++                        if ((uint32_t)i >= tx->getArrayLength(cx, obj)) {
++                            RootedValue lenval(cx);
++                            lenval.setInt32(i + 1);
++                            tx->recordAction(cx, obj, NameToId(cx->runtime->atomState.lengthAtom), lenval, AX_WRITE);
++                        }
++                    } else
++#endif
+                     if ((uint32_t)i >= obj->getArrayLength())
+                         obj->setArrayLength(cx, i + 1);
+                 }
++#ifdef TxJS
++                if (tx) {
++                    tx->recordAction(cx, obj, id, value, AX_WRITE);
++                    return true;
++                }
++#endif
+                 obj->setDenseArrayElementWithType(cx, i, value);
+                 return true;
+             } else {
+@@ -793,6 +998,9 @@
+                 jsbytecode *pc;
+                 types::TypeScript::GetPcScript(cx, &script, &pc);
+ 
++#ifdef TxJS
++                // %%% Interpose here?
++#endif
+                 if (script->hasAnalysis())
+                     script->analysis()->getCode(pc).arrayWriteHole = true;
+             }
+@@ -800,6 +1008,12 @@
+     } while (0);
+ 
+     RootedValue tmp(cx, value);
++#ifdef TxJS
++    if (tx) {
++        tx->recordAction(cx, obj, id, value, AX_WRITE);
++        return true;
++    }
++#endif
+     return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
+ }
+ 

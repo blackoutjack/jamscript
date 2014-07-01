@@ -1,0 +1,5 @@
+0: [object global] / a / one,two,three,four
+1: one,two,three,four / join / function join() {
+    [native code]
+}
+2: [object global] / sep /  X 

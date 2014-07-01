@@ -1,0 +1,256 @@
+--- mozilla-esr17-orig/js/src/frontend/Parser.cpp	2013-02-15 14:59:19.000000000 -0600
++++ mozilla-esr17/js/src/frontend/Parser.cpp	2014-05-02 14:57:37.598561654 -0500
+@@ -517,6 +517,11 @@
+             return ENDS_IN_OTHER;
+         return HasFinalReturn(pn->last());
+ 
++#ifdef TxJS
++      case PNK_TX:
++        return ENDS_IN_OTHER;
++#endif
++
+       case PNK_IF:
+         if (!pn->pn_kid3)
+             return ENDS_IN_OTHER;
+@@ -1323,6 +1328,7 @@
+     ParseNode *argsbody = ListNode::create(PNK_ARGSBODY, this);
+     if (!argsbody)
+         return false;
++
+     argsbody->setOp(JSOP_NOP);
+     argsbody->makeEmpty();
+ 
+@@ -1608,15 +1614,6 @@
+     if (hasRest)
+         fun->setHasRest();
+ 
+-    if (type == Getter && fun->nargs > 0) {
+-        reportError(NULL, JSMSG_ACCESSOR_WRONG_ARGS, "getter", "no", "s");
+-        return NULL;
+-    }
+-    if (type == Setter && fun->nargs != 1) {
+-        reportError(NULL, JSMSG_ACCESSOR_WRONG_ARGS, "setter", "one", "");
+-        return NULL;
+-    }
+-
+     FunctionBodyType bodyType = StatementListBody;
+ #if JS_HAS_EXPR_CLOSURES
+     if (tokenStream.getToken(TSF_OPERAND) != TOK_LC) {
+@@ -1715,6 +1712,51 @@
+     return pn;
+ }
+ 
++#ifdef TxJS
++bool
++Parser::txArguments(ParseNode* txpn)
++{
++    if (tokenStream.getToken() != TOK_LP) {
++        reportError(NULL, JSMSG_PAREN_BEFORE_FORMAL);
++        return false;
++    }
++    
++    ParseNode *arg = expr();
++    if (!arg) {
++        // %%% Report error.
++        return false;
++    }
++    txpn->pn_left = arg;
++
++    /*
++    ParseNode *argsbody = ListNode::create(PNK_ARGSBODY, this);
++    if (!argsbody)
++        return false;
++
++    argsbody->setOp(JSOP_NOP);
++    argsbody->makeEmpty();
++
++    txpn->pn_left = argsbody;
++
++    if (!tokenStream.matchToken(TOK_RP)) {
++        do {
++            ParseNode *arg = expr();
++            if (!arg)
++                return false;
++            argsbody->append(arg);
++        } while (tokenStream.matchToken(TOK_COMMA));
++    }
++    */
++
++    if (tokenStream.getToken() != TOK_RP) {
++        reportError(NULL, JSMSG_PAREN_AFTER_FORMAL);
++        return false;
++    }
++
++    return true;
++}
++#endif
++
+ ParseNode *
+ Parser::functionStmt()
+ {
+@@ -2777,7 +2819,13 @@
+     }
+ 
+     /* Make a new node for this declarator name (or destructuring pattern). */
++#if 0//def TxJS
++    // %%% This was part of an attempt to allow "transaction" to be used
++    // %%% as an identifier name.
++    JS_ASSERT(parser->tokenStream.currentToken().type == TOK_NAME || parser->tokenStream.currentToken().type == TOK_TX);
++#else
+     JS_ASSERT(parser->tokenStream.currentToken().type == TOK_NAME);
++#endif
+     return NameNode::create(PNK_NAME, atom, parser, parser->pc);
+ }
+ 
+@@ -3706,6 +3754,13 @@
+         return functionStmt();
+       }
+ 
++#ifdef TxJS
++      case TOK_TX:
++      {
++        return txStmt();
++      }
++#endif
++
+       case TOK_IF:
+       {
+         /* An IF node has three kids: condition, then, and optional else. */
+@@ -4096,13 +4151,28 @@
+         }
+ #endif /* JS_HAS_DESTRUCTURING */
+ 
++#if 0//def TxJS
++        // %%% This was an attempt to allow "transaction" to be used as
++        // %%% an identifier name.
++        RootedPropertyName name(context);
++        if (tt == TOK_TX) {
++            
++            name = Atomize(context, "transaction", 11)->asPropertyName(); 
++        } else {
++#endif
++
+         if (tt != TOK_NAME) {
+             if (tt != TOK_ERROR)
+                 reportError(NULL, JSMSG_NO_VARIABLE_NAME);
+             return NULL;
+         }
+ 
++#if 0//def TxJS
++            name = tokenStream.currentToken().name();
++        }
++#else
+         RootedPropertyName name(context, tokenStream.currentToken().name());
++#endif
+         pn2 = NewBindingNode(name, this, varContext);
+         if (!pn2)
+             return NULL;
+@@ -4380,6 +4450,91 @@
+     return pn;
+ }
+ 
++#ifdef TxJS
++ParseNode *
++Parser::txStmt()
++{
++    JS_ASSERT(tokenStream.currentToken().type == TOK_TX);
++
++    ParseNode *pn, *pn1;
++
++    StmtInfoPC stmtInfo(context);
++    PushStatementPC(pc, &stmtInfo, STMT_TX);
++
++    // Transaction statements may optionally be named.
++    // %%% The name doesn't currently serve any purpose.
++    RootedPropertyName name(context);
++    if (tokenStream.getToken(TSF_KEYWORD_IS_NAME) == TOK_NAME)
++        name = tokenStream.currentToken().name();
++    else
++        tokenStream.ungetToken();
++
++    /*
++     * This code models transactions as inline blocks.
++     */
++
++    pn = BinaryNode::create(PNK_TX, this);
++    if (!pn)
++      return NULL;
++    pn->setOp(JSOP_BEGIN_TX);
++
++    /* Parse the "argument list" to get the policy function. */
++    if (!txArguments(pn))
++        return NULL;
++
++    pn1 = statement();
++    if (!pn1)
++        return NULL;
++    pn->pn_right = pn1;
++
++#ifndef TxJS_NOEXPR
++    // Not needed if we don't allow transaction expressions.
++    // To disable expressions, change jsopcode.tbl to indicate
++    // that transaction blocks generate 0 stack values and define
++    // TxJS_NOEXPR in jstx.h.
++    // %%% Disabling expressions currently untested.
++    pn->pn_xflags |= PNX_POPVAR;
++#endif
++
++    PopStatementPC(context, pc);
++
++    return pn;
++}
++
++#ifndef TxJS_NOEXPR
++ParseNode *
++Parser::txExpr()
++{
++    if (!tokenStream.matchToken(TOK_TX))
++        return NULL;
++
++    // This code models transactions as inline blocks.
++    ParseNode *pn, *pn1;
++
++    pn = BinaryNode::create(PNK_TX, this);
++    if (!pn)
++      return NULL;
++    pn->setOp(JSOP_BEGIN_TX);
++
++    /* Parse the "argument list" to get the policy function. */
++    if (!txArguments(pn))
++        return NULL;
++
++    pn1 = statement();
++    if (!pn1)
++        return NULL;
++    pn->pn_right = pn1;
++
++    //PopStatementPC(context, pc);
++
++    // This code models transactions as function invocations.
++    //ParseNode *pn = txDef();
++
++    return pn;
++}
++#endif
++#endif
++
+ JS_ALWAYS_INLINE ParseNode *
+ Parser::condExpr1()
+ {
+@@ -4463,6 +4618,16 @@
+         return returnOrYield(true);
+ #endif
+ 
++#ifdef TxJS
++#ifndef TxJS_NOEXPR
++    // If the right-hand side of the assignment is a transaction,
++    // parse it as such.
++    ParseNode *pn = txExpr();
++    if (pn)
++        return pn;
++#endif
++#endif
++
+     ParseNode *lhs = condExpr1();
+     if (!lhs)
+         return NULL;

@@ -1,0 +1,13 @@
+--- mozilla-esr17-orig/js/src/jsfun.h	2013-02-15 14:59:22.000000000 -0600
++++ mozilla-esr17/js/src/jsfun.h	2014-05-02 14:57:37.606561652 -0500
+@@ -110,7 +110,9 @@
+     }
+ 
+     JSAtom *atom() const { return hasGuessedAtom() ? NULL : atom_.get(); }
+-    void initAtom(JSAtom *atom) { atom_.init(atom); }
++    void initAtom(JSAtom *atom) {
++      atom_.init(atom);
++    }
+     JSAtom *displayAtom() const { return atom_; }
+ 
+     void setGuessedAtom(JSAtom *atom) {

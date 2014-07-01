@@ -1,0 +1,2 @@
+first
+tests/js/print1.js:2:2 ReferenceError: parnt is not defined

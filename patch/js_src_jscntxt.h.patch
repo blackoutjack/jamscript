@@ -1,0 +1,64 @@
+--- mozilla-esr17-orig/js/src/jscntxt.h	2013-02-15 14:59:21.000000000 -0600
++++ mozilla-esr17/js/src/jscntxt.h	2014-05-23 21:53:39.657433850 -0500
+@@ -22,6 +22,9 @@
+ #include "jsgc.h"
+ #include "jspropertycache.h"
+ #include "jspropertytree.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ #include "jsutil.h"
+ #include "prmjtime.h"
+ 
+@@ -1160,6 +1163,51 @@
+     /* Per-context run options. */
+     unsigned            runOptions;          /* see jsapi.h for JSOPTION_* */
+ 
++#ifdef TxJS
++  private:
++    /* Tx data */
++    TxContext *tx_;
++
++    inline TxContext *getTxInState(int state) {
++        TxContext *tx = tx_;
++        while (tx != NULL) {
++            if (tx->inState(state))
++                break;
++            tx = tx->getNext();
++        }
++        return tx;
++    }
++
++  public:
++    inline TxContext *getRunningTx() {
++        return getTxInState(TX_RUNNING);
++    }
++    inline TxContext *getClosingTx() {
++        return getTxInState(TX_RUNNING | TX_DUMMY);
++    }
++    inline TxContext *getSuspendingTx() {
++        return getTxInState(TX_SUSPEND0 | TX_END0);
++    }
++    inline TxContext *getSuspendedTx() {
++        return getTxInState(TX_SUSPEND1 | TX_END1);
++    }
++
++    inline TxContext *getTxContext() { return tx_; }
++    // Return the new transaction to simplify jsinterp.cpp.
++    inline TxContext *setTxContext(TxContext *tx) { tx_ = tx; return tx_; }
++
++    inline const js::Value getIntrospector() {
++        if (hasfp()) {
++            return fp()->script()->getIntrospector();
++        }
++        return JS::UndefinedValue();
++    }
++    inline void setIntrospector(const js::Value &ispect) {
++        JS_ASSERT(hasfp());
++        fp()->script()->setIntrospector(ispect);
++    }
++#endif
++
+   public:
+     int32_t             reportGranularity;  /* see jsprobes.h */
+ 

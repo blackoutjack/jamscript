@@ -1,0 +1,44 @@
+This file describes how to apply the JAMScript patches to Firefox
+17.0.5esr obtained through the /usr/ports system on FreeBSD 9.0.
+Hopefully the steps for 17.0.3esr should be identical (save for 
+obtaining the port itself) since it worked that way in Ubuntu.
+
+0) Obtain the www/firefox port and the www/firefox-esr ports for
+FreeBSD. You can work in the /usr/ports directory, or if you want
+to copy them to an isolated directory, they need to both be within a
+parent directory called www.
+
+1) In the commands shown, we'll assume the following environment
+variables point to the checked-out JAMScript repository root and
+the top of the firefox-esr port directory, respectively.
+
+  JAMSCRIPTPKG=/path/to/jamscript
+  FIREFOXESRPORT=/path/to/www/firefox-esr
+
+2) Extract and patch the firefox-esr files. You may need to use sudo.
+  
+  cd $FIREFOXESRPORT && make extract && make patch
+
+3) Apply all patches. If the port directory is owned by root, you'll
+need to add sudo in front of the patch command.
+
+  cat $JAMSCRIPTPKG/patch/*.patch | patch -d $FIREFOXESRPORT/work/mozilla-esr17 -p1
+
+4) JIT is now supported, so there is no need to disable it.
+
+5) Build the browser with make in the top directory for the port. (I
+haven't yet determined how to rebuild when files are changed. Running
+make again doesn't seem to recognize changes.)
+
+  cd $FIREFOXESRPORT && make
+
+6) If built successfully, you can run the browser as follows.
+
+  ./work/mozilla-esr17/obj-release/browser/dist/bin/firefox
+
+You can also find the js shell at the following location. It is good
+for playing around with how transactions behave and is used by the 
+automated test suite found in ./tests/run.py.
+
+  ./obj-release/browser/dist/bin/js 
+

@@ -1,0 +1,13 @@
+--- mozilla-esr17-orig/js/src/frontend/ParseNode.h	2013-02-15 14:59:19.000000000 -0600
++++ mozilla-esr17/js/src/frontend/ParseNode.h	2014-05-02 14:57:37.598561654 -0500
+@@ -208,6 +208,10 @@
+     PNK_MODASSIGN,
+     PNK_ASSIGNMENT_LAST = PNK_MODASSIGN,
+ 
++#ifdef TxJS
++    PNK_TX,
++#endif
++
+     PNK_LIMIT /* domain size */
+ };
+ 

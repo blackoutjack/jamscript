@@ -1,0 +1,24 @@
+--- mozilla-esr17-orig/js/src/jsarray.h	2013-02-15 14:59:21.000000000 -0600
++++ mozilla-esr17/js/src/jsarray.h	2014-05-02 14:57:37.602561653 -0500
+@@ -14,6 +14,9 @@
+ #include "jspubtd.h"
+ #include "jsatom.h"
+ #include "jsobj.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ /* Small arrays are dense, no matter what. */
+ const unsigned MIN_SPARSE_INDEX = 256;
+@@ -142,4 +145,11 @@
+ JSBool
+ js_Array(JSContext *cx, unsigned argc, js::Value *vp);
+ 
++#ifdef TxJS
++extern JSBool
++js_SetArrayElement(JSContext *cx, js::HandleObject obj, double index, js::HandleValue vp);
++
++extern JSBool
++js_GetArrayElement(JSContext *cx, js::HandleObject obj, double index, JSBool *hole, js::MutableHandleValue vp);
++#endif
+ #endif /* jsarray_h___ */

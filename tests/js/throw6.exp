@@ -1,0 +1,3 @@
+ok
+Caught: xxx is not defined
+tests/js/throw6.js:3:0 ReferenceError: xxx is not defined

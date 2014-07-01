@@ -1,0 +1,34 @@
+--- mozilla-esr17-orig/js/src/methodjit/Compiler.cpp	2013-02-15 14:59:22.000000000 -0600
++++ mozilla-esr17/js/src/methodjit/Compiler.cpp	2014-05-02 14:57:37.622561652 -0500
+@@ -943,6 +943,10 @@
+   restart:
+     if (!cx->methodJitEnabled)
+         return Compile_Abort;
++#ifndef TxJS_LOCAL
++    if (cx->getRunningTx())
++        return Compile_Abort;
++#endif
+ 
+     /*
+      * If an SPS frame has already been pushed and profiling has since been
+@@ -3246,6 +3250,20 @@
+           }
+           END_CASE(JSOP_DEBUGGER)
+ 
++#ifdef TxJS
++          BEGIN_CASE(JSOP_BEGIN_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_BEGIN_TX\n");
++          }
++          END_CASE(JSOP_BEGIN_TX)
++
++          BEGIN_CASE(JSOP_END_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_END_TX\n");
++          }
++          END_CASE(JSOP_END_TX)
++#endif
++
+           default:
+             JS_NOT_REACHED("Opcode not implemented");
+         }

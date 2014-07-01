@@ -1,0 +1,1029 @@
+--- mozilla-esr17-orig/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
++++ mozilla-esr17/js/src/jsjam.cpp	2014-06-18 18:18:57.604790098 -0500
+@@ -0,0 +1,1026 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "jsversion.h"
++#ifdef TxJS
++
++/*
++ * JAM native object package.
++ */
++
++#include "jstypes.h"
++#include "jsapi.h"
++#include "jscntxt.h"
++#include "jsobjinlines.h"
++#include "jsjam.h"
++#include <sys/time.h>
++#include <sys/resource.h>
++
++using namespace js;
++
++#ifdef TxJS_PROFILE_ACTIONS
++const char *actionTypeNames[] = {
++  "AX_NULL (lookup miss)",
++  "AX_READ",
++  "AX_WRITE",
++  "AX_CALL",
++  "AX_DELETE",
++  "AX_FORIN"
++};
++#endif
++
++class JAMProfiler
++{
++  private:
++    typedef HashMap<unsigned,unsigned> TxCounts;
++    
++  public:
++
++    class JAMProfileEntry {
++      private:
++#ifdef TxJS_PROFILE_TX
++        TxCounts *entryCounts;
++        TxCounts *endingCounts;
++        TxCounts *suspensionCounts;
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++        TxCounts *actionRecordCounts;
++        TxCounts *actionRetrievalCounts;
++        TxCounts *actionCommitCounts;
++        TxCounts *actionLookupCounts;
++#endif
++        bool running;
++        JSString *id;
++        int64_t startTime;
++        int64_t endTime;
++#ifdef TxJS_PROFILE_MEM
++        int64_t startMemory;
++#endif
++        JSContext *cx;
++
++      public:
++
++        ~JAMProfileEntry() {
++#ifdef TxJS_PROFILE_TX
++            deleteCounts(&entryCounts);
++            deleteCounts(&endingCounts);
++            deleteCounts(&suspensionCounts);
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++            deleteCounts(&actionRecordCounts);
++            deleteCounts(&actionRetrievalCounts);
++            deleteCounts(&actionCommitCounts);
++            deleteCounts(&actionLookupCounts);
++#endif
++        }
++
++        JSBool
++        deleteCounts(TxCounts **counts) {
++            if (*counts) {
++                (*counts)->finish();
++                delete *counts;
++            }
++            return JS_TRUE;
++        }
++        
++        JSBool
++        initCounts(TxCounts **counts) {
++            deleteCounts(counts);
++            *counts = new TxCounts(TempAllocPolicy(cx));
++            (*counts)->init();
++            if (!(*counts)->initialized()) {
++                fprintf(stderr, "ERROR: could not initialize hash map");
++                return JS_FALSE;
++            }
++            return JS_TRUE;
++        }
++
++        JSBool
++        start(JSContext *cx, JSString *id) {
++
++            this->cx = cx;
++            this->id = id;
++            this->running = true;
++            this->startTime = PRMJ_Now();
++
++#ifdef TxJS_PROFILE_MEM
++            struct rusage u;
++            getrusage(RUSAGE_SELF, &u);
++            this->startMemory = u.ru_maxrss;
++#endif
++
++#ifdef TxJS_PROFILE_TX
++            initCounts(&entryCounts);
++            initCounts(&endingCounts);
++            initCounts(&suspensionCounts);
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++            initCounts(&actionRecordCounts);
++            initCounts(&actionRetrievalCounts);
++            initCounts(&actionCommitCounts);
++            initCounts(&actionLookupCounts);
++#endif
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        stop() {
++            endTime = PRMJ_Now();    
++            running = false;
++            return JS_TRUE;
++        }
++
++#ifdef TxJS_PROFILE_TX
++        JSBool
++        addEntry(const char *script, unsigned line) {
++            // %%% Use script as key also
++            unsigned cnt = 0;
++            if (TxCounts::Ptr p = entryCounts->lookup(line)) {
++                JS_ASSERT(p->key == line);     // Entry contains the key
++                cnt = p->value;     // and value
++                entryCounts->remove(line);
++            }
++            ++cnt;
++            entryCounts->put(line, cnt);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        addEnding(const char *script, unsigned line) {
++            // %%% Use script as key also
++            unsigned cnt = 0;
++            if (TxCounts::Ptr p = endingCounts->lookup(line)) {
++                JS_ASSERT(p->key == line);     // Entry contains the key
++                cnt = p->value;     // and value
++                endingCounts->remove(line);
++            }
++            ++cnt;
++            endingCounts->put(line, cnt);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        addSuspension(const char *script, unsigned line) {
++            // %%% Use script as key also
++            unsigned cnt = 0;
++            if (TxCounts::Ptr p = suspensionCounts->lookup(line)) {
++                JS_ASSERT(p->key == line);     // Entry contains the key
++                cnt = p->value;     // and value
++                suspensionCounts->remove(line);
++            }
++            ++cnt;
++            suspensionCounts->put(line, cnt);
++
++            return JS_TRUE;
++        }
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++        JSBool
++        addActions(uint32_t n, TxActionType type) {
++            unsigned cnt = 0;
++            if (TxCounts::Ptr p = actionRecordCounts->lookup(type)) {
++                JS_ASSERT(p->key == type);
++                cnt = p->value;
++                actionRecordCounts->remove(type);
++            }
++            cnt += n;
++            actionRecordCounts->put(type, cnt);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        addActionRetrieval(uint32_t n, TxActionType type) {
++            unsigned cnt = 0;
++            if (TxCounts::Ptr p = actionRetrievalCounts->lookup(type)) {
++                JS_ASSERT(p->key == type);
++                cnt = p->value;
++                actionRetrievalCounts->remove(type);
++            }
++            cnt += n;
++            actionRetrievalCounts->put(type, cnt);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        addActionCommit(uint32_t n, TxActionType type) {
++            unsigned cnt = 0;
++
++            if (TxCounts::Ptr p = actionCommitCounts->lookup(type)) {
++                JS_ASSERT(p->key == type);
++                cnt = p->value;
++                actionCommitCounts->remove(type);
++            }
++            cnt += n;
++            actionCommitCounts->put(type, cnt);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        addActionLookup(uint32_t n, TxActionType type) {
++            unsigned cnt = 0;
++
++            if (TxCounts::Ptr p = actionLookupCounts->lookup(type)) {
++                JS_ASSERT(p->key == type);
++                cnt = p->value;
++                actionLookupCounts->remove(type);
++            }
++            cnt += n;
++            actionLookupCounts->put(type, cnt);
++
++            return JS_TRUE;
++        }
++#endif
++
++        JSBool
++        printName() {
++            // |id->getChars()| just returns the first character.
++            uint32_t bufsize = id->length() + 1;
++            char *buf = (char*)malloc(bufsize * sizeof(char));
++            JS_PutEscapedString(cx, buf, bufsize, id, '\0');
++            fprintf(stderr, "<<<<< Profile: %s >>>>>\n", buf);
++            free(buf);
++
++            // Output the JavaScript stack.
++            js_DumpBacktrace(cx);
++
++            return JS_TRUE;
++        }
++
++        JSBool
++        printCounts(TxCounts *cnts, const char *header, bool isActions=false) {
++            unsigned tot = 0;
++            fprintf(stderr, "%s\n", header);
++            // %%% Iterate in some sensible order.
++            for (TxCounts::Range r = cnts->all(); !r.empty(); r.popFront()) {
++                unsigned line = r.front().key;
++                unsigned cnt = r.front().value;
++                tot += cnt;
++#ifdef TxJS_PROFILE_ACTIONS
++                if (isActions) {
++                    // Don't print actions without any occurrences.
++                    if (cnt == 0) continue;
++
++                    // Retrieve the action type name when appropriate.
++                    unsigned idx = 0;
++                    if (line > 0) {
++                        idx++;
++                        while (line != 1) {
++                          JS_ASSERT(idx < 32);
++                          line >>= 1;
++                          idx++;
++                        }
++                    }
++                    const char *atype = actionTypeNames[idx];  
++                    fprintf(stderr, "%s/%d\n", atype, cnt);
++                } else
++#endif
++                    fprintf(stderr, "%d/%d\n", line, cnt);
++            }
++            fprintf(stderr, "total/%d\n", tot);
++
++            return JS_TRUE;
++        }
++
++#ifdef TxJS_PROFILE_TX
++        JSBool
++        printEntryCounts() {
++            return printCounts(entryCounts, "===== Transaction blocks entered =====\nline/count");
++        }
++
++        JSBool
++        printEndingCounts() {
++            return printCounts(endingCounts, "===== Transaction blocks ended =====\nline/count");
++        }
++
++        JSBool
++        printSuspensionCounts() {
++            return printCounts(suspensionCounts, "===== Transaction suspensions =====\nline/count");
++        }
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++        JSBool
++        printActionCounts() {
++            return printCounts(actionRecordCounts, "===== Actions recorded =====\ntype/count", true);
++        }
++
++        JSBool
++        printActionRetrievalCounts() {
++            return printCounts(actionRetrievalCounts, "===== Actions retrieved =====\ntype/count", true);
++        }
++
++        JSBool
++        printActionCommitCounts() {
++            return printCounts(actionCommitCounts, "===== Actions committed =====\ntype/count", true);
++        }
++
++        JSBool
++        printActionLookupCounts() {
++            return printCounts(actionLookupCounts, "===== Actions values looked up =====\ntype/count", true);
++        }
++#endif
++
++        JSBool
++        printTimeElapsed() {
++            int64_t start = getStartTime();
++            int64_t end = getEndTime();
++            //int64_t tot = (end - start) / PRMJ_USEC_PER_MSEC;
++            int64_t tot = (end - start);
++            fprintf(stderr, "===== Time elapsed: %ldus =====\n", tot);
++            return JS_TRUE;
++        }
++
++#ifdef TxJS_PROFILE_MEM
++        JSBool
++        printMemoryStats() {
++            int64_t start = getStartMemory();
++            int64_t max = getMaxMemory();
++            int64_t used = (max - start);
++            fprintf(stderr, "===== Memory max: %ldKB =====\n", max);
++            fprintf(stderr, "===== Memory gain: %ldKB =====\n", used);
++            return JS_TRUE;
++        }
++
++        int64_t getStartMemory() {
++            return startMemory;
++        }
++
++        int64_t getMaxMemory() {
++            struct rusage u;
++            getrusage(RUSAGE_SELF, &u);
++            return u.ru_maxrss;
++        }
++#endif
++
++        int64_t getStartTime() {
++            return startTime;
++        }
++
++        int64_t getEndTime() {
++            // Return the current time if the profile has not ended.
++            if (running) {
++              endTime = PRMJ_Now();    
++            }
++            return endTime;
++        }
++
++        bool isRunning() {
++            return running;
++        }
++    };
++
++  private:
++    typedef HashMap<JSString*,JAMProfileEntry*> ProfileMap;
++    ProfileMap *profileMap;
++
++  public:
++    JSBool
++    printProfile(JAMProfileEntry *pe)
++    {
++        pe->printName();
++        pe->printTimeElapsed();
++#ifdef TxJS_PROFILE_MEM
++        pe->printMemoryStats();
++#endif
++#ifdef TxJS_PROFILE_TX
++        pe->printEntryCounts();
++        pe->printEndingCounts();
++        pe->printSuspensionCounts();
++#endif
++#ifdef TxJS_PROFILE_ACTIONS
++        pe->printActionCounts();
++        pe->printActionRetrievalCounts();
++        pe->printActionCommitCounts();
++        pe->printActionLookupCounts();
++#endif
++
++        return JS_TRUE;
++    }
++    
++    JSBool
++    printProfile(JSContext *cx, JSString *id)
++    {
++        if (!profileMap)
++            return JS_FALSE;
++
++        ProfileMap::Ptr p = profileMap->lookup(id);
++        if (p) {
++            JS_ASSERT(p->key == id);
++            JAMProfileEntry *pe = p->value;
++            printProfile(pe);
++            return JS_TRUE;
++        }
++        return JS_FALSE;
++    }
++
++    JSBool
++    startProfile(JSContext *cx, JSString *id)
++    {
++        if (!profileMap) {
++            profileMap = new ProfileMap(TempAllocPolicy(cx));
++            profileMap->init();
++        }
++        
++        ProfileMap::Ptr p = profileMap->lookup(id);
++        JAMProfileEntry *entry;
++        if (p) {
++            entry = p->value;
++        } else {
++            entry = new JAMProfileEntry();
++            profileMap->put(id, entry);
++        }
++        return entry->start(cx, id);
++    }
++
++    JSBool
++    stopProfile(JSContext *cx, JSString *id)
++    {
++        if (!profileMap)
++            return JS_FALSE;
++
++        ProfileMap::Ptr p = profileMap->lookup(id);
++        if (p) {
++            JS_ASSERT(p->key == id);
++            JAMProfileEntry *pe = p->value;
++            pe->stop();
++            return JS_TRUE;
++        }
++        
++        return JS_FALSE;
++    }
++
++    JSBool
++    removeProfile(JSContext *cx, JSString *id)
++    {
++        if (!profileMap)
++            return JS_FALSE;
++
++        ProfileMap::Ptr p = profileMap->lookup(id);
++        if (p) {
++            JS_ASSERT(p->key == id);
++            JAMProfileEntry *pe = p->value;
++            delete pe;
++            profileMap->remove(p);
++            if (profileMap->count() == 0) {
++              profileMap->finish();
++              delete profileMap;
++              profileMap = NULL;
++            }
++            return JS_TRUE;
++        }
++
++        return JS_FALSE;
++    }
++
++#ifdef TxJS_PROFILE_TX
++    JSBool
++    addEntry(const char *filename, unsigned line)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addEntry(filename, line))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++
++    JSBool
++    addEnding(const char *filename, unsigned line)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addEnding(filename, line))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++
++    JSBool
++    addSuspension(const char *filename, unsigned line)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addSuspension(filename, line))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++    JSBool
++    addActions(TxContext *tx)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        TxActionType type;
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                type = AX_WRITE;
++                if (!pe->addActions(tx->getWriteCount(), type))
++                    return JS_FALSE;
++                type = AX_READ;
++                if (!pe->addActions(tx->getReadCount(), type))
++                    return JS_FALSE;
++                type = AX_CALL;
++                if (!pe->addActions(tx->getCallCount(), type))
++                    return JS_FALSE;
++                type = AX_DELETE;
++                if (!pe->addActions(tx->getDeleteCount(), type))
++                    return JS_FALSE;
++                type = AX_FORIN;
++                if (!pe->addActions(tx->getForinCount(), type))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++
++    JSBool
++    addActionRetrieval(uint32_t cnt, TxActionType type)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addActionRetrieval(cnt, type))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++
++    JSBool
++    addActionCommit(uint32_t cnt, TxActionType type)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addActionCommit(cnt, type))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++
++    JSBool
++    addActionLookup(uint32_t cnt, TxActionType type)
++    {
++        if (!profileMap)
++            return JS_TRUE;
++
++        for (ProfileMap::Range r = profileMap->all(); !r.empty(); r.popFront()) {
++            JAMProfileEntry *pe = r.front().value;
++            if (pe->isRunning()) {
++                if (!pe->addActionLookup(cnt, type))
++                    return JS_FALSE;
++            }
++        }
++        return JS_TRUE;
++    }
++#endif
++
++    JSBool
++    isActive()
++    {
++      return !!profileMap;
++    }
++};
++
++JAMProfiler profiler;
++
++Class JAMClass = {
++    js_JAM_str,
++    JSCLASS_HAS_CACHED_PROTO(JSProto_JAM),
++    JS_PropertyStub,         /* addProperty */
++    JS_PropertyStub,         /* delProperty */
++    JS_PropertyStub,         /* getProperty */
++    JS_StrictPropertyStub,   /* setProperty */
++    JS_EnumerateStub,
++    JS_ResolveStub,
++    JS_ConvertStub
++};
++
++#ifdef TxJS_PROFILE_TX
++JSBool
++js_jam_profileTxEntry(JSContext *cx, TxContext *tx)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++#ifdef TxJS_TRANSPARENT
++    if (tx->inState(TX_DUMMY))
++      return JS_TRUE;
++#endif
++
++#ifdef DEBUG
++    if (tx->getNext()) {
++      StackIter i(cx);
++      if (i.isScript()) {
++          const char *filename = JS_GetScriptFilename(cx, i.script());
++          unsigned line = JS_PCToLineNumber(cx, i.script(), i.pc());
++          fprintf(stderr, "WARNING: nested %d %s:%d\n", tx->depth(), filename, line);
++      } else {
++          fprintf(stderr, "WARNING: nested %d\n", tx->depth());
++      }
++    }
++#endif
++
++
++    StackIter i(cx);
++    if (i.isScript()) {
++        const char *filename = JS_GetScriptFilename(cx, i.script());
++        unsigned line = JS_PCToLineNumber(cx, i.script(), i.pc());
++        profiler.addEntry(filename, line);
++        return JS_TRUE;
++    }
++    return JS_FALSE;
++}
++
++JSBool
++js_jam_profileTxSuspension(JSContext *cx, TxContext *tx)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++    StackIter i(cx);
++    if (i.isScript()) {
++        const char *filename = JS_GetScriptFilename(cx, i.script());
++        unsigned line = JS_PCToLineNumber(cx, i.script(), i.pc());
++        profiler.addSuspension(filename, line);
++        return JS_TRUE;
++    }
++    return JS_FALSE;
++}
++
++JSBool
++js_jam_profileTxEnding(JSContext *cx, TxContext *tx)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++    
++    StackIter i(cx);
++    if (i.isScript()) {
++        const char *filename = JS_GetScriptFilename(cx, i.script());
++        unsigned line = JS_PCToLineNumber(cx, i.script(), i.pc());
++        profiler.addEnding(filename, line);
++        return JS_TRUE;
++    }
++    return JS_FALSE;
++}
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++JSBool
++js_jam_profileActions(JSContext *cx, TxContext *tx)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++    profiler.addActions(tx);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_profileActionRetrieval(JSContext *cx, uint32_t cnt, TxActionType type)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++    profiler.addActionRetrieval(cnt, type);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_profileActionCommit(JSContext *cx, uint32_t cnt, TxActionType type)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++    profiler.addActionCommit(cnt, type);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_profileActionLookup(JSContext *cx, uint32_t cnt, TxActionType type)
++{
++    if (!profiler.isActive())
++      return JS_TRUE;
++
++    profiler.addActionLookup(cnt, type);
++    return JS_TRUE;
++}
++#endif
++
++JSBool
++js_jam_startProfile(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (args.length() == 0) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    JSString *profid = ToString(cx, args[0]);
++    JSBool ok = profiler.startProfile(cx, profid);
++
++    vp->setBoolean(ok);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_stopProfile(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (args.length() == 0) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    JSString *profid = ToString(cx, args[0]);
++    JSBool ok = profiler.stopProfile(cx, profid);
++    if (ok) ok = profiler.printProfile(cx, profid);
++    if (ok) ok = profiler.removeProfile(cx, profid);
++
++    vp->setBoolean(ok);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_setDynamicIntrospector(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (argc == 0) {
++        cx->fp()->script()->setIntrospector(JSVAL_VOID);
++        args.rval().setBoolean(true);
++        return JS_TRUE;
++    }
++
++    cx->fp()->script()->setIntrospector(args[0]);
++    vp->setBoolean(true);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_identical(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (argc < 2) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    Value &lval = args[0];
++    Value &rval = args[1];
++    bool stricteq;
++    if (!StrictlyEqual(cx, lval, rval, &stricteq))
++        return JS_FALSE;
++
++    if (stricteq) {
++        args.rval().setBoolean(true);
++        return JS_TRUE;
++    }
++
++    if (lval.isObject() && rval.isObject()) {
++
++        JSObject *lobj = &lval.toObject();
++        JSObject *robj = &rval.toObject();
++
++        // Strip any proxies.
++        while (IsProxy(lobj)) {
++            lval = GetProxyPrivate(lobj);
++            if (lval.isObject()) {
++                lobj = &lval.toObject();
++            } else {
++                args.rval().setBoolean(false);
++                return JS_TRUE;
++            }
++        }
++        while (IsProxy(robj)) {
++            rval = GetProxyPrivate(robj);
++            if (rval.isObject()) {
++                robj = &rval.toObject();
++            } else {
++                args.rval().setBoolean(false);
++                return JS_TRUE;
++            }
++        }
++
++        bool checkStrict = false;
++        while (lobj->isFunction()) {
++            if (!lobj->isBoundFunction())
++                break;
++            // For some reason, using |getBoundFunctionTarget|
++            // produces linking errors. It's simple enough to
++            // replicate: the target is stored in parent.
++            lobj = lobj->getParent();
++            checkStrict = true;
++        }
++        while (robj->isFunction()) {
++            if (!robj->isBoundFunction())
++                break;
++            // See comment for |lobj| above.
++            robj = robj->getParent();
++            checkStrict = true;
++        }
++
++        if (checkStrict) {
++            // Recheck strict identify after the root bound
++            // functions are located.
++            lval = ObjectValue(*lobj);
++            rval = ObjectValue(*robj);
++            if (!StrictlyEqual(cx, lval, rval, &stricteq))
++                return JS_FALSE;
++
++            if (stricteq) {
++                args.rval().setBoolean(true);
++                return JS_TRUE;
++            }
++        }
++
++        if (checkStrict || lobj->global() != robj->global()) {
++
++            // %%% What about prototypes and other native objects?
++            if (lobj->isFunction() && robj->isFunction()) {
++                JSFunction *lfun = lobj->toFunction();
++
++                JSFunction *rfun = robj->toFunction();
++
++                if (lfun->isNative() && rfun->isNative()) {
++                    bool eq;
++                    if (!EqualStrings(cx, JS_GetFunctionId(lfun), JS_GetFunctionId(rfun), &eq))
++                        return JS_FALSE;
++                    if (eq) {
++                        args.rval().setBoolean(true);
++                        return JS_TRUE;
++                    }
++                }
++            }
++        }
++    } 
++    args.rval().setBoolean(false);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_instanceof(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (argc < 2) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    Value lval = args[0];
++    Value rval = args[1];
++    if (rval.isPrimitive())
++        return JS_FALSE;
++
++    // Strip any proxies.
++    JSObject *lobj = NULL;
++    if (lval.isObject()) {
++        lobj = &lval.toObject();
++        while (IsProxy(lobj)) {
++            lval = GetProxyPrivate(lobj);
++            if (lval.isObject()) {
++                lobj = &lval.toObject();
++            } else {
++                args.rval().setBoolean(false);
++                return JS_TRUE;
++            }
++        }
++    }
++    JSObject *robj = &rval.toObject();
++    while (IsProxy(robj)) {
++        rval = GetProxyPrivate(robj);
++        if (rval.isObject()) {
++            robj = &rval.toObject();
++        } else {
++            args.rval().setBoolean(false);
++            return JS_TRUE;
++        }
++    }
++
++    // Check the normal case.
++    RootedObject obj(cx, robj);
++    JSBool result;
++    if (!HasInstance(cx, obj, &lval, &result))
++        return JS_FALSE;
++    if (result) {
++        args.rval().setBoolean(true);
++        return JS_TRUE;
++    }
++
++    // Check for cross-compartment prototype relations.
++    // %%% Since each object class can have it's own |hasInstance|
++    // %%% handler, we focus for now on |Function| objects. This means
++    // %%% that only functions should be used as the rhs of |instanceof|
++    // %%% in a JAM policy.
++    if (lobj && robj->isFunction()) {
++        RootedObject obj(cx, robj);
++
++        while (obj->isFunction()) {
++            // See comment in |js_jam_identical| above.
++            if (!obj->isBoundFunction())
++                break;
++            obj = obj->getParent();
++        }
++
++        RootedValue pval(cx);
++        if (!JSObject::getProperty(cx, obj, obj, cx->runtime->atomState.classPrototypeAtom, &pval))
++            return JS_FALSE;
++
++        if (pval.isPrimitive()) {
++            /*
++             * Throw a runtime error if instanceof is called on a function that
++             * has a non-object as its .prototype value.
++             */
++            RootedValue val(cx, ObjectValue(*obj));
++            js_ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, NullPtr());
++            return JS_FALSE;
++        }
++
++        JSObject *pobj = &pval.toObject();
++        while ((lobj = lobj->getProto()) != NULL) {
++            // This is the altered check. Under normal circumstances,
++            // the objects themselves are compared.
++            // %%% Is this sound?
++            if (lobj->getClass() == pobj->getClass()) {
++                args.rval().setBoolean(true);
++                return JS_TRUE;
++            }
++        }
++    }
++
++    args.rval().setBoolean(false);
++    return JS_TRUE;
++}
++
++static JSFunctionSpec jam_static_methods[] = {
++    JS_FN("startProfile",   js_jam_startProfile,  1, JSFUN_TX_NOSUSPEND),
++    JS_FN("stopProfile",    js_jam_stopProfile,   1, JSFUN_TX_NOSUSPEND),
++    JS_FN("setDynamicIntrospector", js_jam_setDynamicIntrospector, 1, JSFUN_TX_NOSUSPEND),
++    JS_FN("instanceof", js_jam_instanceof, 2, JSFUN_TX_NOSUSPEND),
++    JS_FN("identical", js_jam_identical, 2, JSFUN_TX_NOSUSPEND),
++    JS_FS_END
++};
++
++JSObject *
++js_InitJAMClass(JSContext *cx, JSObject *obj_)
++{
++    RootedObject obj(cx, obj_);
++    RootedObject JAM(cx, NewObjectWithClassProto(cx, &JAMClass, NULL, obj));
++    if (!JAM || !JSObject::setSingletonType(cx, JAM))
++        return NULL;
++
++    if (!JS_DefineProperty(cx, obj, js_JAM_str, OBJECT_TO_JSVAL(JAM),
++                           JS_PropertyStub, JS_StrictPropertyStub, 0)) {
++        return NULL;
++    }
++
++    if (!JS_DefineFunctions(cx, JAM, jam_static_methods))
++        return NULL;
++
++    MarkStandardClassInitializedNoProto(obj, &JAMClass);
++
++    return JAM;
++}
++
++#endif

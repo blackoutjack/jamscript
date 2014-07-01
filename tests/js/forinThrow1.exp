@@ -1,0 +1,10 @@
+handler called
+handler called
+handler called
+TypeError: a[p] is not a function
+ok;p1
+ok;p2
+0
+function concat(s1, s2) {
+  return s1 + s2;
+}

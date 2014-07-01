@@ -1,0 +1,71 @@
+
+The JAMScript system (the enforcement mechanism targeted by the JAM
+policy weaver) is implemented as an extension to the JavaScript language
+through the addition of a "transaction" keyword. This file explains the
+syntax and semantics of transaction blocks. Due to the relative 
+immaturity of the implementation, this description is subject to change;
+features that are incomplete or liable to change are noted in the text.
+
+========== Syntax ==========
+
+A transaction block is delimited by the keyword "transaction," followed
+by an argument list containing a single expression, followed by an
+open curly brace, followed by a block of zero or more statements,
+followed by a close curly brace. NOTE: currently there is support for
+one and only one expression in the argument list; the parser allows
+variable number but the semantics is undefined when more or less are
+provided. NOTE: a transaction block must currently be a statement in
+the program (as opposed to an expression; explore the difference between
+a function statement and function expression if you're not sure of the
+distinction); transaction expressions may be supported in the future.
+
+The argument to the transaction block should evaluate to a function
+value. This is the "handler" function that will introspect on the state
+of the transaction when it suspended and finishes. A non-function value
+will throw an exception. The block surrounded by the curly braces can be
+any number of JavaScript statements to be executed speculatively. The
+"Semantics" section below will further explain what this actually means.
+
+========== Semantics ==========
+
+The code inside a transaction block is executed speculatively; that is,
+actions (reads, writes and calls) that occur during interpretation of
+the block are recorded, and the writes are intercepted prior to
+affecting the state of memory. Reads that occur in the block are kept
+consistent by looking up the current value (i.e. the value that would
+have been retrieved if the code were executing freely) in a shadow
+memory that is updated with the values of the intercepted writes. Calls
+to user-defined functions are recorded and also carried out during the
+speculative execution. Calls to native functions will, in most cases,
+suspend the transaction; the semantics of suspending transactions is
+explained further below. NOTE: currently there is a configuration in the
+interpreter code that determines whether transactions suspend on all
+native calls or only on calls to a few blacklisted functions; the likely
+eventual solution will be to suspend on all with whitelisted exceptions,
+but this is not implemented yet. NOTE: for technical reasons, when a
+for-in loop is reached, the transaction is suspended.
+
+When the transaction block finishes (or suspends), the function value
+provided as the argument to the transaction will be invoked, with a
+"transaction object" as its first (and only) argument. This object
+provides a handle to retrieve information about the actions that
+occurred during the speculative execution. If the handler function
+does nothing, then the program state will remain unmodified, as if
+the transaction block had never been executed. To apply the actions
+to the program state, the "commit" method of the transaction object
+is called, applying all the speculative writes. When the handler
+function is invoked by the suspend/finish mechanism, the speculative
+transaction context is escaped, such that actions carried out by the
+handler code are made directly in the program state; i.e. the handler
+function is a trusted context that introspects on the untrusted code
+enclosed in the transaction block.
+
+%%% TODO
+Other methods of the transaction object
+The semantics of suspending
+The libTx.js library
+Nested transactions
+
+
+
+
