@@ -24,7 +24,7 @@ if (typeof policy !== "object") {
   }());
 }
 
-var PERFORMANCE_TESTING = false;
+const PERFORMANCE_TESTING = false;
 
 // Define the JAMScript property to be read-only.
 Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
