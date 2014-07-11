@@ -1,15 +1,12 @@
-
 // We assume that first, some policy.js has been included in a script
 // tag in the HTML page, and then this file, followed by all others.
-// Allow testing in the JS shell.
-if (typeof alert === "undefined" && typeof print === "function") {
-  alert = print;
-}
+
+const PERFORMANCE_TESTING = true;
 
 // If no policy is provided, use a default. It either allows or
 // disallows everything, based on DEFAULT_ALLOW.
 if (typeof policy !== "object") {
-  var DEFAULT_ALLOW = true;
+  const DEFAULT_ALLOW = true;
   // See file txjs/policy.template.js for documentation of the format
   // of policy objects.
   function process(tx) {
@@ -24,26 +21,10 @@ if (typeof policy !== "object") {
   }());
 }
 
-const PERFORMANCE_TESTING = false;
-
 // Define the JAMScript property to be read-only.
 Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
 
-  // Configuration options for debugging.
-  var BYPASS_BIND = false;
-  var BYPASS_CALL = false;
-  var BYPASS_CALLINTROSPECT = false;
-  var BYPASS_NEWINTROSPECT = false;
-  var BYPASS_NEW = false;
-  var BYPASS_SET = false;
-  var BYPASS_PERFORM = false;
-  var BYPASS_PERFORM_WRITE = false;
-  var BYPASS_PERFORM_CALL = false;
-  var BYPASS_WRAP_HTML = false;
-  var BYPASS_WRAP_HTML_EVENT = false;
-
   // Close over some native values and objects that may be needed.
-  var _global = this;
   var _undefined = undefined;
   var _eval = eval;
   var _Function = Function;
@@ -74,23 +55,13 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     var _document_writeln = document.writeln;
 
     // These are to call for effect from within methods.
-    var _document_createDocumentFragment = document.createDocumentFragment.bind(_document);
     var _document_getElementById = document.getElementById.bind(_document);
     var _document_createElement = document.createElement.bind(_document);
-    var _document_getElementsByTagName = document.getElementsByTagName.bind(_document);
-    var _document_getElementsByClassName = document.getElementsByClassName.bind(_document);
 
     var _HTMLScriptElement = _document_createElement('script').constructor;
     var _HTMLIFrameElement = _document_createElement('iframe').constructor;
 
     // Dynamically wrap various properties of DOM nodes.
-  }
-
-  if (typeof Element === "object") {
-    var _setAttribute = Element.prototype.setAttribute;
-    var _appendChild = Element.prototype.appendChild;
-    var _insertBefore = Element.prototype.insertBefore;
-    var _replaceChild = Element.prototype.replaceChild;
   }
 
   if (typeof console === "object")
@@ -118,20 +89,10 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     }
   }
 
-  // This is tricky. It allows us to specify an introspector that can be
-  // retrieved within a string argument.
-  var tmpIntrospector = null;
-
   return {
     introspectors: pol.introspectors,
 
     process: function(tx) {
-      // For debugging.
-      //var rs = tx.getReadSequence();
-      //alert(JAMScript.rwsetToString(rs));
-      //var ws = tx.getWriteSequence();
-      //alert(JAMScript.rwsetToString(ws));
-
       tx.commit();
       if (tx.isSuspended()) {
         JAMScript.performAction(tx);
@@ -155,14 +116,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       throw new Error(msg);
     },
 
-    setTmpIntrospector: function(ispect) {
-      tmpIntrospector = ispect;
-    },
-
-    getTmpIntrospector: function() {
-      return tmpIntrospector;
-    },
-
     isEval: function(e) {
       return e === _eval;
     },
@@ -176,21 +129,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         _console.log(message);
       } else if (_alert) {
         print(message);
-      }
-    },
-
-    // Initialize profiling counts for the given id.
-    startProfile: function(id) {
-      // Start a behind-the-scenes profile.
-      if (typeof JAM === 'object' && JAM.startProfile) {
-        JAM.startProfile(id);
-      }
-    },
-
-    stopProfile: function(id) {
-      // Stop the behind-the-scenes profiling.
-      if (typeof JAM === 'object' && JAM.stopProfile) {
-        JAM.stopProfile(id);
       }
     },
 
@@ -225,64 +163,11 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     },
 
     wrapHTMLEventScript: function(elt, html) {
-      if (BYPASS_WRAP_HTML_EVENT) {
-        return html;
-      }
-      /*
-      try {
-        x.x;
-      } catch (e) {
-        alert("wrapHTMLScript: " + e.stack);
-      }
-      */
       if (elt instanceof HTMLElement) {
         var frag = _document_createElement(elt.tagName);
         frag.innerHTML = html;
         recursiveWrap(frag);
         var wrapped = frag.innerHTML;
-      }
-      return frag.innerHTML;
-    },
-
-    wrapHTMLScript: function(elt, html) {
-      if (BYPASS_WRAP_HTML) {
-        return html;
-      }
-      /*
-      try {
-        x.x;
-      } catch (e) {
-        alert("wrapHTMLScript: " + e.stack);
-      }
-      */
-      if (elt instanceof Document || elt instanceof DocumentFragment) {
-        // %%% Uuuuuugly.
-        //alert("\n\nHTML\n\n" + html);
-        var doctype = "";
-        if (html.startsWith("<!DOCTYPE")) {
-          var doctypeEnd = html.indexOf('>') + 1;
-          if (doctypeEnd > 0) {
-            var doctype = html.substring(0, doctypeEnd);
-            html = html.substring(doctypeEnd);
-          }
-        }
-        var frag = _document_createElement('html');
-        frag.innerHTML = html;
-        /*
-        var doc = document.implementation.createHTMLDocument('temp');
-        doc.write(html);
-        var frag = doc.documentElement;
-        */
-        recursiveWrap(frag);
-        var wrapped = frag.innerHTML;
-        //alert("\n\nFRAG\n\n" + wrapped);
-      } else if (elt instanceof HTMLElement) {
-        var frag = _document_createElement(elt.tagName);
-        frag.innerHTML = html;
-        recursiveWrap(frag);
-        var wrapped = frag.innerHTML;
-      } else {
-        alert("Non-element: " + elt);
       }
       return frag.innerHTML;
     },
@@ -298,10 +183,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       // General notes:
       // * |HTMLElement.prototype.setAttribute| cannot be used to
       //   trigger parsing of |innerHTML|.
-
-      if (BYPASS_BIND) {
-        return _bind_apply(f, args);
-      }
 
       var len = args.length;
 
@@ -489,14 +370,10 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       //   original arguments.
 
       // This is a tricky way to maintain the semantics of |new|.
-      function cproxy(argArray) {
+      var cproxy = function(argArray) {
         return c.apply(this, argArray);
-      }
+      };
       cproxy.prototype = c.prototype;
-
-      if (BYPASS_NEW) {
-        return new cproxy(args);
-      }
 
       var len = args.length; 
 
@@ -518,15 +395,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       // General notes:
       // * |HTMLElement.prototype.setAttribute| cannot be used to
       //   trigger parsing of |innerHTML|.
-
-      if (BYPASS_CALL) {
-        // %%% Closure-ize this.
-        try{
-        return f.apply(rec, args);
-        }catch(ex){
-          JAMScript.log("EX0: " + ex.message + "\n" + ex.stack);
-        }
-      }
 
       var len = args.length;
 
@@ -721,11 +589,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     },
 
     callIntrospect: function(f, rec, args, ispect) {
-      if (BYPASS_CALLINTROSPECT) {
-        // %%% Closure-ize this.
-        return f.apply(rec, args);
-      }
-
       var len = args.length;
 
       /*
@@ -799,11 +662,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     },
  
     newIntrospect: function(c, args, ispect) {
-      if (BYPASS_NEWINTROSPECT) {
-        // %%% Closure-ize this.
-        return JAMScript.new(c, args);
-      }
-
       var node = { type: "call", value: c, obj: rec, null: args, argc: args.length }
       if (ispect(node) || PERFORMANCE_TESTING) {
         return JAMScript.new(c, args);
@@ -827,9 +685,6 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       //   ``when adding a src attribute to an element that already
       //     contains an inline script, the script referenced by the src
       //     attribute will not be loaded.''
-
-
-      if (BYPASS_SET) return obj[memb] = val;
 
       // %%% Need to be more general? |Node|, perhaps?
       if (obj instanceof HTMLElement) {
@@ -895,383 +750,166 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       // for suspend on for-in loops, (done for techical reasons).
       var desc = sx.description;
 
-      switch (type) {
+      if (type === "write") {
         // Transaction suspensions caused by assignment to a property.
-        case "write":
-          var writeValue = sx.value;
+        var writeValue = sx.value;
 
-          if (BYPASS_PERFORM || BYPASS_PERFORM_WRITE) {
-            obj[prop] = writeValue;
-            tx.setRetval(writeValue);
-            break;
-          }
-
-          if (typeof prop === "string" && prop.startsWith("on")) {
-            // Wrap event handlers in transaction blocks.
-            writeValue = JAMScript.wrapFunction(tx.getHandler(), writeValue, false);
+        if (typeof prop === "string" && prop.startsWith("on")) {
+          // Wrap event handlers in transaction blocks.
+          writeValue = JAMScript.wrapFunction(tx.getHandler(), writeValue, false);
+        } else if (prop === "innerHTML") {
+          // Intervene for constructs that can generate dynamic code.
+          if (obj instanceof _HTMLScriptElement) {
+            writeValue = "introspect(JAMScript.introspectors.processAll) { " + writeValue + " };";
           } else {
-            switch (prop) {
-              // Intervene for constructs that can generate dynamic code.
-              case "innerHTML":
-                if (obj instanceof _HTMLScriptElement) {
-                  writeValue = "introspect(JAMScript.introspectors.processAll) { " + writeValue + " };";
-                } else {
-                  writeValue = JAMScript.wrapHTMLEventScript(obj, writeValue);
-                }
-                break;
-
-              default:
-                break;
-            }
+            writeValue = JAMScript.wrapHTMLEventScript(obj, writeValue);
           }
-          //alert("obj: " + obj + " prop: " + prop + " writeValue: " + writeValue);
-          obj[prop] = writeValue;
+        }
+        obj[prop] = writeValue;
 
-          // Set the return value.
-          tx.setRetval(writeValue);
-          break;
+        // Set the return value.
+        tx.setRetval(writeValue);
 
+      } else if (type === "call") {
         // Transaction suspensions caused by call to a function.
-        case "call":
 
-          // Get the function that triggered the suspend.
-          var fun = sx.value;
-          // And the arguments.
-          var args = sx.args;
-          var len = args.length;
+        // Get the function that triggered the suspend.
+        var fun = sx.value;
+        // And the arguments.
+        var args = sx.args;
+        var len = args.length;
 
-          var ret;
-
-          if (BYPASS_PERFORM || BYPASS_PERFORM_CALL) {
-            ret = _apply_apply(fun, [obj, args]);
-            tx.setRetval(ret);
-            break;
-          }
-
-          switch (desc) {
-            /*
-            case "__defineGetter__":
-              // Calling apply causes problems with these methods.
-              var arg0 = sx.argc > 0 ? args[0] : _undefined;
-              var arg1 = sx.argc > 1 ? args[1] : _undefined;
-              //JAMScript.log("getter: " + arg1);
-              obj.__defineGetter__(arg0, arg1);
-              break;
-            case "__defineSetter__":
-              // Calling apply causes problems with these methods.
-              var arg0 = sx.argc > 0 ? args[0] : _undefined;
-              var arg1 = sx.argc > 1 ? args[1] : _undefined;
-              obj.__defineSetter__(arg0, arg1);
-              break;
-            */
-            case "sort":
-              // Array.prototype.sort may invoke a user-provided
-              // comparison function.
-              if (args.length >= 1) {
-                args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
-              }
-              ret = fun.apply(obj, args);
-              break;
-            case "addEventListener":
-              // For |addEventListener|, the first argument is the type
-              // of event and the second (index 1) is the event handler.
-              // There may be optional further arguments.
-              // %%% What if the second argument is an |EventListener|
-              // %%% rather than a simple |Function|?
-              args[1] = JAMScript.wrapFunction(tx.getHandler(), args[1], false);
-              ret = fun.apply(obj, args);
-              break;
-            
-            case "removeEventListener":
-              // The second argument must specify the |Function| or
-              // |EventListener| to remove, so we need to maintain a
-              // mapping from the "original" functions to their
-              // wrapped version. The latter is the value to pass as
-              // second argument, if it exists in the mapping. If not,
-              // use the passed argument (which should cover the case
-              // in which the user retrieves the current event handler
-              // and requests that it be removed, as opposed to
-              // requesting that a reference to the original, unwrapped
-              // function value be removed.
-              // %%% Implement mapping described above.
-              ret = fun.apply(obj, args);
-              break;
-
-            case "setTimeout":
-            case "setInterval":
-              // %%% Currently assumes args[0] is a function object
+        var ret;
+        switch (desc) {
+          case "sort":
+            // Array.prototype.sort may invoke a user-provided
+            // comparison function.
+            if (args.length >= 1) {
               args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
-              ret = fun.apply(obj, args);
-              break;
-                  
-            case "clearInterval":
-              // %%% See comment for |removeEventListener|.
-              ret = fun.apply(obj, args);
-              break;
+            }
+            ret = fun.apply(obj, args);
+            break;
+          case "addEventListener":
+            // For |addEventListener|, the first argument is the type
+            // of event and the second (index 1) is the event handler.
+            // There may be optional further arguments.
+            // %%% What if the second argument is an |EventListener|
+            // %%% rather than a simple |Function|?
+            args[1] = JAMScript.wrapFunction(tx.getHandler(), args[1], false);
+            ret = fun.apply(obj, args);
+            break;
+          
+          case "removeEventListener":
+            // The second argument must specify the |Function| or
+            // |EventListener| to remove, so we need to maintain a
+            // mapping from the "original" functions to their
+            // wrapped version. The latter is the value to pass as
+            // second argument, if it exists in the mapping. If not,
+            // use the passed argument (which should cover the case
+            // in which the user retrieves the current event handler
+            // and requests that it be removed, as opposed to
+            // requesting that a reference to the original, unwrapped
+            // function value be removed.
+            // %%% Implement mapping described above.
+            ret = fun.apply(obj, args);
+            break;
 
-            case "Function":
-              // %%% What happens in non-string cases?
-              if (len > 0) {
-                //args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
-              }
-              ret = fun.apply(obj, args);
-              if (typeof ret === "function") {
-                ret = JAMScript.wrapFunction(JAMScript.introspectors.processAll, ret, true)
-              }
-              break;
-               
-            case "eval":
-              // Given that the callsite transformation will handle all
-              // direct calls to |eval|, we can assume this is indirect.
+          case "setTimeout":
+          case "setInterval":
+            // %%% Currently assumes args[0] is a function object
+            args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
+            ret = fun.apply(obj, args);
+            break;
+                
+          case "clearInterval":
+            // %%% See comment for |removeEventListener|.
+            ret = fun.apply(obj, args);
+            break;
 
-              // Per MDN, SpiderMonkey no longer supports |eval| with
-              // more than 1 argument.
-              // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-              JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-              ret = fun.apply(obj, args);
-              JAM.setDynamicIntrospector();
-              /*
-              if (len > 0) {
-                var code = args[0];
-                if (typeof code === "string") {
-                  // We need to use the comprehensive introspector here.
-                  //JAMScript.setTmpIntrospector(tx.getHandler());
-                  ret = _eval("introspect(JAMScript.introspectors.processAll) { " + code + " };");
-                } else {
-                  // Per MDN (link above), |eval| return the value
-                  // unchanged if it isn't a string.
-                  ret = code;
-                }
-              } else {
-                ret = fun.apply(obj, args);
-              }
-              */
-              break;
+          case "Function":
+            // %%% What happens in non-string cases?
+            if (len > 0) {
+              //args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
+            }
+            ret = fun.apply(obj, args);
+            if (typeof ret === "function") {
+              ret = JAMScript.wrapFunction(JAMScript.introspectors.processAll, ret, true)
+            }
+            break;
+             
+          case "eval":
+            // Given that the callsite transformation will handle all
+            // direct calls to |eval|, we can assume this is indirect.
 
-            case "writeln":
-            case "write":
-              // %%% Test this once it has a chance of working
-              //domString += args[0].toString();
-              //writeDOM(tx, b, c);
-              //args[0] = JAMScript.wrapHTMLScript(obj, args[0]);
-              JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-              ret = fun.apply(obj, args);
-              JAM.setDynamicIntrospector();
-              break;
+            // Per MDN, SpiderMonkey no longer supports |eval| with
+            // more than 1 argument.
+            // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
+            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            ret = fun.apply(obj, args);
+            JAM.setDynamicIntrospector();
+            break;
 
-            case "appendChild":
-            case "replaceChild":
-            case "insertBefore":
-              /*
-              // For |appendChild|, |replaceChild| and |insertBefore|,
-              // the first argument is the element to be inserted.
-              // %%% Is this needed, given that |innerHTML| is covered?
-              var elt = args[0];
-              if (elt instanceof HTMLElement) {
-                // Wrap scripts within the |innerHTML| of this element.
-                elt.innerHTML = JAMScript.wrapHTMLScript(elt, elt.innerHTML);
-              }
-              */
-              //JAMScript.log("1) f: " + fun + " fname: " + fun.name + " rec: " + obj + " args: " + args);
-              JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-              ret = fun.apply(obj, args);
-              JAM.setDynamicIntrospector();
-              break;
+          case "writeln":
+          case "write":
+            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            ret = fun.apply(obj, args);
+            JAM.setDynamicIntrospector();
+            break;
 
-            case "apply":
-              // Pass through if this is the internal _bind_apply.
-              if (fun === _apply) {
-                //JAMScript.log("APPLY1 fun: " + fun + " obj: " + obj + " argc: " + sx.argc);
-                fun = obj;
-                obj = sx.argc > 0 ? args[0] : _undefined;
-                args = sx.argc > 1 ? args[1] : _undefined;
-                //JAMScript.log("APPLY2 fun: " + fun + " obj: " + obj + " argc: " + sx.argc);
-              }
-              ret = fun.apply(obj, args);
-              break;
+          case "appendChild":
+          case "replaceChild":
+          case "insertBefore":
+            // For |appendChild|, |replaceChild| and |insertBefore|,
+            // the first argument is the element to be inserted.
+            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            ret = fun.apply(obj, args);
+            JAM.setDynamicIntrospector();
+            break;
 
-            case "call":      
-              // %%% Not sure what code path this takes in the
-              // %%% interpreter, so not sure of the reason why we
-              // %%% would want to suspend on a call to |call|.
-              //JAMScript.log("CALL1 fun: " + fun + " obj: " + obj + " argc: " + sx.argc);
+          case "apply":
+            // Pass through if this is the internal _bind_apply.
+            if (fun === _apply) {
               fun = obj;
               obj = sx.argc > 0 ? args[0] : _undefined;
-              args = sx.argc > 1 ? _Array_slice(args, 1) : _undefined;
-              //JAMScript.log("CALL2 fun: " + fun + " obj: " + obj + " argc: " + sx.argc);
-              // Fall through
-          
-            // Below this line, all cases are just for documentation and
-            // fall through to the default case.
+              args = sx.argc > 1 ? args[1] : _undefined;
+            }
+            ret = fun.apply(obj, args);
+            break;
 
-            case "removeChild":
-              // This induces a change in the DOM, so it must suspend.
-          
-            case "setAttribute":
-            case "setAttributeNS":
-            case "setAttributeNode":
-            case "setAttributeNodeNS":
-              // %%% Should this somehow reuse the logic from the
-              // %%% "write" group to handle, e.g. writes to the |src|
-              // %%% property?
-              // %%% Need to do something to sanitize potential script
-              // %%% insertions here at any rate.
+          case "call":      
+            // %%% Not sure what code path this takes in the
+            // %%% interpreter, so not sure of the reason why we
+            // %%% would want to suspend on a call to |call|.
+            fun = obj;
+            obj = sx.argc > 0 ? args[0] : _undefined;
+            args = sx.argc > 1 ? _Array_slice(args, 1) : _undefined;
+            // Fall through
 
-            case "getAttribute":
-              // %%% This may not need to suspend, depending on the code
-              // %%% path that the interpreter uses to satisfy this
-              // %%% call. I.e. if a call to |getAttribute| is follows
-              // %%% some path in the interpreter in which JAMScript
-              // %%% intervenes to produce the right value, there's no
-              // %%% need to suspend.
-              
-            case "getPropertyValue":
-              // This is used on CSSStyleDeclaration objects to get CSS
-              // properties, which are often differently named than the
-              // corresponding JavaScript property. For example,
-              // %%% Confirm this correspondence.
-              // style.borderRadius === style.getPropertyValue("border-radius")
-          
-            case "setRequestHeader":
-              // Can exfiltrate data via an XMLHttpRequest object.
-              // This has further relevance in the domain of add-on devel.
-              // https://developer.mozilla.org/en-US/docs/Setting_HTTP_request_headers
-          
-            case "preventDefault":
-              // This changes some intrinsic property of the receiver.
-              // %%% Understand the implications.
-              
-            case "createEvent":
-            case "initMouseEvent":
-            case "initKeyEvent":
-            case "initDragEvent":
-            case "initUIEvent":
-            case "initMessageEvent":
-            case "initMutationEvent":
-              // %%% Understand the implication of event generation.
-            case "dispatchEvent":
-            case "captureEvents":
-            case "releaseEvents":
-            case "stopPropagation":
-              // These affects event propagation behavior.
-              // %%% Understand the implications.
+          default:
+            ret = _apply_apply(fun, [obj, args]);
+            break;
+        }
 
-            case "open":
-              // This suspends to give the policy an opportunity to
-              // prevent the call.
-              // %%% Can this generate code that somehow runs in the
-              // %%% current context? If so can we enclose it somehow?
-            case "close":
-              // No particular intervention needed here.
-        
-            case "send":
-              // Same reasoning for suspension as |open|.
-
-            case "createTextNode":
-            case "createDocumentFragment":
-            case "cloneNode":
-            case "createComment":
-            case "createElement":
-              // There shouldn't be any script wrapping needed at this
-              // particular juncture. All effects of these calls are
-              // contained only in memory.
-            case "getElementById":
-            case "getElementsByTagName":
-            case "getElementsByClassName":
-            case "querySelectorAll":
-            case "compareDocumentPosition":
-            case "getAttributeNode":
-              // %%% Still needed?
-              //if (domString) { writeDOM(tx,b,c); }
-          
-            case "print":
-              // Since we're generating (irreversible) output, we
-              // suspend the transaction on |print| to allow the policy
-              // to intervene.
-            case "alert":
-              // This suspends for the same reason as print, but also
-              // because of technical issues of hanging up the GUI if
-              // we do try to call |alert| while still in a transaction.
-          
-            case "getBoundingClientRect":
-            case "scroll":
-            case "scrollBy":
-            case "scrollByLines":
-            case "scrollByPages":
-            case "focus":
-            case "getComputedStyle":
-              // These all induce or depend on changes to the GUI.
-
-            default:
-              //JAMScript.log("fun: " + fun + " fun.name: " + fun.name + " obj: " + obj + " args: " + args);
-              ret = _apply_apply(fun, [obj, args]);
-              break;
-          }
-
-          // Set the return value.
-          tx.setRetval(ret);
-          break;
-
+        // Set the return value.
+        tx.setRetval(ret);
+      } else if (type === "forin") {
         // Transaction suspensions caused by entering a for-in loop.
-        case "forin":
-          // Do nothing, we just rely on the commit to sync the state
-          // of the transaction with the heap.
-          break;
 
-        case "read":
-          //_console.log("obj: " + obj + " prop: " + prop);
-          // %%% May need to wrap a user-defined getter in a tx.
-          var ret = obj[prop];
-          //_console.log("ret: " + ret);
-          tx.setRetval(ret);
-          break;
-
+        // Do nothing, we just rely on the commit to sync the state
+        // of the transaction with the heap.
+      } else if (type === "read") {
+        // %%% May need to wrap a user-defined getter in a tx.
+        var ret = obj[prop];
+        //_console.log("ret: " + ret);
+        tx.setRetval(ret);
+      } else {
         // Other suspension types.
         // %%% May need to handle these in the future.
-        default:
-          alert("Unhandled suspend type: " + type);
-          break;
+        alert("Unhandled suspend type: " + type);
       }
 
       return;
     },
-
-    dump: function(obj, depth) {
-      if (typeof obj !== "object" && typeof obj !== "function") {
-        // Just print a primitive as is.
-        alert(obj);
-        return;
-      }
-      if (typeof depth == "undefined") {
-        // Default value for prototype depth.
-        depth = 1;
-      }
-
-      //var str = "";
-      //for (var p in obj) {
-      //  var v = obj[p];
-      //  str += p + ": " + v + "\n";
-      //}
-      //alert(str);
-      alert(Object.getOwnPropertyNames(obj));
-      if (depth > 0 && obj.__proto__) {
-        // Recurse up the prototype chain.
-        this.dump(obj.__proto__, depth - 1);
-      }
-    },
-
-    // %%% Maybe make |TxAction.prototype.toString()| do this or similar.
-    rwsetToString: function(rwset) {
-      var str = "";
-      for (var i=0; i<rwset.length; i++) {
-        str += i + ":\n";
-        // %%% Explicitly enumerate rather than using for-in.
-        for (var p in rwset[i]) {
-          str += "\t" + p + ": " + rwset[i][p] + "\n";
-        }
-      }
-      return str;
-    }
   };
 
 }(policy)) } );
