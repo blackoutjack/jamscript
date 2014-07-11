@@ -12,50 +12,6 @@ const BYPASS_SET = false;
 const BYPASS_WRAP_HTML_EVENT = false;
 const BYPASS_PERFORM = false;
 
-// Allow testing scripts with |alert| in the JS shell.
-if (typeof alert === "undefined" && typeof print === "function") {
-  alert = print;
-}
-
-// Additional methods useful for debugging.
-JAMScript.dump = function(obj, depth) {
-  if (typeof obj !== "object" && typeof obj !== "function") {
-    // Just print a primitive as is.
-    alert(obj);
-    return;
-  }
-  if (typeof depth == "undefined") {
-    // Default value for prototype depth.
-    depth = 1;
-  }
-
-  //var str = "";
-  //for (var p in obj) {
-  //  var v = obj[p];
-  //  str += p + ": " + v + "\n";
-  //}
-  //alert(str);
-  alert(Object.getOwnPropertyNames(obj));
-  if (depth > 0 && obj.__proto__) {
-    // Recurse up the prototype chain.
-    this.dump(obj.__proto__, depth - 1);
-  }
-};
-
-// %%% Maybe make |TxAction.prototype.toString()| do this or similar.
-JAMScript.rwsetToString = function(rwset) {
-  var str = "";
-  for (var i=0; i<rwset.length; i++) {
-    str += i + ":\n";
-    // %%% Explicitly enumerate rather than using for-in.
-    for (var p in rwset[i]) {
-      str += "\t" + p + ": " + rwset[i][p] + "\n";
-    }
-  }
-  return str;
-};
-
-
 // Override some methods to bypass protection for debugging.
 JAMScript.bindOrig = JAMScript.bind;
 JAMScript.bind = function(f, args) {

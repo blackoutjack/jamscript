@@ -24,6 +24,7 @@ MWWIDGETS_DIR = os.path.join(JAMSCRIPTDIR, 'mwwidgets')
 JSQRCODE_DIR = os.path.join(JAMSCRIPTDIR, 'jsqrcode')
 TXLIBDIR = os.path.join(JAMSCRIPTDIR, 'txjs')
 TXLIB = os.path.join(TXLIBDIR, 'libTx.js')
+TXDBGLIB = os.path.join(TXLIBDIR, 'libTxDbg.js')
 TXTESTDIR = os.path.join(TESTDIR, 'js')
 
 # Constants used when running JAMScript tests

@@ -1,7 +1,12 @@
 // We assume that first, some policy.js has been included in a script
 // tag in the HTML page, and then this file, followed by all others.
 
-const PERFORMANCE_TESTING = true;
+const PERFORMANCE_TESTING = false;
+
+// Allow testing scripts with |alert| in the JS shell.
+if (typeof alert === "undefined" && typeof print === "function") {
+  alert = print;
+}
 
 // If no policy is provided, use a default. It either allows or
 // disallows everything, based on DEFAULT_ALLOW.
@@ -128,7 +133,9 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       } else if (_console) {
         _console.log(message);
       } else if (_alert) {
-        print(message);
+        _alert(message);
+      } else if (_print) {
+        _print(message);
       }
     },
 
@@ -155,7 +162,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         var args = _Array_slice(arguments, 0);
         var ret;
         introspect(hdlr) {
-          ret = fn.apply(rec, args);
+          ret = _apply_apply(fn, [rec, args]);
         }
         return ret;
       };
@@ -371,7 +378,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
 
       // This is a tricky way to maintain the semantics of |new|.
       var cproxy = function(argArray) {
-        return c.apply(this, argArray);
+        return _apply_apply(c, [this, argArray]);
       };
       cproxy.prototype = c.prototype;
 
@@ -468,7 +475,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
           // recognized statically and handled differently.
           //args[0] = "introspect(JAMScript.process) { " + args[0] + " };";
           JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          var ret = f.apply(rec, args);
+          var ret = _apply_apply(f, [rec, args]);
           JAM.setDynamicIntrospector();
           return ret;
         } else if (f === _Function) {
@@ -495,7 +502,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
           // %%% Test each of these cases.
           //JAMScript.log("1) f: " + f + " fname: " + fname + " rec: " + rec + " args: " + args);
           JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          var ret = f.apply(rec, args);
+          var ret = _apply_apply(f, [rec, args]);
           JAM.setDynamicIntrospector();
           return ret;
         }
@@ -533,14 +540,14 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
               if (rec instanceof _HTMLScriptElement) {
                 //JAMScript.log("2) f: " + f + " fname: " + fname + " rec: " + rec + " args: " + args);
                 JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-                var ret = f.apply(rec, args);
+                var ret = _apply_apply(f, [rec, args]);
                 JAM.setDynamicIntrospector();
                 return ret;
               }
             } else if (attr === "data") {
               if (rec instanceof _HTMLObjectElement) {
                 JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-                var ret = f.apply(rec, args);
+                var ret = _apply_apply(f, [rec, args]);
                 JAM.setDynamicIntrospector();
                 return ret;
               }
@@ -585,7 +592,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         }
       }
 
-      return f.apply(rec, args);
+      return _apply_apply(f, [rec, args]);
     },
 
     callIntrospect: function(f, rec, args, ispect) {
@@ -787,6 +794,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
             if (args.length >= 1) {
               args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
             }
+            //ret = _apply_apply(fun, [obj, args]);
             ret = fun.apply(obj, args);
             break;
           case "addEventListener":
@@ -796,7 +804,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
             // %%% What if the second argument is an |EventListener|
             // %%% rather than a simple |Function|?
             args[1] = JAMScript.wrapFunction(tx.getHandler(), args[1], false);
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             break;
           
           case "removeEventListener":
@@ -811,27 +819,24 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
             // requesting that a reference to the original, unwrapped
             // function value be removed.
             // %%% Implement mapping described above.
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
+            break;
+                
+          case "clearInterval":
+            // %%% See comment for |removeEventListener|.
+            ret = _apply_apply(fun, [obj, args]);
             break;
 
           case "setTimeout":
           case "setInterval":
             // %%% Currently assumes args[0] is a function object
             args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
-            ret = fun.apply(obj, args);
-            break;
-                
-          case "clearInterval":
-            // %%% See comment for |removeEventListener|.
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             break;
 
           case "Function":
             // %%% What happens in non-string cases?
-            if (len > 0) {
-              //args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
-            }
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             if (typeof ret === "function") {
               ret = JAMScript.wrapFunction(JAMScript.introspectors.processAll, ret, true)
             }
@@ -845,14 +850,14 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
             // more than 1 argument.
             // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
             JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             break;
 
           case "writeln":
           case "write":
             JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             break;
 
@@ -862,7 +867,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
             // For |appendChild|, |replaceChild| and |insertBefore|,
             // the first argument is the element to be inserted.
             JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             break;
 
@@ -873,7 +878,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
               obj = sx.argc > 0 ? args[0] : _undefined;
               args = sx.argc > 1 ? args[1] : _undefined;
             }
-            ret = fun.apply(obj, args);
+            ret = _apply_apply(fun, [obj, args]);
             break;
 
           case "call":      
@@ -910,6 +915,45 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
 
       return;
     },
+
+    // Additional methods useful for debugging.
+    dump: function(obj, depth) {
+      if (typeof obj !== "object" && typeof obj !== "function") {
+        // Just print a primitive as is.
+        alert(obj);
+        return;
+      }
+      if (typeof depth == "undefined") {
+        // Default value for prototype depth.
+        depth = 1;
+      }
+
+      //var str = "";
+      //for (var p in obj) {
+      //  var v = obj[p];
+      //  str += p + ": " + v + "\n";
+      //}
+      //alert(str);
+      alert(Object.getOwnPropertyNames(obj));
+      if (depth > 0 && obj.__proto__) {
+        // Recurse up the prototype chain.
+        this.dump(obj.__proto__, depth - 1);
+      }
+    },
+
+    // %%% Maybe make |TxAction.prototype.toString()| do this or similar.
+    rwsetToString: function(rwset) {
+      var str = "";
+      for (var i=0; i<rwset.length; i++) {
+        str += i + ":\n";
+        // %%% Explicitly enumerate rather than using for-in.
+        for (var p in rwset[i]) {
+          str += "\t" + p + ": " + rwset[i][p] + "\n";
+        }
+      }
+      return str;
+    },
+
   };
 
 }(policy)) } );
