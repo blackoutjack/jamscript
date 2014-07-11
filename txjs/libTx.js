@@ -162,7 +162,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         var args = _Array_slice(arguments, 0);
         var ret;
         introspect(hdlr) {
-          ret = _apply_apply(fn, [rec, args]);
+          ret = fn.apply(rec, args);
         }
         return ret;
       };
