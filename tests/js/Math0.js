@@ -1,8 +1,5 @@
 var v0 = 1.75;
-introspect(JAMScript.process) {
-  var v1 = [Math, v0];
-  var v2 = Math.round
+introspect(JAM.process) {
+  var result = JAM.call(Math.round, Math, [v0]);
 }
-var v3 = JAMScript.bind(v2, v1);
-var result = v3();
 print(result);

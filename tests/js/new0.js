@@ -7,6 +7,6 @@ function c(p) {
   init();
 }
 var a = { id: "xxx" };
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   new c(a);
 }

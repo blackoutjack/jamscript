@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jsinterp.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterp.h	2014-05-14 19:18:15.448963915 -0500
-@@ -207,6 +207,14 @@
++++ mozilla-esr17/js/src/jsinterp.h	2014-07-25 12:54:25.475010550 -0500
+@@ -207,6 +207,20 @@
  extern JSBool
  HasInstance(JSContext *cx, HandleObject obj, const js::Value *v, JSBool *bp);
  
@@ -10,6 +10,12 @@
 +
 +extern bool 
 +IntrospectTx(JSContext *cx, TxContext *tx, bool isEnd, HandleScript script, int *path, bool *newType);
++
++extern bool
++TxSubsumed(JSContext *cx, const js::Value &ispect);
++
++extern bool
++SuspendCall(JSContext *cx, TxContext *tx, CallArgs &args, bool *construct);
 +#endif
 +
  /*

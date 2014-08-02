@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 GridSampler = {};
 
 GridSampler.checkAndNudgePoints=function( image,  points)

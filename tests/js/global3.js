@@ -4,7 +4,7 @@ function pol(tx) {
     var node = rs[i];
     print("obj: " + node.obj + " id: " + node.id);
   }
-  JAMScript.process(tx);
+  JAM.process(tx);
   return true;
 }
 function v1(MH) {

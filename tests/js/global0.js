@@ -1,7 +1,7 @@
 function f(glob) {
   glob.prop = "ok";
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   f(this);
   print("prop: " + prop);
 }

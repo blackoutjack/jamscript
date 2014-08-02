@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.cpp	2014-06-30 22:45:51.109508267 -0500
-@@ -0,0 +1,898 @@
++++ mozilla-esr17/js/src/jstx.cpp	2014-07-22 21:56:07.373938651 -0500
+@@ -0,0 +1,895 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -210,7 +210,7 @@
 +#endif
 +
 +JSBool
-+TxContext::recordSuspend(JSContext *cx, const CallArgs *args, JSString *desc)
++TxContext::recordSuspend(JSContext *cx, const CallArgs *args, bool construct)
 +{
 +    // Invariant: only the topmost running transaction can suspend.
 +    JS_ASSERT(this == cx->getRunningTx());
@@ -219,8 +219,7 @@
 +    //}
 +
 +    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
-+    init_action(cx, &suspend_, args);
-+    suspend_.description = desc;
++    init_action(cx, &suspend_, args, construct);
 +
 +    // Clear the return value.
 +    setReturnValue(JSVAL_VOID);
@@ -232,11 +231,11 @@
 +}
 +
 +JSBool
-+TxContext::recordAction(JSContext *cx, const CallArgs *args)
++TxContext::recordAction(JSContext *cx, const CallArgs *args, bool construct)
 +{
 +    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    TxAction *act = expandSequence(cx);
-+    init_action(cx, act, args);
++    init_action(cx, act, args, construct);
 +    //seq_ = append_action(seq_, act);
 +#ifdef TxJS_PROFILE_ACTIONS
 +    ++callsize_;
@@ -245,7 +244,7 @@
 +}
 +
 +JSBool
-+TxContext::recordSuspend(JSContext *cx, JSObject *obj, jsid id, Value val, JSString *desc, TxActionType type)
++TxContext::recordSuspend(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
 +{
 +    // Invariant: only the topmost running transaction can suspend.
 +    JS_ASSERT(this == cx->getRunningTx());
@@ -266,7 +265,6 @@
 +    // Cases other than array length/indices come straight here.
 +    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    init_action(cx, &suspend_, obj, id, val, type);
-+    suspend_.description = desc;
 +#ifdef TxJS_PROFILE_ACTIONS
 +    switch (type) {
 +      case AX_WRITE: ++writesize_; break;
@@ -393,7 +391,7 @@
 +
 +#ifdef TxJS_LOCAL
 +JSBool
-+TxContext::recordSuspend(JSContext *cx, StackFrame *fp, uint32_t i, Value val, JSString *desc, TxActionType type, bool active)
++TxContext::recordSuspend(JSContext *cx, StackFrame *fp, uint32_t i, Value val, TxActionType type, bool active)
 +{
 +    // Invariant: only the topmost running transaction can suspend.
 +    JS_ASSERT(this == cx->getRunningTx());
@@ -405,7 +403,6 @@
 +
 +    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    init_action(cx, &suspend_, fp, i, val, type, active);
-+    suspend_.description = desc;
 +
 +#ifdef TxJS_PROFILE_ACTIONS
 +    switch (type) {

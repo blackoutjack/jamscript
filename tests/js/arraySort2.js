@@ -4,7 +4,7 @@ function pol(tx) {
   print(a); // B,D,A,C
   // The return value should be undefined at this point.
   print(b); // undefined
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The original array is sorted.
   print(a); // A,B,C,D
   // The return value is also the sorted array.

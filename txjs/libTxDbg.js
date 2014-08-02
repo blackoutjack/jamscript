@@ -1,5 +1,5 @@
 // This file contains utility methods for debugging. To use it, you
-// must first comment out the |Object.freeze| of the JAMScript object
+// must first comment out the |Object.freeze| of the JAM object
 // in libTx.js. Then include this file in the HTML after that one.
 
 // Configuration options for debugging.
@@ -13,72 +13,41 @@ const BYPASS_WRAP_HTML_EVENT = false;
 const BYPASS_PERFORM = false;
 
 // Override some methods to bypass protection for debugging.
-JAMScript.bindOrig = JAMScript.bind;
-JAMScript.bind = function(f, args) {
-  if (BYPASS_BIND) {
-    return f.bind.apply(args);
-  }
-  return this.bindOrig(f, args);
-};
-
-JAMScript.newOrig = JAMScript.new;
-JAMScript.new = function(c, args) {
+JAM.newOrig = JAM.new;
+JAM.new = function(c, args, ispect) {
   if (BYPASS_NEW) {
-    // This is a tricky way to maintain the semantics of |new|.
-    var cproxy = function(argArray) {
-      return c.apply(this, argArray);
-    }
-    cproxy.prototype = c.prototype;
-
-    return new cproxy(args);
+    return JAM.newApply(c, args);
   }
 
-  return JAMScript.newOrig(c, args);
+  return JAM.newOrig(c, args, ispect);
 };
 
-JAMScript.callOrig = JAMScript.call;
-JAMScript.call = function(f, rec, args) {
+JAM.callOrig = JAM.call;
+JAM.call = function(f, rec, args, ispect) {
   if (BYPASS_CALL) {
     return f.apply(rec, args);
   }
-  return JAMScript.callOrig(f, rec, args);
+  return JAM.callOrig(f, rec, args, ispect);
 };
 
-JAMScript.callIntrospectOrig = JAMScript.callIntrospect;
-JAMScript.callIntrospect = function(f, rec, args, ispect) {
-  if (BYPASS_CALLINTROSPECT) {
-    // %%% Closure-ize this.
-    return f.apply(rec, args);
-  }
-  return JAMScript.callIntrospectOrig(f, rec, args, ispect);
-};
-
-JAMScript.newIntrospectOrig = JAMScript.newIntrospect;
-JAMScript.newIntrospect = function(c, args, ispect) {
-  if (BYPASS_NEWINTROSPECT) {
-    return JAMScript.new(c, args);
-  }
-  return JAMScript.newIntrospectOrig(c, args, ispect);
-};
-
-JAMScript.setOrig = JAMScript.set;
-JAMScript.set = function(obj, memb, val, ispect) {
+JAM.setOrig = JAM.set;
+JAM.set = function(obj, memb, val, ispect) {
   if (BYPASS_SET) {
     return obj[memb] = val;
   }
-  return JAMScript.setOrig(obj, memb, val, ispect);
+  return JAM.setOrig(obj, memb, val, ispect);
 }
 
-JAMScript.wrapHTMLEventScriptOrig = JAMScript.wrapHTMLEventScript;
-JAMScript.wrapHTMLEventScript = function(elt, html) {
+JAM.wrapHTMLEventScriptOrig = JAM.wrapHTMLEventScript;
+JAM.wrapHTMLEventScript = function(elt, html) {
   if (BYPASS_WRAP_HTML_EVENT) {
     return html;
   }
-  return JAMScript.wrapHTMLEventScriptOrig(elt, html);
+  return JAM.wrapHTMLEventScriptOrig(elt, html);
 }
 
-JAMScript.performActionOrig = JAMScript.performAction;
-JAMScript.performAction = function(tx) {
+JAM.commitSuspendOrig = JAM.commitSuspend;
+JAM.commitSuspend = function(tx) {
   if (BYPASS_PERFORM) {
     // Get the cause of the suspend.
     var sx = tx.getSuspendInfo();
@@ -112,7 +81,7 @@ JAMScript.performAction = function(tx) {
       return;
     }
   }
-  return JAMScript.performActionOrig(tx);
+  return JAM.commitSuspendOrig(tx);
 }
 
-Object.freeze(JAMScript);
+Object.freeze(JAM);

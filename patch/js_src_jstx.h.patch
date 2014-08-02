@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.h	2014-07-09 15:33:12.942099593 -0500
++++ mozilla-esr17/js/src/jstx.h	2014-07-22 21:58:42.913936899 -0500
 @@ -0,0 +1,157 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -121,12 +121,12 @@
 +    TxAction *expandSequence(JSContext *);
 +   
 +  public:  
-+    JSBool recordSuspend(JSContext *, const js::CallArgs *, JSString *);
-+    JSBool recordSuspend(JSContext *, JSObject *, jsid, js::Value, JSString *, TxActionType);
++    JSBool recordSuspend(JSContext *, const js::CallArgs *, bool construct);
++    JSBool recordSuspend(JSContext *, JSObject *, jsid, js::Value, TxActionType);
 +#ifdef TxJS_LOCAL
-+    JSBool recordSuspend(JSContext *, js::StackFrame *, uint32_t, js::Value, JSString *, TxActionType, bool = true);
++    JSBool recordSuspend(JSContext *, js::StackFrame *, uint32_t, js::Value, TxActionType, bool = true);
 +#endif
-+    JSBool recordAction(JSContext *, const js::CallArgs *);
++    JSBool recordAction(JSContext *, const js::CallArgs *, bool);
 +    JSBool recordAction(JSContext *, JSObject *, jsid, js::Value, TxActionType);
 +#ifdef TxJS_LOCAL
 +    JSBool recordAction(JSContext *, js::StackFrame *, uint32_t, js::Value, TxActionType, bool = true);

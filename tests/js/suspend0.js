@@ -2,7 +2,7 @@
 // workings of the suspend mechanism. |print| causes a suspend.
 function pol(tx) {
   print("suspended: " + tx.isSuspended());
-  JAMScript.performAction(tx);
+  JAM.commitSuspend(tx);
 }
 introspect(pol) {
   print("ok");

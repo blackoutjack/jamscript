@@ -6,7 +6,7 @@ function pol(tx) {
   for (var i=0; i<rs.length; i++) {
     print(i + ": " + rs[i].obj + " / " + rs[i].id + " / " + rs[i].value);
   }
-  JAMScript.process(tx);
+  JAM.process(tx);
   // This should be an array listing the removed items.
   print(rem); // 3, 4, 5
   // The array should have new elements in place of the removed ones.

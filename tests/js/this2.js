@@ -12,7 +12,7 @@ function c2(o) {
   return { p1: 100, m1: f1, p2: o };
 }
 
-introspect (JAMScript.process) {
+introspect (JAM.process) {
   var o1 = c1();
   print("o1.p1: " + o1.p1);
   var o2 = c2(o1);

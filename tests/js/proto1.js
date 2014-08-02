@@ -22,12 +22,12 @@ function v37() {
 function v82() {
   var l = C.A;
   var o = C.B;
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     var v1 = l.extend();
     var v2 = o.extend();
   };
-  JAMScript.dump(v1, 4);
-  JAMScript.dump(v2, 4);
+  JAM.dump(v1, 4);
+  JAM.dump(v2, 4);
 }
 var C = v37();
 v82();

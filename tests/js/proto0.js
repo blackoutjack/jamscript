@@ -169,7 +169,7 @@ function v37(p, h$$4) {
   var v246 = r.extend(v245);
   return i$$1
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var v135 = v37(Math)
 };
-JAMScript.dump(v135);
+JAM.dump(v135);

@@ -16,7 +16,7 @@ function pol(tx) {
   tx.commit();
   if (tx.isSuspended()) {
     print("tx is suspended");
-    JAMScript.performAction(tx);
+    JAM.commitSuspend(tx);
   }
 }
 try {

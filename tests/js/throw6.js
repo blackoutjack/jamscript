@@ -1,5 +1,5 @@
 function pol(tx) {
-  JAMScript.process(tx);
+  JAM.process(tx);
   var z = xxx.xxx;
 }
 var a = {};

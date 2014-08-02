@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 var g;
 var h = g;
 function f() {

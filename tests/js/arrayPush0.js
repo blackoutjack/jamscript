@@ -1,6 +1,6 @@
 var a = new Array();
 var len = null;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   len = a.push("ok");
 }
 print(len);

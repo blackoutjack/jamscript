@@ -1,6 +1,6 @@
 // Testcase for array.reverse
 var a = new Array(1, 2, 3, 4, 5, 6, 7);
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var rev = a.reverse();
 }
 // The array is reversed in place.

@@ -4,7 +4,7 @@ function f() {
   g = a;
 }
 var g;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   f();
 }
 print("g: " + g);

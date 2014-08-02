@@ -6,7 +6,7 @@ function f(a, b) {
   }
   return tot;
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var v = f(5, 7, 10);
 }
 print("v: " + v); // v: 22

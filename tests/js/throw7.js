@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   try {
     var b = 2;
     var c = x.xxx;

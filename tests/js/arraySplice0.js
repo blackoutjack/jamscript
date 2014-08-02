@@ -1,7 +1,7 @@
 // Testcase for array.splice
 var a = new Array(1, 2, 3, 4, 5, 6, 7);
 var rem;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   rem = a.splice(2, 3, "X", "Y", "Z");
 }
 // This should be an array with the removed items.

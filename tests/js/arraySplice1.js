@@ -4,7 +4,7 @@ function pol(tx) {
   print(rem); // undefined
   // This should be the original array.
   print(a); // 1, 2, 3, 4, 5, 6, 7
-  JAMScript.process(tx);
+  JAM.process(tx);
   // This should be an array listing the removed items.
   print(rem); // 3, 4, 5
   // The array should have new elements in place of the removed ones.

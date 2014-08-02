@@ -26,8 +26,8 @@ function v37(p, h$$4) {
         var v125 = a$$2.hasOwnProperty(c$$1);
         /*
         if (c$$1 == "_append") {
-          JAMScript.dump(a$$2);
-          JAMScript.dump(v125);
+          JAM.dump(a$$2);
+          JAM.dump(v125);
         }
         */
         if(v125) {
@@ -441,7 +441,7 @@ function v45(p$$2) {
   }
   function v41() {
     // Nested introspect used to cause a crash.
-    introspect(JAMScript.process) {
+    introspect(JAM.process) {
       var f$$5 = 0;
       var v101 = 64 > f$$5;
       for(;v101;) {
@@ -458,7 +458,7 @@ function v45(p$$2) {
   }
   v41();
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 var CryptoJS = v37(Math)
 v45(Math);
 };

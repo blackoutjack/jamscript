@@ -3,7 +3,7 @@ function comp(v1, v2) {
   return -v1.toString().localeCompare(v2);
 }
 var a = new Array("B", "D", "A", "C");
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var b = a.sort(comp);
 }
 // The original array is sorted in reverse order.

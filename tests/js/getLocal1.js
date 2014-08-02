@@ -1,10 +1,10 @@
 var g;
 function f() {
   var a;
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     a = 1;
   }
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     g = a;
   }
 }

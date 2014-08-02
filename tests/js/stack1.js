@@ -9,7 +9,7 @@ function f2(a) {
   var e = "hello";
   return e;
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var v = f2();
   f3(v);
 };

@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 function c() {
   var v1 = new Array(10);
   this.a = v1;

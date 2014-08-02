@@ -9,6 +9,6 @@ function f() {
   var c = 3 + v;
   print(c);
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   f();
 }

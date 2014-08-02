@@ -1,5 +1,5 @@
 // Test the semantics of functions declared in a introspect.
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var f = function() {
     print("In f");
   }

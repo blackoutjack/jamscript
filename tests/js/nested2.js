@@ -1,7 +1,7 @@
 var a = 1;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   a *= 3;
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     a *= 5;
   }
 }

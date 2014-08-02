@@ -1,7 +1,7 @@
 function pol(tx) {
   print(len);
   print(a);
-  JAMScript.process(tx);
+  JAM.process(tx);
   print(len);
   print(a);
 }

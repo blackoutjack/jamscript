@@ -6,7 +6,7 @@ function pol(tx) {
   }
   tx.commit();
   if (tx.isSuspended()) {
-    JAMScript.performAction(tx, "", "tx");
+    JAM.commitSuspend(tx, "", "tx");
   }
   tx.suppress();
 }

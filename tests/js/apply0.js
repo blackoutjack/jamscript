@@ -4,7 +4,7 @@ function pol(tx) {
     var sx = tx.getSuspendInfo();
     var fun = sx.value;
     var argv = sx.args;
-    fun(argv[0]);
+    tx.setRetval(fun(argv[0]));
   }
 }
 introspect(pol) {

@@ -5,7 +5,7 @@ var val = "GLOBAL";
 var a = { val: "LOCAL" };
 var ret;
 var fbound;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   fbound = f.bind(a);
 }
 ret = fbound();

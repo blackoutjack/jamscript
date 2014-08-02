@@ -1,6 +1,6 @@
 // Testcase for array.sort
 var a = new Array("B", "D", "A", "C");
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var b = a.sort();
 }
 // The original array is sorted.

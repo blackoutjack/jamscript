@@ -7,7 +7,7 @@ function pol(tx) {
   for (var i=0; i<rs.length; i++) {
     print(i + ": " + rs[i].obj + " / " + rs[i].id + " / " + rs[i].value);
   }
-  JAMScript.process(tx);
+  JAM.process(tx);
 }
 var a = new Array(3, 4);
 introspect(pol) {

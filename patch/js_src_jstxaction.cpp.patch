@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstxaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstxaction.cpp	2014-06-25 14:43:05.814882988 -0500
-@@ -0,0 +1,394 @@
++++ mozilla-esr17/js/src/jstxaction.cpp	2014-07-22 21:56:50.801938160 -0500
+@@ -0,0 +1,386 @@
 +#include "jsversion.h"
 +#ifdef TxJS
 +
@@ -107,19 +107,22 @@
 +    // Set the "type" property.
 +    switch (node->type) {
 +      case AX_READ:
-+        val = StringValue(Atomize(cx, "read", 4));
++        val = StringValue(cx->runtime->atomState.readAtom);
 +        break;
 +      case AX_WRITE:
-+        val = StringValue(Atomize(cx, "write", 5));
++        val = StringValue(cx->runtime->atomState.writeAtom);
 +        break;
 +      case AX_CALL:
-+        val = StringValue(Atomize(cx, "call", 4));
++        val = StringValue(cx->runtime->atomState.callAtom);
++        break;
++      case AX_NEW:
++        val = StringValue(cx->runtime->atomState.newAtom);
 +        break;
 +      case AX_DELETE:
-+        val = StringValue(Atomize(cx, "delete", 6));
++        val = StringValue(cx->runtime->atomState.deleteAtom);
 +        break;
 +      case AX_FORIN:
-+        val = StringValue(Atomize(cx, "forin", 5));
++        val = StringValue(cx->runtime->atomState.forinAtom);
 +        break;
 +      default:
 +        JS_ASSERT(false);
@@ -161,7 +164,7 @@
 +    }
 +
 +    // Add the arguments information.
-+    if (node->type == AX_CALL) {
++    if (node->type & AX_INVOKE) {
 +        RootedValue rootVal4(cx, NumberValue(node->argc));
 +        RootedId rootId4(cx, AtomToId(cx->runtime->atomState.argcAtom));
 +        JSObject::setGeneric(cx, rootObj, rootObj, rootId4, &rootVal4, false);
@@ -179,12 +182,6 @@
 +        RootedValue rootVal6(cx, ObjectValue(*args));
 +        RootedId rootId6(cx, AtomToId(cx->runtime->atomState.argsAtom));
 +        JSObject::setGeneric(cx, rootObj, rootObj, rootId6, &rootVal6, false);
-+    }
-+
-+    if (node->description != NULL) {
-+        RootedValue rootVal7(cx, StringValue(node->description));
-+        RootedId rootId7(cx, AtomToId(cx->runtime->atomState.descriptionAtom));
-+        JSObject::setGeneric(cx, rootObj, rootObj, rootId7, &rootVal7, false);
 +    }
 +
 +    // Set the return value.
@@ -218,7 +215,6 @@
 +    act->value = val;
 +    act->argv = NULL;
 +    act->argc = 0;
-+    act->description = NULL;
 +
 +    return JS_TRUE;
 +}
@@ -237,7 +233,6 @@
 +    act->value = val;
 +    act->argv = NULL;
 +    act->argc = 0;
-+    act->description = NULL;
 +    //act->prev = NULL;
 +    //act->next = NULL;
 +
@@ -245,7 +240,7 @@
 +}
 +
 +JSBool
-+init_action(JSContext *cx, TxAction *act, const CallArgs *args)
++init_action(JSContext *cx, TxAction *act, const CallArgs *args, bool construct)
 +{
 +    JS_ASSERT(args != NULL && act != NULL);
 +
@@ -283,7 +278,7 @@
 +      fnid = INT_TO_JSID(0);
 +    }
 +
-+    act->type = AX_CALL;
++    act->type = construct ? AX_NEW : AX_CALL;
 +    act->prop.type = TX_OBJECT;
 +    act->prop.object.init(rec);
 +    act->prop.i.id = fnid;
@@ -298,9 +293,6 @@
 +    } else {
 +      act->argv = NULL;
 +    }
-+    act->description = NULL;
-+    //act->prev = NULL;
-+    //act->next = NULL;
 +
 +    return JS_TRUE;
 +}

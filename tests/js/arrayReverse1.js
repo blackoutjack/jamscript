@@ -4,7 +4,7 @@ function pol(tx) {
   print(rev); // undefined
   // This should be the original array.
   print(a); // 3, 4, 5, 6, 7
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The array is reversed in place.
   print(a); // 7, 6, 5, 4, 3
   // And a reference to the array is returned.

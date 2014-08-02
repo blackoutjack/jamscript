@@ -1,6 +1,6 @@
 // Testcase for array.slice
 var a = new Array("A", "B", "C", "D");
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var j = a.join("|");
 }
 // The original array is unchanged.

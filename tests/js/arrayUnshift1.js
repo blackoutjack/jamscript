@@ -4,7 +4,7 @@ function pol(tx) {
   print(len); // 5
   // This should be the original array.
   print(a); // 3, 4, 5, 6, 7
-  JAMScript.process(tx);
+  JAM.process(tx);
   // This should be the new length.
   print(len); // 7
   // The array should show the new elements prepended.

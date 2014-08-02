@@ -12,6 +12,6 @@ function g() {
   return o;
 }
 var r = g();
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   r.m1();
 }

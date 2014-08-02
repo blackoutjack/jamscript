@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jsjam.h	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jsjam.h	2014-05-02 14:57:37.606561652 -0500
-@@ -0,0 +1,47 @@
++++ mozilla-esr17/js/src/jsjam.h	2014-07-21 14:48:02.438816208 -0500
+@@ -0,0 +1,50 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -44,6 +44,9 @@
 +JSBool
 +js_jam_profileActionLookup(JSContext *, uint32_t, TxActionType);
 +#endif
++
++extern JSBool
++js_jam_newApply(JSContext *cx, unsigned argc, js::Value *vp);
 +
 +#endif
 +

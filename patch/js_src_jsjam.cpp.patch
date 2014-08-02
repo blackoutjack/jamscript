@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jsjam.cpp	2014-06-18 18:18:57.604790098 -0500
-@@ -0,0 +1,1026 @@
++++ mozilla-esr17/js/src/jsjam.cpp	2014-07-25 13:05:29.070991149 -0500
+@@ -0,0 +1,1126 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -31,7 +31,8 @@
 +  "AX_WRITE",
 +  "AX_CALL",
 +  "AX_DELETE",
-+  "AX_FORIN"
++  "AX_FORIN",
++  "AX_NEW",
 +};
 +#endif
 +
@@ -649,18 +650,27 @@
 +#endif
 +
 +#ifdef DEBUG
-+    if (tx->getNext()) {
++    uint32_t nestDepth = 0;
++    TxContext *curtx = tx->getNext();
++    while (curtx != NULL) {
++      if (curtx->inState(TX_RUNNING)) {
++        nestDepth++;
++      }
++      curtx = curtx->getNext();
++    }
++    if (nestDepth > 0) {
 +      StackIter i(cx);
 +      if (i.isScript()) {
 +          const char *filename = JS_GetScriptFilename(cx, i.script());
 +          unsigned line = JS_PCToLineNumber(cx, i.script(), i.pc());
-+          fprintf(stderr, "WARNING: nested %d %s:%d\n", tx->depth(), filename, line);
++          fprintf(stderr, "WARNING: nested %d %s:%d\n", nestDepth, filename, line);
 +      } else {
-+          fprintf(stderr, "WARNING: nested %d\n", tx->depth());
++          fprintf(stderr, "WARNING: nested %d\n", nestDepth);
 +      }
++      // Output the JavaScript stack.
++      js_DumpBacktrace(cx);
 +    }
 +#endif
-+
 +
 +    StackIter i(cx);
 +    if (i.isScript()) {
@@ -800,6 +810,94 @@
 +}
 +
 +JSBool
++js_jam_isNativeFunction(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (argc == 0) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    Value &v = args[0];
++    if (!v.isObject()) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
++
++    // Strip any proxies.
++    JSObject *obj = &v.toObject();
++    while (IsProxy(obj)) {
++        v = GetProxyPrivate(obj);
++        if (v.isObject()) {
++            obj = &v.toObject();
++        } else {
++            args.rval().setBoolean(false);
++            return JS_TRUE;
++        }
++    }
++
++    if (IsNativeFunction(v)) {
++        args.rval().setBoolean(true);
++        return JS_TRUE;
++    }
++
++    args.rval().setBoolean(false);
++    return JS_TRUE;
++}
++
++JSBool
++js_jam_newApply(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    if (argc < 1)
++        return JS_FALSE;
++
++    // Suspend on application of native function.
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        bool construct = true;
++        if (SuspendCall(cx, tx, args, &construct)) {
++            // Force non-inline execution.
++            int path = 1;
++            // Not used.
++            bool newType;
++            RootedScript s(cx, cx->fp()->script());
++            bool ok = IntrospectTx(cx, tx, true, s, &path, &newType);
++            args.rval().set(tx->getReturnValue());
++            return ok;
++        }
++    }
++
++    // Let InvokeConstructor check for function values, etc.
++    Value &constructor = args[0];
++
++    uint32_t newargc = 0;
++    Value *newargs = NULL;
++    if (argc > 1) {
++        Value &argArray = args[1];
++        if (!argArray.isObject()) {
++            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_APPLY_ARGS, js_apply_str);
++            return JS_FALSE;
++        }
++        JSObject *argsobj = &argArray.toObject();
++        if (!GetLengthProperty(cx, HandleObject::fromMarkedLocation(&argsobj), &newargc))
++            return JS_FALSE; 
++        if (newargc > 0) {
++            newargs = (Value*)malloc(sizeof(Value)*(newargc));
++            if (!GetElements(cx, HandleObject::fromMarkedLocation(&argsobj), newargc, newargs))
++                return JS_FALSE;
++        }
++    }
++
++    bool ok = InvokeConstructor(cx, constructor, newargc, newargs, args.rval().address());
++    if (newargs) free(newargs);
++
++    return ok;
++}
++
++JSBool
 +js_jam_identical(JSContext *cx, unsigned argc, Value *vp)
 +{
 +    CallArgs args = CallArgsFromVp(argc, vp);
@@ -913,8 +1011,10 @@
 +
 +    Value lval = args[0];
 +    Value rval = args[1];
-+    if (rval.isPrimitive())
-+        return JS_FALSE;
++    if (rval.isPrimitive()) {
++        args.rval().setBoolean(false);
++        return JS_TRUE;
++    }
 +
 +    // Strip any proxies.
 +    JSObject *lobj = NULL;
@@ -967,17 +1067,15 @@
 +        }
 +
 +        RootedValue pval(cx);
-+        if (!JSObject::getProperty(cx, obj, obj, cx->runtime->atomState.classPrototypeAtom, &pval))
-+            return JS_FALSE;
++        if (!JSObject::getProperty(cx, obj, obj, cx->runtime->atomState.classPrototypeAtom, &pval)) {
++            // %%% Should this be an exception?
++            args.rval().setBoolean(false);
++            return JS_TRUE;
++        }
 +
 +        if (pval.isPrimitive()) {
-+            /*
-+             * Throw a runtime error if instanceof is called on a function that
-+             * has a non-object as its .prototype value.
-+             */
-+            RootedValue val(cx, ObjectValue(*obj));
-+            js_ReportValueError(cx, JSMSG_BAD_PROTOTYPE, -1, val, NullPtr());
-+            return JS_FALSE;
++            args.rval().setBoolean(false);
++            return JS_TRUE;
 +        }
 +
 +        JSObject *pobj = &pval.toObject();
@@ -1002,6 +1100,8 @@
 +    JS_FN("setDynamicIntrospector", js_jam_setDynamicIntrospector, 1, JSFUN_TX_NOSUSPEND),
 +    JS_FN("instanceof", js_jam_instanceof, 2, JSFUN_TX_NOSUSPEND),
 +    JS_FN("identical", js_jam_identical, 2, JSFUN_TX_NOSUSPEND),
++    JS_FN("isNativeFunction", js_jam_isNativeFunction, 1, JSFUN_TX_NOSUSPEND),
++    JS_FN("newApply", js_jam_newApply, 2, JSFUN_TX_NOSUSPEND),
 +    JS_FS_END
 +};
 +

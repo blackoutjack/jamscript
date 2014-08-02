@@ -5,7 +5,7 @@ function f(a) {
     return 0;
   }
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var x = f();
   var p = 1;
   var y = f(p);

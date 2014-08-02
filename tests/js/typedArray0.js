@@ -1,7 +1,7 @@
 var R = new ArrayBuffer(134217728);
 var L = new Int32Array(R);
 var Q = new Uint8Array(R);
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   L[0] = 255;
   var v11763 = Q[0];
 }

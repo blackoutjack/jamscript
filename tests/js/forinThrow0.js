@@ -12,7 +12,7 @@ function f() {
   }
 }
 var a = { p1: concat, p2: concat, p3: 0 };
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   f();
 }
 for (var p in a) {

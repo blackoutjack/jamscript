@@ -4,7 +4,7 @@ function pol(tx) {
   print(a); // one,two,three,four
   // The return value should be undefined at this point.
   print(j); // undefined
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The original array is still unchanged.
   print(a); // one,two,three,four
   // The first time through (on the suspend), |j| is still undefined.

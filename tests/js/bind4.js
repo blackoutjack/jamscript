@@ -1,7 +1,7 @@
 function nocommit(tx) {
   if (tx.isSuspended()) {
     // This will just commit the first suspend of |f.bind|.
-    JAMScript.process(tx);
+    JAM.process(tx);
   }
 }
 function f() {

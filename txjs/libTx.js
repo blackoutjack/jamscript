@@ -1,7 +1,9 @@
 // We assume that first, some policy.js has been included in a script
 // tag in the HTML page, and then this file, followed by all others.
 
-const PERFORMANCE_TESTING = false;
+const PERFORMANCE_TESTING = true;
+const MIMIC = true;
+const DEFAULT_ALLOW = true;
 
 // Allow testing scripts with |alert| in the JS shell.
 if (typeof alert === "undefined" && typeof print === "function") {
@@ -11,25 +13,27 @@ if (typeof alert === "undefined" && typeof print === "function") {
 // If no policy is provided, use a default. It either allows or
 // disallows everything, based on DEFAULT_ALLOW.
 if (typeof policy !== "object") {
-  const DEFAULT_ALLOW = true;
   // See file txjs/policy.template.js for documentation of the format
   // of policy objects.
   function process(tx) {
     if (DEFAULT_ALLOW) {
-      JAMScript.process(tx);
+      JAM.process(tx);
     } else {
-      JAMScript.prevent(tx);
+      JAM.prevent(tx);
     }
   }
   var policy = (function () {
-    return { introspectors: { processAll: process } };
+    return { pFull: process };
   }());
 }
 
-// Define the JAMScript property to be read-only.
-Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
+// Define the JAM property to be read-only.
+Object.defineProperty(this, 'JAM', { 'value': (function() {
+
+  var pFull = policy.pFull;
 
   // Close over some native values and objects that may be needed.
+  var _global = this;
   var _undefined = undefined;
   var _eval = eval;
   var _Function = Function;
@@ -39,6 +43,10 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
   var _bind_apply = _apply.bind(_bind);
   var _apply_apply = _apply.bind(_apply);
   var _Array_slice = Array.slice;
+  var _String_startsWith = String.startsWith;
+
+  var _Array_prototype_sort = Array.prototype.sort;
+  var _String_prototype_replace = String.prototype.replace;
 
   if (typeof Object.prototype.__defineGetter__ !== "undefined")
     var ___defineGetter__ = Object.prototype.__defineGetter__;
@@ -46,27 +54,26 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     var ___defineSetter__ = Object.prototype.__defineSetter__;
   if (typeof Object.defineProperty !== "undefined")
     var _defineProperty = Object.defineProperty;
-  if (typeof setTimeout !== "undefined")
+  if (typeof setTimeout !== "undefined") {
     var _setTimeout = setTimeout;
-  if (typeof setInterval !== "undefined")
     var _setInterval = setInterval;
+    var _clearInterval = clearInterval;
+  }
 
   if (typeof document === "object") {
     // Close over |document| methods needed by instrumentation.
 
     // These are to test for equality.
     var _document = document;
-    var _document_write = document.write;
-    var _document_writeln = document.writeln;
+    var _HTMLDocument_prototype_write = HTMLDocument.prototype.write;
+    var _HTMLDocument_prototype_writeln = HTMLDocument.prototype.writeln; 
+    var _HTMLElement = HTMLElement;
+    var _HTMLScriptElement = HTMLScriptElement;
+    var _HTMLIFrameElement = HTMLIFrameElement;
 
     // These are to call for effect from within methods.
     var _document_getElementById = document.getElementById.bind(_document);
     var _document_createElement = document.createElement.bind(_document);
-
-    var _HTMLScriptElement = _document_createElement('script').constructor;
-    var _HTMLIFrameElement = _document_createElement('iframe').constructor;
-
-    // Dynamically wrap various properties of DOM nodes.
   }
 
   if (typeof console === "object")
@@ -78,15 +85,15 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     var children = frag.childNodes;
     for (var i=0; i<children.length; i++) {
       var c = children.item(i);
-      if (c.tagName == "SCRIPT") {
-        c.innerHTML = "introspect(JAMScript.introspectors.processAll) { " + c.innerHTML + " }";
+      if (c.tagName === "SCRIPT") {
+        c.innerHTML = "introspect(JAM.policy.pFull) { " + c.innerHTML + " }";
       }
       // Find all "on..." attributes.
       if (c.attributes) {
         for (var a=0; a<c.attributes.length; a++) { 
           var attr = c.attributes[a];
-          if (attr.localName.startsWith("on")) {
-            attr.value = "introspect(JAMScript.introspectors.processAll) { " + attr.value + " }";
+          if (_String_startsWith(attr.localName, "on")) {
+            attr.value = "introspect(JAM.policy.pFull) { " + attr.value + " }";
           }
         }
       }
@@ -94,13 +101,80 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     }
   }
 
+  // Wrap the given function |fn| in a transaction and an outer
+  // function. In this way, when untrusted guest code that registers
+  // event introspectors we can innocculate that also.
+  //
+  // given:
+  //   ispect  An introspector to apply
+  //   fn  A function to wrap in a transaction
+  //   rec  An optional receiver (for event handlers)
+  // return:
+  //   The wrapper function, that when called, initiates a transaction
+  //     and then calls the original |fn|.
+  function wrapFunction(hdlr, fn, rec) {
+    rec = rec ? rec : null;
+    var txfn = function() {
+      // |arguments| will be whatever arguments are provided to |txfn|
+      // when it is called. So if we're wrapping an event handler,
+      // that will typically be the event object.
+      var args = _Array_slice(arguments, 0);
+      var ret;
+      introspect(hdlr) {
+        ret = _apply_apply(fn, [rec, args]);
+      }
+      return ret;
+    };
+    return txfn;
+  }
+
+  function wrapMethod(hdlr, meth) {
+    var txmeth = function() {
+      var rec = this;
+      // |arguments| will be whatever arguments are provided to |txmeth|
+      // when it is called.
+      var args = _Array_slice(arguments, 0);
+      var ret;
+      introspect(hdlr) {
+        ret = _apply_apply(meth, [rec, args]);
+      }
+      return ret;
+    };
+    return txmeth;
+  }
+
+  function wrapHTMLEventScript(elt, html) {
+    if (JAM.instanceof(elt, _HTMLElement)) {
+      var frag = _document_createElement(elt.tagName);
+      frag.innerHTML = html;
+      recursiveWrap(frag);
+      var wrapped = frag.innerHTML;
+    }
+    return frag.innerHTML;
+  }
+
+  // This object can play the role of a single-node transaction.
+  var nodeTx = {
+    node: _undefined,
+    ret: _undefined,
+    getActionSequence: function() { return typeof this.node === "object" ? [this.node] : []; },
+    suppress: function() { },
+    commit: function() { JAM.commitNode(this) },
+    isSuspended: function () { return false; },
+    getSuspendInfo: function() { return _undefined; },
+    setRetval: function(val) { this.ret = val; }
+  }
+
   return {
-    introspectors: pol.introspectors,
+    policy: policy,
+
+    // Commandeer the native JAM utility functions.
+    __proto__: JAM,
 
     process: function(tx) {
       tx.commit();
       if (tx.isSuspended()) {
-        JAMScript.performAction(tx);
+        JAM.commitSuspend(tx);
         // Clear all the reads and writes. This is only needed if the
         // transaction is suspended, since not commiting at the
         // end of a transaction effectively suppresses.
@@ -111,18 +185,18 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
     // Generate an exception to prevent policy violation.
     prevent: function(tx) {
       tx.suppress();
-      JAMScript.violation();
+      JAM.violation();
     },
 
     violation: function() {
-      console.trace();
-      var msg = "JAMScript prevented a policy violation";
-      JAMScript.log(msg);
+      //console.trace();
+      var msg = "JAM prevented a policy violation";
+      JAM.log(msg);
       throw new Error(msg);
     },
 
     isEval: function(e) {
-      return e === _eval;
+      return JAM.identical(e, _eval);
     },
 
     // Write the message to the log (for debugging/notification).
@@ -134,253 +208,19 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         _console.log(message);
       } else if (_alert) {
         _alert(message);
-      } else if (_print) {
+      } else if (typeof _print === "function") {
         _print(message);
       }
     },
 
-    // Wrap the given function |fn| in a transaction and an outer
-    // function. In this way, when untrusted guest code that registers
-    // event introspectors we can innocculate that also.
-    //
-    // given:
-    //   ispect  An introspector to apply
-    //   fn  A function to wrap in a transaction
-    //   norec  Flag to not include |this| as receiver.
-    // return:
-    //   The wrapper function, that when called, initiates a transaction
-    //     and then calls the original |fn|.
-    wrapFunction: function(hdlr, fn, norec) {
-      // %%% Want to provide the event object to the transaction somehow?
-      // %%% Then add a parameter |ev| to the function defined here.
-      var txfn = function () {
-        // |this| will typically be the event target.
-        var rec = norec ? null : this;
-        // |arguments| will be whatever arguments are provided to |txfn|
-        // when it is called. So if we're wrapping an event handler,
-        // that will typically (%%% always?) be the event object.
-        var args = _Array_slice(arguments, 0);
-        var ret;
-        introspect(hdlr) {
-          ret = fn.apply(rec, args);
-        }
-        return ret;
-      };
-      return txfn;
-    },
-
-    wrapHTMLEventScript: function(elt, html) {
-      if (elt instanceof HTMLElement) {
-        var frag = _document_createElement(elt.tagName);
-        frag.innerHTML = html;
-        recursiveWrap(frag);
-        var wrapped = frag.innerHTML;
-      }
-      return frag.innerHTML;
-    },
-
-    isNativeFunction: function(f) {
-      // %%% Close over natives
-      return !!f && (typeof f).toLowerCase() == 'function' 
-        && (f === Function.prototype 
-        || /^\s*function\s*(\b[a-z$_][a-z0-9$_]*\b)*\s*\((|([a-z$_][a-z0-9$_]*)(\s*,[a-z$_][a-z0-9$_]*)*)\)\s*{\s*\[native code\]\s*}\s*$/i.test(String(f)));
-    },
-
-    bind: function(f, args) {
-      // General notes:
-      // * |HTMLElement.prototype.setAttribute| cannot be used to
-      //   trigger parsing of |innerHTML|.
-
-      var len = args.length;
-
-      if (f === _bind) {
-        // Prevent a sneaky script from calling |bind| to obscure the
-        // identity of a policy-transitioning function prior to a call.
-        f = null;
-        if (len > 0) {
-          f = args[0];
-          args = _Array_slice(args, 1);
-          var bound = JAMScript.bind(f, args);
-          return function() { return bound; }
-        }
-      }
-      if (f === _apply) {
-        // Given that the call is now formatted as follows...
-        // 
-        //   JAMScript.bind(f.apply, [f, rec, args]);
-        //
-        // ...the original call was this:
-        //
-        //   f.apply(rec, args);
-        // 
-        // So for the logic below to evaluate what's actually being
-        // called, we extract the function |f| and recreate the original
-        // |args| array. Then recursively examine the result.
-        f = args[0];
-        if (len > 1) {
-          if (len > 2) {
-            // %%% Hackish.
-            if ("" + args[2] === "[object Arguments]") {
-              args[2] = _Array_slice(args[2], 0);
-            }
-            args = [args[1]].concat(args[2]);
-          } else {
-            args = [args[1]];
-          }
-          return JAMScript.bind(f, args);
-        } else {
-          return JAMScript.bind(f);
-        }
-      }
-      if (f === _call) {
-        // This is largely the same as for |apply|, but with a different
-        // method of forming the new arguments.
-        f = args[0];
-        if (len > 1) {
-          args = _Array_slice(args, 1);
-          return JAMScript.bind(f, args);
-        } else {
-          return JAMScript.bind(f, []);
-        }
-      }
-
-      var fname = f.name;
-
-      // The first element of |args| is the object that we're binding
-      // the function to. The rest are the arguments, which we may need
-      // to sanitize for some cases.
-      if (len > 1) {
-        if (f === _eval) {
-          // Assume this is an indirect |eval| because direct cases are
-          // recognized statically and handled differently.
-          // %%% The chokepoint doesn't cover |eval|.
-          JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          //args[1] = "introspect(JAMScript.introspectors.processAll) { " + args[1] + " };";
-          var bound = _bind_apply(f, args);
-          var ret = bound();
-          JAM.setDynamicIntrospector();
-          return function() { return ret; };
-        } else if (f === _Function) {
-          // The last argument is the function body. Any prior arguments
-          // are the formals for the new function.
-          args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
-        } else if (f === _setTimeout || f === _setInterval) {
-          if (typeof args[1] === "function") {
-            if (JAMScript.isNativeFunction(args[1])) {
-              // Wrap the native function in a comprehensive transaction.
-              // %%% Test this
-              args[1] = function(val) {
-                introspect(JAMScript.introspectors.processAll) {
-                  return args[1](val);
-                }
-              }
-            }
-          } else {
-            args[1] = "introspect(JAMScript.introspectors.processAll) {" + args[1] + " };";
-          }
-        } else if (f === _document_write || f === _document_writeln
-            || (fname === "appendChild" && args[0] instanceof Element)
-            || (fname === "setAttributeNode" && args[0] instanceof Element)) {
-          // %%% Test each of these cases.
-          JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          var bound = _bind_apply(f, args);
-          var ret = bound();
-          JAM.setDynamicIntrospector();
-          return function() { return ret; };
-        }
-
-        if (len > 2) {
-          if (f === ___defineGetter__ || f === ___defineSetter__) {
-            // This should prevent a sneaky use of getters and setters to
-            // subvert a policy. E.g. consider the following code w.r.t. the
-            // policy predicate |x === 2|.
-            //
-            // o.__defineSetter__("prop", eval);
-            // o.prop = "x = 2";
-            if (JAMScript.isNativeFunction(args[2])) {
-              //JAMScript.log("wrapping __define[G|S]etter__: " + args[1]);
-              // Wrap the native function in a comprehensive transaction.
-              args[2] = function(val) {
-                introspect(JAMScript.introspectors.processAll) {
-                  return args[2](val);
-                }
-              }
-            }
-            // User-defined functions (i.e. non-native ones) will already
-            // be instrumented, so fall through.
-          } else if (fname === "setAttribute" && args[0] instanceof Element) {
-            // We check |name| because each subclass of |Element|
-            // (i.e. |HTMLElement|, |HTMLImageElement|,
-            // |HTMLInputElement|, etc) has a distinct |setAttribute|
-            // method. The |name| property is read-only, so this is
-            // safe.
-            // %%% Less safe is relying on |instanceof|. Can the
-            // %%% prototype chain be manipulated to subvert this?
-            var attr = args[1].toString();
-            
-            if (attr === "src") {
-              if (args[0] instanceof _HTMLScriptElement) {
-                // %%% Test each of these cases.
-                JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-                var bound = _bind_apply(f, args);
-                var ret = bound();
-                JAM.setDynamicIntrospector();
-                return function() { return ret; };
-              }
-            } else if (attr.startsWith("on")) {
-              // %%% Could implement case by case.
-              var val = args[2].toString();
-              args[2] = "introspect(JAMScript.introspectors.processAll) {" + val + "}";
-            }
-          }
-
-          if (len > 2) {
-            if (f === _defineProperty) {
-              // The 3rd argument to Object.defineProperty is an object with
-              // properties describing attributes of the new property. We
-              // are interested in the |get| and |set| attributes.
-              var o = args[3];
-              if (typeof o === "object") {
-                if (JAMScript.isNativeFunction(o.get)) {
-                  //JAMScript.log("wrapping defineProperty (get)");
-                  // Wrap the native function in a comprehensive transaction.
-                  var getter = o.get;
-                  o.get = function(val) {
-                    introspect(JAMScript.introspectors.processAll) {
-                      // %%% Need to bind to |o| or something similiar?
-                      return getter(val);
-                    }
-                  }
-                }
-                if (JAMScript.isNativeFunction(o.set)) {
-                  //JAMScript.log("wrapping defineProperty (set)");
-                  // Wrap the native function in a comprehensive transaction.
-                  var setter = o.set;
-                  o.set = function(val) {
-                    introspect(JAMScript.introspectors.processAll) {
-                      return setter(val);
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return _bind_apply(f, args);
-    },
-
-    new: function(c, args) {
+    new: function(c, args, ispect) {
       // General notes:
       // * The receiver won't matter, so |args| only contains the
       //   original arguments.
 
-      // This is a tricky way to maintain the semantics of |new|.
-      var cproxy = function(argArray) {
-        return _apply_apply(c, [this, argArray]);
-      };
-      cproxy.prototype = c.prototype;
+      if (!JAM.isNativeFunction(c)) {
+        return JAM.newApply(c, args);
+      }
 
       var len = args.length; 
 
@@ -388,38 +228,80 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       // the function to. The rest are the arguments, which we may need
       // to sanitize for some cases.
       if (len > 0) {
-        if (c === _Function) {
+        if (JAM.identical(c, _Function)) {
           // The last argument is the function body. Any prior arguments
           // are the formals for the new function.
-          args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
+          ispect = pFull;
         }
       }
 
-      return new cproxy(args);
+      var ret;
+      if (typeof ispect === "function") {
+        if (MIMIC) {
+          nodeTx.node = { type: "new", value: c, obj: null, args: args, argc: len };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
+        } else {
+          introspect(ispect) {
+            ret = JAM.newApply(c, args);
+          }
+        }
+      } else {
+        ret = JAM.newApply(c, args);
+      }
+      return ret;
     },
 
-    call: function(f, rec, args) {
+    // This is just here for auto.js to use.
+    bind: function(f, args) {
+      return _bind_apply(f, args);
+    },
+
+    invoke: function(rec, prop, args, ispect) {
+      var f;
+      if (typeof ispect === "function") {
+        if (MIMIC) {
+          nodeTx.node = { type: "read", id: prop, obj: rec };
+          ispect(nodeTx);
+          f = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
+        } else {
+          introspect(ispect) {
+            f = rec[prop];
+          }
+        }
+      } else {
+        f = rec[prop];
+      }
+
+      JAM.call(f, rec, args, ispect);
+    },
+
+    call: function(f, rec, args, ispect) {
       // General notes:
       // * |HTMLElement.prototype.setAttribute| cannot be used to
       //   trigger parsing of |innerHTML|.
 
+      if (!JAM.isNativeFunction(f)) {
+        return _apply_apply(f, [rec, args]);
+      }
+
       var len = args.length;
 
-      if (f === _bind) {
+      if (JAM.identical(f, _bind)) {
         // Prevent a sneaky script from calling |bind| to obscure the
         // identity of a policy-transitioning function prior to a call.
-        f = null;
-        if (len > 0) {
-          var bound = JAMScript.bind(rec, args);
-          // %%% Think about this more.
-          // Return the bound function object.
-          return bound;
+        f = rec;
+        if (JAM.isNativeFunction(f)) {
+          f = wrapMethod(pFull, f);
         }
+        return _bind_apply(f, args);
       }
-      if (f === _apply) {
+      if (JAM.identical(f, _apply)) {
         // Given that the call is now formatted as follows...
         // 
-        //   JAMScript.call(f.apply, f, [rec, args]);
+        //   JAM.call(f.apply, f, [rec, args]);
         //
         // ...the original call was this:
         //
@@ -429,162 +311,77 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         // called, we extract the function |f| and recreate the original
         // |args| array. Then recursively examine the result.
         f = rec;
-        if (len > 0) {
-          rec = args[0];
-          if (len > 1) {
-            args = args[1];
-          } else {
-            args = [];
-          }
-          return JAMScript.call(f, rec, args);
-        } else {
-          // Invoke the function only.
-          return JAMScript.call(f, null, []);
-        }
+        rec = len > 0 ? args[0] : null;
+        args = len > 1 ? args[1] : [];
+        return JAM.call(f, rec, args, ispect);
       }
-      if (f === _call) {
-        // %%% Test and examine this more.
+      if (JAM.identical(f, _call)) {
         // This is largely the same as for |apply|, but with a different
         // method of forming the new arguments.
         f = rec;
-        if (len > 0) {
-          // This formulation plays nicer than using |_Array_slice|
-          // to manipulate |args| when running in a nested transaction.
-          //var bound = JAMScript.bind(f, args);
-          //return bound();
-          // %%% Figure out this problem with nesting.
-          // %%% See adsense.transformed.js.
-          rec = args[0];
-          if (len > 1) {
-            args = _Array_slice(args, 1);
-            return JAMScript.call(f, rec, args);
-          } else {
-            return JAMScript.call(f, rec, []);
-          }
-        }
+        rec = len > 0 ? args[0] : null;
+        args = len > 1 ? _Array_slice(args, 1) : [];
+        return JAM.call(f, rec, args, ispect);
       }
 
       var fname = f.name;
 
-      // The first element of |args| is the object that we're binding
-      // the function to. The rest are the arguments, which we may need
-      // to sanitize for some cases.
+      // Recognize higher-order scripts.
       if (len > 0) {
-        if (f === _eval) {
-          // Assume this is an indirect |eval| because direct cases are
-          // recognized statically and handled differently.
-          //args[0] = "introspect(JAMScript.process) { " + args[0] + " };";
-          JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          var ret = _apply_apply(f, [rec, args]);
-          JAM.setDynamicIntrospector();
-          return ret;
-        } else if (f === _Function) {
-          // The last argument is the function body. Any prior arguments
-          // are the formals for the new function.
-          args[len-1] = "introspect(JAMScript.introspectors.processAll) { " + args[len-1] + " };";
-        } else if (f === _setTimeout || f === _setInterval) {
-          if (typeof args[0] === "function") {
-            if (JAMScript.isNativeFunction(args[1])) {
-              // Wrap the native function in a comprehensive transaction.
-              // %%% Test this
-              args[0] = function(val) {
-                introspect(JAMScript.introspectors.processAll) {
-                  return args[0](val);
-                }
-              }
-            }
-          } else {
-            args[0] = "introspect(JAMScript.introspectors.processAll) {" + args[0] + " };";
-          }
-        } else if (f === _document_write || f === _document_writeln
-            || (fname === "appendChild" && rec instanceof Element)
-            || (fname === "setAttributeNode" && rec instanceof Element)) {
-          // %%% Test each of these cases.
-          //JAMScript.log("1) f: " + f + " fname: " + fname + " rec: " + rec + " args: " + args);
-          JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-          var ret = _apply_apply(f, [rec, args]);
-          JAM.setDynamicIntrospector();
-          return ret;
+        if (JAM.identical(f, _eval) || JAM.identical(f, _Function)
+            || JAM.identical(f, _HTMLDocument_prototype_write)
+            || JAM.identical(f, _HTMLDocument_prototype_writeln)
+            || (fname === "appendChild" && JAM.instanceof(rec, Element))
+            || (fname === "insertBefore" && JAM.instanceof(rec, Element))
+            || (fname === "replaceChild" && JAM.instanceof(rec, Element))
+            || (fname === "setAttributeNode" && JAM.instanceof(rec, Element))) {
+          ispect = pFull;
+        } else if (JAM.identical(f, _Array_prototype_sort)
+            || JAM.identical(f, _setTimeout) || JAM.identical(f, _setInterval)) {
+          // Only protect if a native function is being invoked, since
+          // we assume all user-defined functions are instrumented.
+          // %%% What about string values?
+          if (JAM.isNativeFunction(args[0])) ispect = pFull;
         }
 
         if (len > 1) {
-          if (f === ___defineGetter__ || f === ___defineSetter__) {
-            // This should prevent a sneaky use of getters and setters to
-            // subvert a policy. E.g. consider the following code w.r.t. the
-            // policy predicate |x === 2|.
-            //
-            // o.__defineSetter__("prop", eval);
-            // o.prop = "x = 2";
-            if (JAMScript.isNativeFunction(args[2])) {
-              //JAMScript.log("wrapping __define[G|S]etter__: " + args[1]);
-              // Wrap the native function in a comprehensive transaction.
-              args[2] = function(val) {
-                introspect(JAMScript.introspectors.processAll) {
-                  return args[2](val);
-                }
-              }
-            }
-            // User-defined functions (i.e. non-native ones) will already
-            // be instrumented, so fall through.
-          } else if (fname === "setAttribute" && rec instanceof Element) {
+          if (JAM.identical(f, _String_prototype_replace)
+              || JAM.identical(f, ___defineGetter__)
+              || JAM.identical(f, ___defineSetter__)) {
+            // Array.prototype.sort may invoke a user-provided
+            // comparison function.
+            if (JAM.isNativeFunction(args[1])) ispect = pFull;
+          } else if (fname === "setAttribute" && JAM.instanceof(rec, Element)) {
             // We check |name| because each subclass of |Element|
             // (i.e. |HTMLElement|, |HTMLImageElement|,
             // |HTMLInputElement|, etc) has a distinct |setAttribute|
             // method. The |name| property is read-only, so this is
-            // safe.
-            // %%% Less safe is relying on |instanceof|. Can the
-            // %%% prototype chain be manipulated to subvert this?
+            // safe (though overly conservative).
             var attr = args[0].toString();
             
             if (attr === "src") {
-              if (rec instanceof _HTMLScriptElement) {
-                //JAMScript.log("2) f: " + f + " fname: " + fname + " rec: " + rec + " args: " + args);
-                JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-                var ret = _apply_apply(f, [rec, args]);
-                JAM.setDynamicIntrospector();
-                return ret;
+              if (JAM.instanceof(rec, _HTMLScriptElement)) {
+                ispect = pFull;
               }
             } else if (attr === "data") {
-              if (rec instanceof _HTMLObjectElement) {
-                JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
-                var ret = _apply_apply(f, [rec, args]);
-                JAM.setDynamicIntrospector();
-                return ret;
+              if (JAM.instanceof(rec, _HTMLObjectElement)) {
+                ispect = pFull;
               }
-            } else if (attr.startsWith("on")) {
-              // %%% Could implement case by case.
-              var val = args[1].toString();
-              args[1] = "introspect(JAMScript.introspectors.processAll) {" + val + "}";
+            } else if (_String_startsWith(attr, "on")) {
+              ispect = pFull;
             }
           }
 
           if (len > 2) {
-            if (f === _defineProperty) {
+            if (JAM.identical(f, _defineProperty)) {
               // The 3rd argument to Object.defineProperty is an object with
               // properties describing attributes of the new property. We
               // are interested in the |get| and |set| attributes.
               var o = args[2];
               if (typeof o === "object") {
-                if (JAMScript.isNativeFunction(o.get)) {
-                  //JAMScript.log("wrapping defineProperty (get)");
-                  // Wrap the native function in a comprehensive transaction.
-                  var getter = o.get;
-                  o.get = function(val) {
-                    introspect(JAMScript.introspectors.processAll) {
-                      // %%% Need to bind to |o| or something similiar?
-                      return getter(val);
-                    }
-                  }
-                }
-                if (JAMScript.isNativeFunction(o.set)) {
-                  //JAMScript.log("wrapping defineProperty (set)");
-                  // Wrap the native function in a comprehensive transaction.
-                  var setter = o.set;
-                  o.set = function(val) {
-                    introspect(JAMScript.introspectors.processAll) {
-                      return setter(val);
-                    }
-                  }
+                if (JAM.isNativeFunction(o.get) || JAM.isNativeFunction(o.set)) {
+                  // %%% Don't I need to wrap this?
+                  ispect = pFull;
                 }
               }
             }
@@ -592,89 +389,42 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         }
       }
 
-      return _apply_apply(f, [rec, args]);
-    },
-
-    callIntrospect: function(f, rec, args, ispect) {
-      var len = args.length;
-
-      /*
-      // %%% What here?
-      if (f === _bind) {
-        // Prevent a sneaky script from calling |bind| to obscure the
-        // identity of a policy-transitioning function prior to a call.
-        f = null;
-        if (len > 0) {
-          var bound = JAMScript.bind(rec, args);
-          // %%% Think about this more.
-          // Return the bound function object.
-          return bound;
-        }
-      }
-      */
-      if (f === _apply) {
-        // Given that the call is now formatted as follows...
-        // 
-        //   JAMScript.call(f.apply, f, [rec, args], ispect);
-        //
-        // ...the original call was this:
-        //
-        //   f.apply(rec, args);
-        // 
-        // So for the logic below to evaluate what's actually being
-        // called, we extract the function |f| and recreate the original
-        // |args| array. Then recursively examine the result.
-        f = rec;
-        if (len > 0) {
-          rec = args[0];
-          if (len > 1) {
-            args = args[1];
-          } else {
-            args = [];
-          }
-          return JAMScript.callIntrospect(f, rec, args, ispect);
+      var ret;
+      if (typeof ispect === "function") {
+        if (MIMIC) {
+          nodeTx.node = { type: "call", value: f, obj: rec, args: args, argc: len };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
         } else {
-          // Invoke the function only.
-          return JAMScript.callIntrospect(f, null, [], ispect);
-        }
-      }
-      if (f === _call) {
-        // %%% Test and examine this more.
-        // This is largely the same as for |apply|, but with a different
-        // method of forming the new arguments.
-        f = rec;
-        if (len > 0) {
-          // This formulation plays nicer than using |_Array_slice|
-          // to manipulate |args| when running in a nested transaction.
-          //var bound = JAMScript.bind(f, args);
-          //return bound();
-          // %%% Figure out this problem with nesting.
-          // %%% See adsense.transformed.js.
-          rec = args[0];
-          if (len > 1) {
-            args = _Array_slice(args, 1);
-            return JAMScript.callIntrospect(f, rec, args, ispect);
-          } else {
-            return JAMScript.callIntrospect(f, rec, [], ispect);
+          introspect(ispect) {
+            ret = _apply_apply(f, [rec, args]);
           }
         }
-      }
-
-      var node = { type: "call", value: f, obj: rec, args: args, argc: args.length }
-      if (ispect(node) || PERFORMANCE_TESTING) {
-        return JAMScript.call(f, rec, args);
       } else {
-        JAMScript.violation();
+        ret = _apply_apply(f, [rec, args]);
       }
+      return ret;
     },
- 
-    newIntrospect: function(c, args, ispect) {
-      var node = { type: "call", value: c, obj: rec, null: args, argc: args.length }
-      if (ispect(node) || PERFORMANCE_TESTING) {
-        return JAMScript.new(c, args);
+
+    get: function(obj, memb, ispect) {
+      if (obj === null) obj = _global;
+      var ret;
+      if (ispect) {
+        if (MIMIC) {
+          nodeTx.node = { type: "read", id: memb, obj: obj };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
+        } else {
+          introspect(ispect) {
+            ret = obj[memb];
+          }
+        }
       } else {
-        JAMScript.violation();
+        ret = obj[memb];
       }
+      return ret;
     },
 
     set: function(obj, memb, val, ispect) {
@@ -693,209 +443,241 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
       //     contains an inline script, the script referenced by the src
       //     attribute will not be loaded.''
 
+      if (obj === null) obj = _global;
       // %%% Need to be more general? |Node|, perhaps?
-      if (obj instanceof HTMLElement) {
+      if (JAM.instanceof(obj, _HTMLElement)) {
         if (memb === "outerHTML") {
-          // Writing to |outerHTML| replaces the node altogether, so the
-          // action is irrespective of the element type.
-          val = JAMScript.wrapHTMLEventScript(obj, val);
-        } else if (memb.startsWith("on")) {
-          var typ = typeof val;
-          if (typ === "function") {
-            if (JAMScript.isNativeFunction(val)) {
-              // This should be rare. The |this| value will be |obj|.
-              // %%% Should |obj| be used instead of |this|?
-              val = function () { introspect(JAMScript.introspectors.processAll) { val(this); } };
+          ispect = pFull;
+        } else if (_String_startsWith(memb, "on")) {
+          if (typeof val === "function") {
+            if (JAM.isNativeFunction(val)) {
+              // This should be rare.
+              ispect = pFull;
             }
-          } else if (typ === "string") {
-            val = "introspect(JAMScript.introspectors.processAll) { " + val + " }";
+          } else {
+            ispect = pFull;
           }
-        } else if (obj instanceof _HTMLScriptElement) {
+        } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
           // The contents of script elements are directly interpreted.
           // I believe this should work with CDATA-enclosed text also,
           // since the CDATA tags have to be commented.
-          if (memb === "innerHTML") {
-            val = "introspect(JAMScript.introspectors.processAll) { " + val + " }";
-          } else if (memb === "textContent") {
-            val = "introspect(JAMScript.introspectors.processAll) { " + val + " }";
+          if (memb === "innerHTML" || memb === "textContent") {
+            ispect = pFull;
           }
         } else {
           if (memb === "innerHTML") {
-            val = JAMScript.wrapHTMLEventScript(obj, val);
+            ispect = pFull;
           }
           // No action needed for |textContent|.
         }
+        if (memb === "src") {
+          if (JAM.instanceof(rec, _HTMLScriptElement)) {
+            ispect = pFull;
+          }
+        } else if (memb === "data") {
+          if (JAM.instanceof(rec, _HTMLObjectElement)) {
+            ispect = pFull;
+          }
+        }
       }
       
-      if (ispect === undefined) {
-        return obj[memb] = val;
-      } else {
-        // %%% Seg. fault occurs when return is inside the transaction.
+      if (typeof ispect === "function") {
         var ret;
-        introspect(ispect) {
-          ret = obj[memb] = val;
+        if (MIMIC) {
+          nodeTx.node = { type: "write", id: memb, value: val, obj: obj };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
+        } else {
+          // %%% Seg. fault occurs when return is inside the transaction.
+          introspect(ispect) {
+            ret = obj[memb] = val;
+          }
         }
         return ret;
+      } else {
+        obj[memb] = val;
+        return val;
       }
     },
 
-    performAction: function(tx) {
+    commitNode: function(tx) {
+      var node = tx.node;
+      var type = node.type;
 
-      // Get the cause of the suspend.
-      var sx = tx.getSuspendInfo();
-      if (!sx) return;
-
-      var type = sx.type;
-
-      // Get the receiver of the action.
-      var obj = sx.obj;
-
-      // Get the property name that was accessed.
-      var prop = sx.id;
-      // And additional information. This is the property name for
-      // reads and writes, the function name for calls, and "forin"
-      // for suspend on for-in loops, (done for techical reasons).
-      var desc = sx.description;
-
+      var ret;
       if (type === "write") {
+        // Get the receiver of the write.
+        var obj = node.obj;
+        // Get the property name that was accessed.
+        var id = node.id;
         // Transaction suspensions caused by assignment to a property.
-        var writeValue = sx.value;
+        var value = node.value;
+        ret = value;
 
-        if (typeof prop === "string" && prop.startsWith("on")) {
+        if (_String_startsWith(id, "on")) {
           // Wrap event handlers in transaction blocks.
-          writeValue = JAMScript.wrapFunction(tx.getHandler(), writeValue, false);
-        } else if (prop === "innerHTML") {
-          // Intervene for constructs that can generate dynamic code.
-          if (obj instanceof _HTMLScriptElement) {
-            writeValue = "introspect(JAMScript.introspectors.processAll) { " + writeValue + " };";
-          } else {
-            writeValue = JAMScript.wrapHTMLEventScript(obj, writeValue);
+          if (JAM.isNativeFunction(value)) {
+            value = wrapFunction(pFull, value, obj);
+          } else if (typeof value === "string") {
+            value = "introspect(JAM.policy.pFull) { " + value + " }";
           }
+        } else if (id === "outerHTML") {
+          // Writing to |outerHTML| replaces the node altogether, so the
+          // action is irrespective of the element type.
+          // %%% Can |outerHTML| be used like |document.write| to
+          // %%% incrementally create elements?
+          value = wrapHTMLEventScript(obj, value);
+        } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
+          if (id === "textContent" || id === "innerHTML") {
+            value = "introspect(JAM.policy.pFull) { " + value + " };";
+          }
+        } else if (id === "innerHTML") {
+          // Dig down into other element types to find scripts.
+          value = wrapHTMLEventScript(obj, value);
         }
-        obj[prop] = writeValue;
+        obj[id] = value;
 
-        // Set the return value.
-        tx.setRetval(writeValue);
+        // Set the return value to the *original* value.
+        tx.setRetval(ret);
 
       } else if (type === "call") {
         // Transaction suspensions caused by call to a function.
 
+        // Get the receiver of the call.
+        var obj = node.obj;
         // Get the function that triggered the suspend.
-        var fun = sx.value;
+        var fun = node.value;
         // And the arguments.
-        var args = sx.args;
-        var len = args.length;
+        var args = node.args;
+        var len = node.argc;
 
-        var ret;
-        switch (desc) {
-          case "sort":
+        // Recursively unwrap these cases.
+        if (JAM.identical(fun, _apply)) {
+          node.value = obj;
+          node.obj = node.argc > 0 ? args[0] : _undefined;
+          node.args = node.argc > 1 ? args[1] : _undefined;
+          node.argc = node.args.length;
+          return JAM.commitNode(tx);
+        } else if (JAM.identical(fun, _call)) {
+          node.value = obj;
+          node.obj = node.argc > 0 ? args[0] : _undefined;
+          node.args = node.argc > 1 ? _Array_slice(args, 1) : _undefined;
+          node.argc = node.args.length;
+          return JAM.commitNode(tx);
+        }
+
+        // Mark this false if special invocation is done in place.
+        var invoke = true;
+        if (len > 0) {
+          if (JAM.identical(fun, _Array_prototype_sort)) {
             // Array.prototype.sort may invoke a user-provided
             // comparison function.
-            if (args.length >= 1) {
-              args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
+            if (JAM.isNativeFunction(args[0])) {
+              args[0] = wrapMethod(pFull, args[0]);
             }
-            //ret = _apply_apply(fun, [obj, args]);
-            ret = fun.apply(obj, args);
-            break;
-          case "addEventListener":
-            // For |addEventListener|, the first argument is the type
-            // of event and the second (index 1) is the event handler.
-            // There may be optional further arguments.
-            // %%% What if the second argument is an |EventListener|
-            // %%% rather than a simple |Function|?
-            args[1] = JAMScript.wrapFunction(tx.getHandler(), args[1], false);
-            ret = _apply_apply(fun, [obj, args]);
-            break;
-          
-          case "removeEventListener":
-            // The second argument must specify the |Function| or
-            // |EventListener| to remove, so we need to maintain a
-            // mapping from the "original" functions to their
-            // wrapped version. The latter is the value to pass as
-            // second argument, if it exists in the mapping. If not,
-            // use the passed argument (which should cover the case
-            // in which the user retrieves the current event handler
-            // and requests that it be removed, as opposed to
-            // requesting that a reference to the original, unwrapped
-            // function value be removed.
-            // %%% Implement mapping described above.
-            ret = _apply_apply(fun, [obj, args]);
-            break;
-                
-          case "clearInterval":
-            // %%% See comment for |removeEventListener|.
-            ret = _apply_apply(fun, [obj, args]);
-            break;
-
-          case "setTimeout":
-          case "setInterval":
+          } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
             // %%% Currently assumes args[0] is a function object
-            args[0] = JAMScript.wrapFunction(tx.getHandler(), args[0], false);
-            ret = _apply_apply(fun, [obj, args]);
-            break;
-
-          case "Function":
+            if (JAM.isNativeFunction(args[0])) {
+              args[0] = wrapMethod(pFull, args[0]);
+            }
+          } else if (JAM.identical(fun, _Function)) {
             // %%% What happens in non-string cases?
             ret = _apply_apply(fun, [obj, args]);
             if (typeof ret === "function") {
-              ret = JAMScript.wrapFunction(JAMScript.introspectors.processAll, ret, true)
+              ret = wrapMethod(pFull, ret)
             }
-            break;
-             
-          case "eval":
+            invoke = false;
+          } else if (JAM.identical(fun, _eval)) {
             // Given that the callsite transformation will handle all
             // direct calls to |eval|, we can assume this is indirect.
+            // %%% What about the modular case?
 
             // Per MDN, SpiderMonkey no longer supports |eval| with
             // more than 1 argument.
             // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            JAM.setDynamicIntrospector(pFull);
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
-            break;
-
-          case "writeln":
-          case "write":
-            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            invoke = false;
+          } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
+            JAM.setDynamicIntrospector(pFull);
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
-            break;
-
-          case "appendChild":
-          case "replaceChild":
-          case "insertBefore":
+            invoke = false;
+          } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
             // For |appendChild|, |replaceChild| and |insertBefore|,
             // the first argument is the element to be inserted.
-            JAM.setDynamicIntrospector(JAMScript.introspectors.processAll);
+            JAM.setDynamicIntrospector(pFull);
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
-            break;
-
-          case "apply":
-            // Pass through if this is the internal _bind_apply.
-            if (fun === _apply) {
-              fun = obj;
-              obj = sx.argc > 0 ? args[0] : _undefined;
-              args = sx.argc > 1 ? args[1] : _undefined;
+            invoke = false;
+          }
+          
+          if (len > 1) {
+            if (JAM.identical(fun, _String_prototype_replace)) {
+              // String.prototype.replace may invoke a user-provided
+              // replacement-generator function.
+              if (JAM.isNativeFunction(args[1])) {
+                args[1] = wrapMethod(pFull, args[1]);
+              }
+            } else if (fun.name === "addEventListener") {
+              // For |addEventListener|, the first argument is the type
+              // of event and the second (index 1) is the event handler.
+              // There may be optional further arguments.
+              // %%% What if the second argument is an |EventListener|
+              // %%% rather than a simple |Function|?
+              if (JAM.isNativeFunction(args[1])) {
+                args[1] = wrapMethod(pFull, args[1]);
+              }
+            } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+              // The second argument must specify the |Function| or
+              // |EventListener| to remove, so we need to maintain a
+              // mapping from the "original" functions to their
+              // wrapped version. The latter is the value to pass as
+              // second argument, if it exists in the mapping. If not,
+              // use the passed argument (which should cover the case
+              // in which the user retrieves the current event handler
+              // and requests that it be removed, as opposed to
+              // requesting that a reference to the original, unwrapped
+              // function value be removed.
+              // %%% Implement mapping described above.
+            } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
+              // Wrap the native function in a comprehensive transaction.
+              if (JAM.isNativeFunction(args[1])) {
+                args[1] = wrapMethod(pFull, args[1]);
+              }
+            } else if (len > 2) {
+              if (JAM.identical(fun, _defineProperty)) {
+                // Wrap the getter/setter function in a comprehensive transaction.
+                var o = args[2];
+                if (JAM.isNativeFunction(o.set)) {
+                  o.set = wrapMethod(pFull, o.set);
+                }
+                if (JAM.isNativeFunction(o.get)) {
+                  o.get = wrapMethod(pFull, o.get);
+                }
+              }
             }
-            ret = _apply_apply(fun, [obj, args]);
-            break;
-
-          case "call":      
-            // %%% Not sure what code path this takes in the
-            // %%% interpreter, so not sure of the reason why we
-            // %%% would want to suspend on a call to |call|.
-            fun = obj;
-            obj = sx.argc > 0 ? args[0] : _undefined;
-            args = sx.argc > 1 ? _Array_slice(args, 1) : _undefined;
-            // Fall through
-
-          default:
-            ret = _apply_apply(fun, [obj, args]);
-            break;
+          }
         }
 
+        if (invoke) ret = _apply_apply(fun, [obj, args]);
+
         // Set the return value.
+        tx.setRetval(ret);
+      } else if (type === "new") {
+        var c = node.value;
+        var args = node.args;
+        var len = node.argc;
+
+        if (len > 0) {
+          if (JAM.identical(c, _Function)) {
+              args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
+          }
+        }
+
+        ret = JAM.newApply(c, args);
         tx.setRetval(ret);
       } else if (type === "forin") {
         // Transaction suspensions caused by entering a for-in loop.
@@ -903,9 +685,192 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         // Do nothing, we just rely on the commit to sync the state
         // of the transaction with the heap.
       } else if (type === "read") {
+        // Get the receiver of the read.
+        var obj = node.obj;
+        var id = node.id;
         // %%% May need to wrap a user-defined getter in a tx.
-        var ret = obj[prop];
-        //_console.log("ret: " + ret);
+        ret = obj[id];
+        tx.setRetval(ret);
+      } else {
+        // Other suspension types.
+        // %%% May need to handle these in the future.
+        alert("Unhandled suspend type: " + type);
+      }
+
+      return;
+    },
+
+    commitSuspend: function(tx) {
+
+      // Get the cause of the suspend.
+      var sx = tx.getSuspendInfo();
+      if (!sx) return;
+
+      var type = sx.type;
+
+      var ret;
+      if (type === "write") {
+        // Get the receiver of the write.
+        var obj = sx.obj;
+        // Transaction suspensions caused by assignment to a property.
+        var value = sx.value;
+        ret = value;
+        // Get the property name that was accessed.
+        var id = sx.id;
+
+        if (_String_startsWith(id, "on")) {
+          // Wrap event handlers in transaction blocks.
+          var typ = typeof value;
+          if (typ === "function") {
+            value = wrapFunction(pFull, value, obj);
+          } else if (typ === "string") {
+            value = "introspect(JAM.policy.pFull) { " + value + " }";
+          }
+        } else if (id === "outerHTML") {
+          // Writing to |outerHTML| replaces the node altogether, so the
+          // action is irrespective of the element type.
+          // %%% Can |outerHTML| be used like |document.write| to
+          // %%% incrementally create elements?
+          value = wrapHTMLEventScript(obj, value);
+        } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
+          if (id === "textContent" || id === "innerHTML") {
+            value = "introspect(JAM.policy.pFull) { " + value + " };";
+          }
+        } else if (id === "innerHTML") {
+          // Dig down into other element types to find scripts.
+          value = wrapHTMLEventScript(obj, value);
+        }
+        obj[id] = value;
+
+        // Set the return value to the *original* value.
+        tx.setRetval(ret);
+
+      } else if (type === "call") {
+        // Transaction suspensions caused by call to a function.
+
+        // Get the receiver of the call.
+        var obj = sx.obj;
+        // Get the function that triggered the suspend.
+        var fun = sx.value;
+        // And the arguments.
+        var args = sx.args;
+        var len = sx.argc;
+
+        // Mark this false if special invocation is done in place.
+        var invoke = true;
+        if (len > 0) {
+          if (JAM.identical(fun, _Array_prototype_sort)) {
+            // Array.prototype.sort may invoke a user-provided
+            // comparison function.
+            args[0] = wrapMethod(pFull, args[0]);
+          } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
+            // %%% Currently assumes args[0] is a function object
+            args[0] = wrapMethod(pFull, args[0]);
+          } else if (JAM.identical(fun, _Function)) {
+            // %%% What happens in non-string cases?
+            ret = _apply_apply(fun, [obj, args]);
+            if (typeof ret === "function") {
+              ret = wrapMethod(pFull, ret)
+            }
+            invoke = false;
+          } else if (JAM.identical(fun, _eval)) {
+            // Given that the callsite transformation will handle all
+            // direct calls to |eval|, we can assume this is indirect.
+            // %%% What about the modular case?
+
+            // Per MDN, SpiderMonkey no longer supports |eval| with
+            // more than 1 argument.
+            // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
+            JAM.setDynamicIntrospector(pFull);
+            ret = _apply_apply(fun, [obj, args]);
+            JAM.setDynamicIntrospector();
+            invoke = false;
+          } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
+            JAM.setDynamicIntrospector(pFull);
+            ret = _apply_apply(fun, [obj, args]);
+            JAM.setDynamicIntrospector();
+            invoke = false;
+          } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+            // For |appendChild|, |replaceChild| and |insertBefore|,
+            // the first argument is the element to be inserted.
+            JAM.setDynamicIntrospector(pFull);
+            ret = _apply_apply(fun, [obj, args]);
+            JAM.setDynamicIntrospector();
+            invoke = false;
+          }
+          
+          if (len > 1) {
+            if (JAM.identical(fun, _String_prototype_replace)) {
+              // String.prototype.replace may invoke a user-provided
+              // replacement-generator function.
+              if (typeof args[1] === "function") {
+                args[1] = wrapMethod(pFull, args[1]);
+              }
+            } else if (fun.name === "addEventListener") {
+              // For |addEventListener|, the first argument is the type
+              // of event and the second (index 1) is the event handler.
+              // There may be optional further arguments.
+              // %%% What if the second argument is an |EventListener|
+              // %%% rather than a simple |Function|?
+              args[1] = wrapMethod(pFull, args[1]);
+            } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+              // The second argument must specify the |Function| or
+              // |EventListener| to remove, so we need to maintain a
+              // mapping from the "original" functions to their
+              // wrapped version. The latter is the value to pass as
+              // second argument, if it exists in the mapping. If not,
+              // use the passed argument (which should cover the case
+              // in which the user retrieves the current event handler
+              // and requests that it be removed, as opposed to
+              // requesting that a reference to the original, unwrapped
+              // function value be removed.
+              // %%% Implement mapping described above.
+            } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
+              // Wrap the native function in a comprehensive transaction.
+              args[1] = wrapMethod(pFull, args[1]);
+            } else if (len > 2) {
+              if (JAM.identical(fun, _defineProperty)) {
+                // Wrap the getter/setter function in a comprehensive transaction.
+                var o = args[2];
+                if (typeof o.set === "function") {
+                  o.set = wrapMethod(pFull, o.set);
+                }
+                if (typeof o.get === "function") {
+                  o.get = wrapMethod(pFull, o.get);
+                }
+              }
+            }
+          }
+        }
+
+        if (invoke) ret = _apply_apply(fun, [obj, args]);
+
+        // Set the return value.
+        tx.setRetval(ret);
+      } else if (type === "new") {
+        var c = sx.value;
+        var args = sx.args;
+        var len = args.length;
+
+        if (len > 0) {
+          if (JAM.identical(c, _Function)) {
+              args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
+          }
+        }
+
+        ret = JAM.newApply(c, args);
+        tx.setRetval(ret);
+      } else if (type === "forin") {
+        // Transaction suspensions caused by entering a for-in loop.
+
+        // Do nothing, we just rely on the commit to sync the state
+        // of the transaction with the heap.
+      } else if (type === "read") {
+        // Get the receiver of the read.
+        var obj = sx.obj;
+        var id = sx.id;
+        // %%% May need to wrap a user-defined getter in a tx.
+        ret = obj[id];
         tx.setRetval(ret);
       } else {
         // Other suspension types.
@@ -923,7 +888,7 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
         alert(obj);
         return;
       }
-      if (typeof depth == "undefined") {
+      if (typeof depth === "undefined") {
         // Default value for prototype depth.
         depth = 1;
       }
@@ -956,16 +921,17 @@ Object.defineProperty(this, 'JAMScript', { 'value': (function(pol) {
 
   };
 
-}(policy)) } );
+}()) } );
+
 if (PERFORMANCE_TESTING) {
   // Pass through violations for performance testing.
-  JAMScript.prevent = JAMScript.process;
+  JAM.prevent = JAM.process;
   // Override |alert| for convenience (and perf. testing).
-  alert = JAMScript.log;
+  alert = JAM.log;
 }
 
-Object.freeze(JAMScript);
-Object.freeze(JAMScript.introspectors);
+Object.freeze(JAM);
+Object.freeze(JAM.policy);
 
-// Prevent access to the policy except within the JAMScript object.
+// Prevent access to the policy except within the JAM object.
 delete policy;

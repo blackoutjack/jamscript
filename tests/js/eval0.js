@@ -2,7 +2,7 @@ function pol(tx) {
   print("1) " + a);
   tx.commit();
   if (tx.isSuspended()) {
-    JAMScript.performAction(tx);
+    JAM.commitSuspend(tx);
   }
   tx.suppress();
   print("2) " + a);

@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 function f(p) {
   function v50() {
     return p;

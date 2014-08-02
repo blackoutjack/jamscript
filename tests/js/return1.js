@@ -3,7 +3,7 @@ function f(val) {
     alert("bah");
   } else {
     var o = { get prop() { return 3 + 4; } }
-    introspect(JAMScript.process) {
+    introspect(JAM.process) {
       return z = o.prop;
     }
   }

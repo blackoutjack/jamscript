@@ -1,10 +1,10 @@
 var a = 1;
 function f() {
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     a *= 5;
   }
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   a *= 3;
   f();
 }

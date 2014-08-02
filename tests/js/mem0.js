@@ -22,7 +22,7 @@ var process = function(){
   var g = {'a': 0};
 	var p = {'b': 1};
   var i = 0;
-  introspect(JAMScript.introspectors.processAll) {
+  introspect(JAM.policy.pFull) {
     for (; i<950000; i++) {
       g.a += p.b;
     }

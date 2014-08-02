@@ -7,7 +7,7 @@ function pol(tx) {
   for (var i=0; i<rs.length; i++) {
     print(i + ": " + rs[i].obj + " / " + rs[i].id + " / " + rs[i].value);
   }
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The array is reversed in place.
   print(rev); // "D", "C", "B", "A"
   // And a reference to the array is returned.

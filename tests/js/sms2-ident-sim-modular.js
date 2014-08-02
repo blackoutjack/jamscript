@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 // sms2_common.js
 //Written by Paul Stothard, University of Alberta, Canada
 

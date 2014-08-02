@@ -11,7 +11,7 @@ function c1() {
 }
 var p1 = "GLOB";
 
-introspect (JAMScript.process) {
+introspect (JAM.process) {
   var o1 = c1();
   print("o1.m1(): " + o1.m1()); // o1.m1(): GLOB
 }

@@ -2,7 +2,7 @@ function pol2(tx) {
   parnt("blah");
 }
 function pol(tx) {
-  JAMScript.process(tx);
+  JAM.process(tx);
   pol2(tx);
 }
 function f() {

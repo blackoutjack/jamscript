@@ -7,7 +7,7 @@
  0.0: 0 / true / call
  // The host processes the outer introspect by performing the |print|
  // action as if it occurred in the outer tx, printing the following.
- // Within JAMScript.process the outer tx is committed, causing |a|
+ // Within JAM.process the outer tx is committed, causing |a|
  // to have value |1| in the host code.
  1.0: 1 / false
  // |pol0| prints the value of |a| as seen by the host code.
@@ -35,13 +35,13 @@
 function pol0(tx) {
   // This function executes in the host context.
   print("0.0: " + a + " / " + tx.isSuspended() + (tx.getSuspendInfo() ? " / " + tx.getSuspendInfo().type : ""));
-  JAMScript.process(tx); 
+  JAM.process(tx); 
   print("0.1: " + a + " / " + tx.isSuspended() + (tx.getSuspendInfo() ? " / " + tx.getSuspendInfo().type : ""));
 }
 function pol1(tx) {
   // This function executes in the outer tx context.
   print("1.0: " + a + " / " + tx.isSuspended() + (tx.getSuspendInfo() ? " / " + tx.getSuspendInfo().type : ""));
-  JAMScript.process(tx);
+  JAM.process(tx);
   print("1.1: " + a + " / " + tx.isSuspended() + (tx.getSuspendInfo() ? " / " + tx.getSuspendInfo().type : ""));
 }
 var a = 0;

@@ -2,7 +2,7 @@ function v83() {
   var c$$29 = [];
   var b$$30 = 0;
   var v109 = 256 > b$$30;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   for(;v109;) {
     var v120;
     var v707 = 128 > b$$30;

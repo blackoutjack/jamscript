@@ -1,6 +1,6 @@
 var tot = 0;
 for (var i=0; i<10000; i++) {
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     tot += i;
   }
 }

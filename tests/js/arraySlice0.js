@@ -1,6 +1,6 @@
 // Testcase for array.slice
 var a = new Array(1, 2, 3, 4, 5, 6, 7);
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var slc = a.slice(2, 4);
 }
 // The original array is unchanged.

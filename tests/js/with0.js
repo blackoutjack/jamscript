@@ -1,6 +1,6 @@
 function f(o) {
   with(o) {
-    introspect(JAMScript.process) {
+    introspect(JAM.process) {
       a = 4;
     }
   }

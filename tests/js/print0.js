@@ -1,6 +1,6 @@
 function pol(tx) {
   print("ok");
-  JAMScript.process(tx);
+  JAM.process(tx);
 }
 var p = print;
 function f(v) {

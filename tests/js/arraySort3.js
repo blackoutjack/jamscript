@@ -1,6 +1,6 @@
 // Testcase for the read set induced by array.sort
 function pol(tx) {
-  JAMScript.process(tx);
+  JAM.process(tx);
 }
 function comp(v1, v2) {
   return -v1.toString().localeCompare(v2);

@@ -4,7 +4,7 @@ function pol(tx) {
   print(a); // 1, 2, 3, 4, 5, 6, 7
   // The return value should be undefined at this point.
   print(slc); // undefined
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The original array is still unchanged.
   print(a); // 1, 2, 3, 4, 5, 6, 7
   // The specified portion of the array is returned.

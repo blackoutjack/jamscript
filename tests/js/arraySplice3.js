@@ -1,3 +1,4 @@
+introspect(JAM.process) {
 function v37(p, h$$4) {
   function v11() {
     function a() {
@@ -25,8 +26,8 @@ function v37(p, h$$4) {
         var v125 = a$$2.hasOwnProperty(c$$1);
         /*
         if (c$$1 == "_append") {
-          JAMScript.dump(a$$2);
-          JAMScript.dump(v125);
+          JAM.dump(a$$2);
+          JAM.dump(v125);
         }
         */
         if(v125) {
@@ -305,15 +306,13 @@ function v37(p, h$$4) {
     if(a$$16) {
       var j = 0;
       var v96 = j < a$$16;
-introspect(JAMScript.process) {
       for(;v96;) {
         this._doProcessBlock(c$$8, j);
         j += d$$2;
         v96 = j < a$$16
       }
       j = c$$8.splice(0, a$$16);
-};
-      JAMScript.log("j: " + j);
+      JAM.log("j: " + j);
       e$$21.sigBytes -= b$$5
     }
     var v305 = o$$1.create(j, b$$5);
@@ -906,9 +905,7 @@ function v82(p$$4) {
     if(b$$15) {
       this._append(b$$15)
     }
-//introspect(JAMScript.process) {
     var v581 = this._doFinalize();
-//};
     return v581
   }
   function v59() {
@@ -934,9 +931,7 @@ function v82(p$$4) {
         }else {
           v117 = e$$31
         }
-//introspect(JAMScript.process) {
         var v587 = v117.decrypt(b$$16, a$$33, q$$3, j$$2);
-//};
         return v587
       }
       var v588 = {encrypt:v56, decrypt:v57};
@@ -945,9 +940,7 @@ function v82(p$$4) {
     return v58
   }
   function v60() {
-//introspect(JAMScript.process) {
     var v593 = this._process(!0);
-//};
     return v593
   }
   function v61(b$$17, a$$34) {
@@ -998,7 +991,9 @@ function v82(p$$4) {
       var v610 = d$$13 + e$$34;
       var f$$10 = a$$40.slice(d$$13, v610);
       c$$19.decryptBlock(a$$40, d$$13);
+introspect(JAM.process) {
       b$$20.call(this, a$$40, d$$13, e$$34);
+}
       this._prevBlock = f$$10
     }
     var a$$37 = f$$9.extend();
@@ -1080,9 +1075,7 @@ function v82(p$$4) {
       b$$26.pad(this._data, this.blockSize);
       var a$$44 = this._process(!0)
     }else {
-//introspect(JAMScript.process) {
       a$$44 = this._process(!0);
-//};
       b$$26.unpad(a$$44)
     }
     return a$$44
@@ -1156,9 +1149,7 @@ function v82(p$$4) {
     f$$13 = v671.extend(f$$13);
     c$$24 = this._parse(c$$24, f$$13.format);
     var v672 = a$$48.createDecryptor(e$$37, f$$13);
-//introspect(JAMScript.process) {
     var v673 = v672.finalize(c$$24.ciphertext);
-//};
     return v673
   }
   function v78(a$$49, c$$25) {
@@ -1738,7 +1729,6 @@ var v135;
 var CryptoJS;
 var v705;
 var v137;
-//introspect(JAMScript.process) {
 v135 = CryptoJS;
 if(!v135) {
   v135 = v37(Math)
@@ -1753,10 +1743,10 @@ if(!v137) {
   v82()
 }
 v88();
-//};
 
 var wordArrPlainText = CryptoJS.AES.decrypt("U2FsdGVkX195KYdbLoQx67r/kJZOeBb9rmtFfpZVH88=", "test");
 var v161 = CryptoJS.enc;
 var v162 = v161.Utf8;
 var plain = v162.stringify(wordArrPlainText);
+}
 print("plain: " + plain);

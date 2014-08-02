@@ -1,5 +1,5 @@
 var s = "abcxdef";
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var f = s.indexOf;
 }
 var m = f.bind(s);

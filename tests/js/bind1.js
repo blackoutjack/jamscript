@@ -4,7 +4,7 @@ function f() {
 var val = "GLOBAL";
 var a = { val: "LOCAL" };
 var ret;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   var fbound = f.bind(a);
   ret = fbound();
 }

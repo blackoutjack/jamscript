@@ -1,7 +1,7 @@
 var result = 0;
 function f() {
   var result = 2;
-  introspect(JAMScript.process) {
+  introspect(JAM.process) {
     var e = eval;
     result = e("result + 1");
   }

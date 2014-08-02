@@ -1,4 +1,3 @@
 print("zeroeth");
-var f = JAMScript.bind(print.apply, [print, undefined, new Array("first")]);
-f();
+JAM.call(print.apply, print, [undefined, new Array("first")]);
 print("done");

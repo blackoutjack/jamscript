@@ -8,7 +8,7 @@ function pol(tx) {
     // This should remain zero until the tx is committed.
     print("len: " + ws[i].obj.length);
   }
-  JAMScript.process(tx);
+  JAM.process(tx);
   // The original array is unchanged.
   print(a); // 1, 2, 3, 4, 5, 6, 7
   // And the extracted array is returned.

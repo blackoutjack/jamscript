@@ -1,5 +1,5 @@
 function pol(tx) {
-  JAMScript.process(tx);
+  JAM.process(tx);
 }
 introspect(pol) {
   var a = 4;

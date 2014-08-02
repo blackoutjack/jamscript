@@ -11,7 +11,7 @@ function f2(a) {
   var d;
   var e = 1;
 }
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   f2();
   f3("ok");
 };

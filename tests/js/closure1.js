@@ -1,4 +1,4 @@
-introspect(JAMScript.process) {
+introspect(JAM.process) {
 function c() {
   this.states = new Array(0,0,0,0,0);
   this.__defineGetter__("States", function() {

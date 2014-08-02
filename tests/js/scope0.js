@@ -1,7 +1,7 @@
 function f() {
   var a = 3;
   function g() {
-    introspect(JAMScript.process) {
+    introspect(JAM.process) {
       a = "dang";
     }
   }

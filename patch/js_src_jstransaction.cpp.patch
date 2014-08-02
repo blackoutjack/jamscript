@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/jstransaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstransaction.cpp	2014-06-18 17:22:16.652889536 -0500
++++ mozilla-esr17/js/src/jstransaction.cpp	2014-07-17 23:43:18.817720772 -0500
 @@ -0,0 +1,341 @@
 +#include "jsversion.h"
 +#ifdef TxJS
@@ -114,7 +114,7 @@
 +        return JS_FALSE;
 +    }
 +
-+    return tx->loadActionSequenceIntoArray(cx, AX_CALL, args.rval());
++    return tx->loadActionSequenceIntoArray(cx, AX_INVOKE, args.rval());
 +}
 +
 +JSBool

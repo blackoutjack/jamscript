@@ -11,7 +11,7 @@ function fo() {
 }
 var g;
 var val;
-introspect(JAMScript.process) {
+introspect(JAM.process) {
   val = fo();
 }
 print("g: " + g);
