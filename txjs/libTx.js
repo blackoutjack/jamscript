@@ -2,7 +2,7 @@
 // tag in the HTML page, and then this file, followed by all others.
 
 const PERFORMANCE_TESTING = true;
-const MIMIC = true;
+const MIMIC = false;
 const DEFAULT_ALLOW = true;
 
 // Allow testing scripts with |alert| in the JS shell.
@@ -153,11 +153,383 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
     return frag.innerHTML;
   }
 
+  function commitSuspendFine(tx) {
+
+    // Get the cause of the suspend.
+    var sx = tx.getSuspendInfo();
+    if (!sx) return;
+
+    var type = sx.type;
+
+    var ret;
+    if (type === "write") {
+      // Get the receiver of the write.
+      var obj = sx.obj;
+      // Transaction suspensions caused by assignment to a property.
+      var value = sx.value;
+      ret = value;
+      // Get the property name that was accessed.
+      var id = sx.id;
+
+      if (_String_startsWith(id, "on")) {
+        // Wrap event handlers in transaction blocks.
+        var typ = typeof value;
+        if (JAM.isNativeFunction(value)) {
+          value = wrapFunction(pFull, value, obj);
+        } else if (typ === "string") {
+          value = "introspect(JAM.policy.pFull) { " + value + " }";
+        }
+      } else if (id === "outerHTML") {
+        // Writing to |outerHTML| replaces the node altogether, so the
+        // action is irrespective of the element type.
+        // %%% Can |outerHTML| be used like |document.write| to
+        // %%% incrementally create elements?
+        value = wrapHTMLEventScript(obj, value);
+      } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
+        if (id === "textContent" || id === "innerHTML") {
+          value = "introspect(JAM.policy.pFull) { " + value + " };";
+        }
+      } else if (id === "innerHTML") {
+        // Dig down into other element types to find scripts.
+        value = wrapHTMLEventScript(obj, value);
+      }
+      obj[id] = value;
+
+      // Set the return value to the *original* value.
+      tx.setRetval(ret);
+
+    } else if (type === "call") {
+      // Transaction suspensions caused by call to a function.
+
+      // Get the receiver of the call.
+      var obj = sx.obj;
+      // Get the function that triggered the suspend.
+      var fun = sx.value;
+      // And the arguments.
+      var args = sx.args;
+      var len = sx.argc;
+
+      // Mark this false if special invocation is done in place.
+      var invoke = true;
+      if (len > 0) {
+        if (JAM.identical(fun, _Array_prototype_sort)) {
+          // Array.prototype.sort may invoke a user-provided
+          // comparison function.
+          if (JAM.isNativeFunction(args[0])) {
+            args[0] = wrapMethod(pFull, args[0]);
+          }
+        } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
+          if (JAM.isNativeFunction(args[0])) {
+            args[0] = wrapMethod(pFull, args[0]);
+          }
+        } else if (JAM.identical(fun, _Function)) {
+          // %%% What happens in non-string cases?
+          ret = _apply_apply(fun, [obj, args]);
+          if (typeof ret === "function") {
+            ret = wrapMethod(pFull, ret)
+          }
+          invoke = false;
+        } else if (JAM.identical(fun, _eval)) {
+          // Given that the callsite transformation will handle all
+          // direct calls to |eval|, we can assume this is indirect.
+          // %%% What about the modular case?
+
+          // Per MDN, SpiderMonkey no longer supports |eval| with
+          // more than 1 argument.
+          // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+          // For |appendChild|, |replaceChild| and |insertBefore|,
+          // the first argument is the element to be inserted.
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        }
+        
+        if (len > 1) {
+          if (JAM.identical(fun, _String_prototype_replace)) {
+            // String.prototype.replace may invoke a user-provided
+            // replacement-generator function.
+            if (JAM.isNativeFunction(args[1])) {
+              args[1] = wrapMethod(pFull, args[1]);
+            }
+          } else if (fun.name === "addEventListener") {
+            // For |addEventListener|, the first argument is the type
+            // of event and the second (index 1) is the event handler.
+            // There may be optional further arguments.
+            // %%% What if the second argument is an |EventListener|
+            // %%% rather than a simple |Function|?
+            if (JAM.isNativeFunction(args[1])) {
+              args[1] = wrapMethod(pFull, args[1]);
+            }
+          } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+            // The second argument must specify the |Function| or
+            // |EventListener| to remove, so we need to maintain a
+            // mapping from the "original" functions to their
+            // wrapped version. The latter is the value to pass as
+            // second argument, if it exists in the mapping. If not,
+            // use the passed argument (which should cover the case
+            // in which the user retrieves the current event handler
+            // and requests that it be removed, as opposed to
+            // requesting that a reference to the original, unwrapped
+            // function value be removed.
+            // %%% Implement mapping described above.
+          } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
+            // Wrap the native function in a comprehensive transaction.
+            if (JAM.isNativeFunction(args[1])) {
+              args[1] = wrapMethod(pFull, args[1]);
+            }
+          } else if (len > 2) {
+            if (JAM.identical(fun, _defineProperty)) {
+              // Wrap the getter/setter function in a comprehensive transaction.
+              var o = args[2];
+              if (JAM.isNativeFunction(o.set)) {
+                o.set = wrapMethod(pFull, o.set);
+              }
+              if (JAM.isNativeFunction(o.get)) {
+                o.get = wrapMethod(pFull, o.get);
+              }
+            }
+          }
+        }
+      }
+
+      if (invoke) ret = _apply_apply(fun, [obj, args]);
+
+      // Set the return value.
+      tx.setRetval(ret);
+    } else if (type === "new") {
+      var c = sx.value;
+      var args = sx.args;
+      var len = args.length;
+
+      if (len > 0) {
+        if (JAM.identical(c, _Function)) {
+            args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
+        }
+      }
+
+      ret = JAM.newApply(c, args);
+      tx.setRetval(ret);
+    } else if (type === "forin") {
+      // Transaction suspensions caused by entering a for-in loop.
+
+      // Do nothing, we just rely on the commit to sync the state
+      // of the transaction with the heap.
+    } else if (type === "read") {
+      // Get the receiver of the read.
+      var obj = sx.obj;
+      var id = sx.id;
+      // %%% May need to wrap a user-defined getter in a tx.
+      ret = obj[id];
+      tx.setRetval(ret);
+    } else {
+      // Other suspension types.
+      // %%% May need to handle these in the future.
+      alert("Unhandled suspend type: " + type);
+    }
+
+    return;
+  }
+
+  function commitSuspendCoarse(tx) {
+
+    // Get the cause of the suspend.
+    var sx = tx.getSuspendInfo();
+    if (!sx) return;
+
+    var type = sx.type;
+
+    var ret;
+    if (type === "write") {
+      // Get the receiver of the write.
+      var obj = sx.obj;
+      // Transaction suspensions caused by assignment to a property.
+      var value = sx.value;
+      ret = value;
+      // Get the property name that was accessed.
+      var id = sx.id;
+
+      if (_String_startsWith(id, "on")) {
+        // Wrap event handlers in transaction blocks.
+        var typ = typeof value;
+        if (typ === "function") {
+          value = wrapFunction(pFull, value, obj);
+        } else if (typ === "string") {
+          value = "introspect(JAM.policy.pFull) { " + value + " }";
+        }
+      } else if (id === "outerHTML") {
+        // Writing to |outerHTML| replaces the node altogether, so the
+        // action is irrespective of the element type.
+        // %%% Can |outerHTML| be used like |document.write| to
+        // %%% incrementally create elements?
+        value = wrapHTMLEventScript(obj, value);
+      } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
+        if (id === "textContent" || id === "innerHTML") {
+          value = "introspect(JAM.policy.pFull) { " + value + " };";
+        }
+      } else if (id === "innerHTML") {
+        // Dig down into other element types to find scripts.
+        value = wrapHTMLEventScript(obj, value);
+      }
+      obj[id] = value;
+
+      // Set the return value to the *original* value.
+      tx.setRetval(ret);
+
+    } else if (type === "call") {
+      // Transaction suspensions caused by call to a function.
+
+      // Get the receiver of the call.
+      var obj = sx.obj;
+      // Get the function that triggered the suspend.
+      var fun = sx.value;
+      // And the arguments.
+      var args = sx.args;
+      var len = sx.argc;
+
+      // Mark this false if special invocation is done in place.
+      var invoke = true;
+      if (len > 0) {
+        if (JAM.identical(fun, _Array_prototype_sort)) {
+          // Array.prototype.sort may invoke a user-provided
+          // comparison function.
+          args[0] = wrapMethod(pFull, args[0]);
+        } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
+          // %%% Currently assumes args[0] is a function object
+          args[0] = wrapMethod(pFull, args[0]);
+        } else if (JAM.identical(fun, _Function)) {
+          // %%% What happens in non-string cases?
+          ret = _apply_apply(fun, [obj, args]);
+          if (typeof ret === "function") {
+            ret = wrapMethod(pFull, ret)
+          }
+          invoke = false;
+        } else if (JAM.identical(fun, _eval)) {
+          // Given that the callsite transformation will handle all
+          // direct calls to |eval|, we can assume this is indirect.
+          // %%% What about the modular case?
+
+          // Per MDN, SpiderMonkey no longer supports |eval| with
+          // more than 1 argument.
+          // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+          // For |appendChild|, |replaceChild| and |insertBefore|,
+          // the first argument is the element to be inserted.
+          JAM.setDynamicIntrospector(pFull);
+          ret = _apply_apply(fun, [obj, args]);
+          JAM.setDynamicIntrospector();
+          invoke = false;
+        }
+        
+        if (len > 1) {
+          if (JAM.identical(fun, _String_prototype_replace)) {
+            // String.prototype.replace may invoke a user-provided
+            // replacement-generator function.
+            if (typeof args[1] === "function") {
+              args[1] = wrapMethod(pFull, args[1]);
+            }
+          } else if (fun.name === "addEventListener") {
+            // For |addEventListener|, the first argument is the type
+            // of event and the second (index 1) is the event handler.
+            // There may be optional further arguments.
+            // %%% What if the second argument is an |EventListener|
+            // %%% rather than a simple |Function|?
+            args[1] = wrapMethod(pFull, args[1]);
+          } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+            // The second argument must specify the |Function| or
+            // |EventListener| to remove, so we need to maintain a
+            // mapping from the "original" functions to their
+            // wrapped version. The latter is the value to pass as
+            // second argument, if it exists in the mapping. If not,
+            // use the passed argument (which should cover the case
+            // in which the user retrieves the current event handler
+            // and requests that it be removed, as opposed to
+            // requesting that a reference to the original, unwrapped
+            // function value be removed.
+            // %%% Implement mapping described above.
+          } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
+            // Wrap the native function in a comprehensive transaction.
+            args[1] = wrapMethod(pFull, args[1]);
+          } else if (len > 2) {
+            if (JAM.identical(fun, _defineProperty)) {
+              // Wrap the getter/setter function in a comprehensive transaction.
+              var o = args[2];
+              if (typeof o.set === "function") {
+                o.set = wrapMethod(pFull, o.set);
+              }
+              if (typeof o.get === "function") {
+                o.get = wrapMethod(pFull, o.get);
+              }
+            }
+          }
+        }
+      }
+
+      if (invoke) ret = _apply_apply(fun, [obj, args]);
+
+      // Set the return value.
+      tx.setRetval(ret);
+    } else if (type === "new") {
+      var c = sx.value;
+      var args = sx.args;
+      var len = args.length;
+
+      if (len > 0) {
+        if (JAM.identical(c, _Function)) {
+            args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
+        }
+      }
+
+      ret = JAM.newApply(c, args);
+      tx.setRetval(ret);
+    } else if (type === "forin") {
+      // Transaction suspensions caused by entering a for-in loop.
+
+      // Do nothing, we just rely on the commit to sync the state
+      // of the transaction with the heap.
+    } else if (type === "read") {
+      // Get the receiver of the read.
+      var obj = sx.obj;
+      var id = sx.id;
+      // %%% May need to wrap a user-defined getter in a tx.
+      ret = obj[id];
+      tx.setRetval(ret);
+    } else {
+      // Other suspension types.
+      // %%% May need to handle these in the future.
+      alert("Unhandled suspend type: " + type);
+    }
+
+    return;
+  }
+
   // This object can play the role of a single-node transaction.
   var nodeTx = {
     node: _undefined,
     ret: _undefined,
     getActionSequence: function() { return typeof this.node === "object" ? [this.node] : []; },
+    getCallSequence: function() { return typeof this.node === "object" && this.node.type === "call" ? [this.node] : []; },
+    getReadSequence: function() { return typeof this.node === "object" && this.node.type === "read" ? [this.node] : []; },
+    getWriteSequence: function() { return typeof this.node === "object" && this.node.type === "write" ? [this.node] : []; },
     suppress: function() { },
     commit: function() { JAM.commitNode(this) },
     isSuspended: function () { return false; },
@@ -335,7 +707,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             || (fname === "insertBefore" && JAM.instanceof(rec, Element))
             || (fname === "replaceChild" && JAM.instanceof(rec, Element))
             || (fname === "setAttributeNode" && JAM.instanceof(rec, Element))) {
-          ispect = pFull;
+          //ispect = pFull;
         } else if (JAM.identical(f, _Array_prototype_sort)
             || JAM.identical(f, _setTimeout) || JAM.identical(f, _setInterval)) {
           // Only protect if a native function is being invoked, since
@@ -490,6 +862,9 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           nodeTx.node = nodeTx.ret = _undefined;
         } else {
           // %%% Seg. fault occurs when return is inside the transaction.
+          //var prof = ispect.name + "/" + obj + "/" + memb + "/" + val;
+          //JAM.startProfile(prof);
+          //JAM.stopProfile(prof);
           introspect(ispect) {
             ret = obj[memb] = val;
           }
@@ -700,186 +1075,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       return;
     },
 
-    commitSuspend: function(tx) {
-
-      // Get the cause of the suspend.
-      var sx = tx.getSuspendInfo();
-      if (!sx) return;
-
-      var type = sx.type;
-
-      var ret;
-      if (type === "write") {
-        // Get the receiver of the write.
-        var obj = sx.obj;
-        // Transaction suspensions caused by assignment to a property.
-        var value = sx.value;
-        ret = value;
-        // Get the property name that was accessed.
-        var id = sx.id;
-
-        if (_String_startsWith(id, "on")) {
-          // Wrap event handlers in transaction blocks.
-          var typ = typeof value;
-          if (typ === "function") {
-            value = wrapFunction(pFull, value, obj);
-          } else if (typ === "string") {
-            value = "introspect(JAM.policy.pFull) { " + value + " }";
-          }
-        } else if (id === "outerHTML") {
-          // Writing to |outerHTML| replaces the node altogether, so the
-          // action is irrespective of the element type.
-          // %%% Can |outerHTML| be used like |document.write| to
-          // %%% incrementally create elements?
-          value = wrapHTMLEventScript(obj, value);
-        } else if (JAM.instanceof(obj, _HTMLScriptElement)) {
-          if (id === "textContent" || id === "innerHTML") {
-            value = "introspect(JAM.policy.pFull) { " + value + " };";
-          }
-        } else if (id === "innerHTML") {
-          // Dig down into other element types to find scripts.
-          value = wrapHTMLEventScript(obj, value);
-        }
-        obj[id] = value;
-
-        // Set the return value to the *original* value.
-        tx.setRetval(ret);
-
-      } else if (type === "call") {
-        // Transaction suspensions caused by call to a function.
-
-        // Get the receiver of the call.
-        var obj = sx.obj;
-        // Get the function that triggered the suspend.
-        var fun = sx.value;
-        // And the arguments.
-        var args = sx.args;
-        var len = sx.argc;
-
-        // Mark this false if special invocation is done in place.
-        var invoke = true;
-        if (len > 0) {
-          if (JAM.identical(fun, _Array_prototype_sort)) {
-            // Array.prototype.sort may invoke a user-provided
-            // comparison function.
-            args[0] = wrapMethod(pFull, args[0]);
-          } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
-            // %%% Currently assumes args[0] is a function object
-            args[0] = wrapMethod(pFull, args[0]);
-          } else if (JAM.identical(fun, _Function)) {
-            // %%% What happens in non-string cases?
-            ret = _apply_apply(fun, [obj, args]);
-            if (typeof ret === "function") {
-              ret = wrapMethod(pFull, ret)
-            }
-            invoke = false;
-          } else if (JAM.identical(fun, _eval)) {
-            // Given that the callsite transformation will handle all
-            // direct calls to |eval|, we can assume this is indirect.
-            // %%% What about the modular case?
-
-            // Per MDN, SpiderMonkey no longer supports |eval| with
-            // more than 1 argument.
-            // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
-            invoke = false;
-          } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
-            invoke = false;
-          } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
-            // For |appendChild|, |replaceChild| and |insertBefore|,
-            // the first argument is the element to be inserted.
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
-            invoke = false;
-          }
-          
-          if (len > 1) {
-            if (JAM.identical(fun, _String_prototype_replace)) {
-              // String.prototype.replace may invoke a user-provided
-              // replacement-generator function.
-              if (typeof args[1] === "function") {
-                args[1] = wrapMethod(pFull, args[1]);
-              }
-            } else if (fun.name === "addEventListener") {
-              // For |addEventListener|, the first argument is the type
-              // of event and the second (index 1) is the event handler.
-              // There may be optional further arguments.
-              // %%% What if the second argument is an |EventListener|
-              // %%% rather than a simple |Function|?
-              args[1] = wrapMethod(pFull, args[1]);
-            } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
-              // The second argument must specify the |Function| or
-              // |EventListener| to remove, so we need to maintain a
-              // mapping from the "original" functions to their
-              // wrapped version. The latter is the value to pass as
-              // second argument, if it exists in the mapping. If not,
-              // use the passed argument (which should cover the case
-              // in which the user retrieves the current event handler
-              // and requests that it be removed, as opposed to
-              // requesting that a reference to the original, unwrapped
-              // function value be removed.
-              // %%% Implement mapping described above.
-            } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
-              // Wrap the native function in a comprehensive transaction.
-              args[1] = wrapMethod(pFull, args[1]);
-            } else if (len > 2) {
-              if (JAM.identical(fun, _defineProperty)) {
-                // Wrap the getter/setter function in a comprehensive transaction.
-                var o = args[2];
-                if (typeof o.set === "function") {
-                  o.set = wrapMethod(pFull, o.set);
-                }
-                if (typeof o.get === "function") {
-                  o.get = wrapMethod(pFull, o.get);
-                }
-              }
-            }
-          }
-        }
-
-        if (invoke) ret = _apply_apply(fun, [obj, args]);
-
-        // Set the return value.
-        tx.setRetval(ret);
-      } else if (type === "new") {
-        var c = sx.value;
-        var args = sx.args;
-        var len = args.length;
-
-        if (len > 0) {
-          if (JAM.identical(c, _Function)) {
-              args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
-          }
-        }
-
-        ret = JAM.newApply(c, args);
-        tx.setRetval(ret);
-      } else if (type === "forin") {
-        // Transaction suspensions caused by entering a for-in loop.
-
-        // Do nothing, we just rely on the commit to sync the state
-        // of the transaction with the heap.
-      } else if (type === "read") {
-        // Get the receiver of the read.
-        var obj = sx.obj;
-        var id = sx.id;
-        // %%% May need to wrap a user-defined getter in a tx.
-        ret = obj[id];
-        tx.setRetval(ret);
-      } else {
-        // Other suspension types.
-        // %%% May need to handle these in the future.
-        alert("Unhandled suspend type: " + type);
-      }
-
-      return;
-    },
+    commitSuspend: policy.woven ? commitSuspendFine : commitSuspendCoarse,
 
     // Additional methods useful for debugging.
     dump: function(obj, depth) {

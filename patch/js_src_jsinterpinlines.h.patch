@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/jsinterpinlines.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterpinlines.h	2014-07-22 19:01:59.966056072 -0500
++++ mozilla-esr17/js/src/jsinterpinlines.h	2014-08-16 17:08:47.798131934 -0500
 @@ -17,6 +17,10 @@
  #include "jsnum.h"
  #include "jsprobes.h"
@@ -254,13 +254,18 @@
      do {
          if (obj->isDenseArray() && JSID_IS_INT(id)) {
              uint32_t length = obj->getDenseArrayInitializedLength();
-@@ -783,9 +977,25 @@
+@@ -783,9 +977,35 @@
                  if (obj->getDenseArrayElement(i).isMagic(JS_ARRAY_HOLE)) {
                      if (js_PrototypeHasIndexedProperties(cx, obj))
                          break;
 +#ifdef TxJS
 +                    // Update the length property if needed.
-+                    if (tx) {
++#ifdef TxJS_ITYPE
++                    if (tx && (tx->itypes_ & AX_WRITE))
++#else
++                    if (tx)
++#endif
++                    {
 +                        if ((uint32_t)i >= tx->getArrayLength(cx, obj)) {
 +                            RootedValue lenval(cx);
 +                            lenval.setInt32(i + 1);
@@ -272,7 +277,12 @@
                          obj->setArrayLength(cx, i + 1);
                  }
 +#ifdef TxJS
-+                if (tx) {
++#ifdef TxJS_ITYPE
++                if (tx && (tx->itypes_ & AX_WRITE))
++#else
++                if (tx)
++#endif
++                {
 +                    tx->recordAction(cx, obj, id, value, AX_WRITE);
 +                    return true;
 +                }
@@ -280,7 +290,7 @@
                  obj->setDenseArrayElementWithType(cx, i, value);
                  return true;
              } else {
-@@ -793,6 +1003,9 @@
+@@ -793,6 +1013,9 @@
                  jsbytecode *pc;
                  types::TypeScript::GetPcScript(cx, &script, &pc);
  
@@ -290,12 +300,17 @@
                  if (script->hasAnalysis())
                      script->analysis()->getCode(pc).arrayWriteHole = true;
              }
-@@ -800,6 +1013,12 @@
+@@ -800,6 +1023,17 @@
      } while (0);
  
      RootedValue tmp(cx, value);
 +#ifdef TxJS
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE))
++#else
++    if (tx)
++#endif
++    {
 +        tx->recordAction(cx, obj, id, value, AX_WRITE);
 +        return true;
 +    }

@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.h	2014-07-22 21:58:42.913936899 -0500
-@@ -0,0 +1,157 @@
++++ mozilla-esr17/js/src/jstx.h	2014-08-16 16:08:46.014172416 -0500
+@@ -0,0 +1,164 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -11,6 +11,9 @@
 +#define jstx_h___
 +
 +#ifdef TxJS
++
++#define TxJS_ITYPE 1
++#define TxJS_ITYPE_MOD 1
 +
 +#ifdef DEBUG
 +#define TxJS_PROFILE_TX 1
@@ -82,6 +85,10 @@
 +    TxContext *next_;
 +
 +  public:
++#ifdef TxJS_ITYPE
++    // %%% Make private
++    int itypes_;
++#endif
 +    static TxContext *initTx(JSContext *, TxContext *tx, const js::Value &handler);
 +#ifdef TxJS_LOCAL
 +    static void clearFrameLocals(JSContext *, js::StackFrame *);

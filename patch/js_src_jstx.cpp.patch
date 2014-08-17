@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.cpp	2014-07-22 21:56:07.373938651 -0500
-@@ -0,0 +1,895 @@
++++ mozilla-esr17/js/src/jstx.cpp	2014-08-16 16:39:42.202151553 -0500
+@@ -0,0 +1,965 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -55,6 +55,51 @@
 +    tx->retval_ = JSVAL_VOID;
 +    tx->next_ = parent;
 +    tx->handler_ = handler;
++
++#ifdef TxJS_ITYPE
++    tx->itypes_ = AX_ANY;
++    JSObject *irawobj = &handler.toObject();
++    cx->compartment->wrap(cx, &irawobj);
++    RootedObject iobj(cx, irawobj);
++    RootedValue itype(cx);
++    bool hasItype = JSObject::getProperty(cx, iobj, iobj, cx->runtime->atomState.itypeAtom, &itype);
++    if (hasItype) {
++        if (itype.isString()) {
++            JSString *itypestr = itype.toString();
++            bool res;
++            EqualStrings(cx, itypestr, cx->runtime->atomState.callAtom, &res);
++            if (res) {
++                //fprintf(stderr, "SETTING AX_CALL\n");
++#ifdef TxJS_ITYPE_MOD
++                tx->itypes_ = AX_CALL; 
++#else
++                tx->itypes_ = AX_CALL | AX_MODIFY;
++#endif
++            } else {
++                EqualStrings(cx, itypestr, cx->runtime->atomState.readAtom, &res);
++                if (res) {
++                  //fprintf(stderr, "SETTING AX_READ\n");
++#ifdef TxJS_ITYPE_MOD
++                  tx->itypes_ = AX_READ; 
++#else
++                  tx->itypes_ = AX_READ | AX_MODIFY;
++#endif
++                } else {
++                    EqualStrings(cx, itypestr, cx->runtime->atomState.writeAtom, &res);
++                    if (res) {
++                      //fprintf(stderr, "SETTING AX_WRITE\n");
++                      tx->itypes_ = AX_WRITE; 
++#ifdef TxJS_ITYPE_MOD
++                      tx->itypes_ = AX_WRITE; 
++#else
++                      tx->itypes_ = AX_MODIFY;
++#endif
++                    }
++                }
++            }
++        }
++    }
++#endif
 +
 +    return tx;
 +}
@@ -233,6 +278,12 @@
 +JSBool
 +TxContext::recordAction(JSContext *cx, const CallArgs *args, bool construct)
 +{
++#ifdef TxJS_ITYPE
++    if (!(itypes_ & AX_CALL)) {
++      //fprintf(stderr, "SKIPPING CALL\n");
++      return JS_FALSE;
++    }
++#endif
 +    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    TxAction *act = expandSequence(cx);
 +    init_action(cx, act, args, construct);
@@ -284,6 +335,12 @@
 +JSBool
 +TxContext::recordAction(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
 +{
++#ifdef TxJS_ITYPE
++    if (!(itypes_ & type)) {
++      //fprintf(stderr, "SKIPPING TYPE: %x\n", type);
++      return JS_FALSE;
++    }
++#endif
 +    // Unwrap objects from their proxy to match consistently later.
 +    // The second condition is because of some weird CSS objects that
 +    // are proxies without being a proxy to anything.
@@ -423,6 +480,12 @@
 +JSBool
 +TxContext::recordAction(JSContext *cx, StackFrame *fp, uint32_t i, Value val, TxActionType type, bool active)
 +{
++#ifdef TxJS_ITYPE
++    if (!(itypes_ & type)) {
++      //fprintf(stderr, "SKIPPING TYPE: %x\n", type);
++      return JS_FALSE;
++    }
++#endif
 +    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    TxAction *act = expandSequence(cx);
 +    init_action(cx, act, fp, i, val, type, active);
@@ -504,6 +567,13 @@
 +#endif
 +    TxContext *tx = this;
 +    while (tx != NULL) {
++#ifdef TxJS_ITYPE
++        if (!(tx->itypes_ & AX_MODIFY)) {
++            //fprintf(stderr, "SKIPPING GETPROPERTY\n");
++            tx = tx->getNext();
++            continue;
++        }
++#endif
 +#ifdef TxJS_HASH
 +        JSObject *sobj = obj;
 +        // See comment in |recordAction| for reasoning behind the

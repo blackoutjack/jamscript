@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/jsinterp.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterp.cpp	2014-07-28 12:43:48.511036314 -0500
++++ mozilla-esr17/js/src/jsinterp.cpp	2014-08-16 16:38:56.410152070 -0500
 @@ -38,6 +38,10 @@
  #include "jsscope.h"
  #include "jsscript.h"
@@ -939,19 +939,25 @@
      uint8_t flags = GET_UINT8(regs.pc);
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!ValueToIterator(cx, flags, res))
-@@ -2134,6 +2978,43 @@
+@@ -2134,6 +2978,49 @@
      RootedObject &scope = rootObject1;
      RootedObject &pobj = rootObject2;
      RootedShape &prop = rootShape0;
 +
 +#ifdef TxJS
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_DELETE))
++#else
++    if (tx)
++#endif
++    {
 +        RootedId &id = rootId0;
 +        id = NameToId(name);
 +
 +        RootedValue &preval = rootValue0;
-+        if (tx->lookupName(cx, name, scopeObj, &scope, &pobj, &preval)) {
++        bool haspreval = tx->lookupName(cx, name, scopeObj, &scope, &pobj, &preval);
++        if (haspreval) {
 +            // %%% Should probably record the read also.
 +            PUSH_BOOLEAN(true);
 +        } else if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop)) {
@@ -959,7 +965,7 @@
 +        } else {
 +            if (prop) {
 +                //prop->get(cx, scope, scopeObj, scope, &preval);
-+                //JSObject::getProperty(cx, scopeObj, scope, name, &preval)) {
++                //JSObject::getProperty(cx, scopeObj, scope, name, &preval)
 +                // Add to the read set since the deleting code can
 +                // now tell whether the property existed.
 +                tx->recordAction(cx, scopeObj, id, JSVAL_VOID, AX_READ);
@@ -983,13 +989,18 @@
      if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop))
          goto error;
  
-@@ -2157,6 +3038,74 @@
+@@ -2157,6 +3044,79 @@
  
      RootedObject &obj = rootObject0;
      FETCH_OBJECT(cx, -1, obj);
 +#ifdef TxJS
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_DELETE))
++#else
++    if (tx)
++#endif
++    {
 +        jsid id = NameToId(name);
 +        RootedObject &pobj = rootObject2;
 +        RootedShape &prop = rootShape0;
@@ -1058,14 +1069,19 @@
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!JSObject::deleteProperty(cx, obj, name, res, script->strictModeCode))
-@@ -2173,6 +3122,40 @@
+@@ -2173,6 +3133,45 @@
      RootedValue &propval = rootValue0;
      propval = regs.sp[-1];
  
 +#ifdef TxJS
 +    // %%% Test this.
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ && AX_DELETE))
++#else
++    if (tx)
++#endif
++    {
 +        jsid id;
 +        ValueToId(cx, propval, &id);
 +
@@ -1099,7 +1115,7 @@
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
      if (!JSObject::deleteByValue(cx, obj, propval, res, script->strictModeCode))
          goto error;
-@@ -2247,6 +3230,9 @@
+@@ -2247,6 +3246,9 @@
  BEGIN_CASE(JSOP_ARGINC)
  {
      unsigned i = GET_ARGNO(regs.pc);
@@ -1109,13 +1125,18 @@
      if (script->argsObjAliasesFormals()) {
          const Value &arg = regs.fp()->argsObj().arg(i);
          Value v;
-@@ -2268,9 +3254,47 @@
+@@ -2268,9 +3270,52 @@
  BEGIN_CASE(JSOP_LOCALINC)
  {
      unsigned i = GET_SLOTNO(regs.pc);
 +#ifdef TxJS_LOCAL
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE))
++#else
++    if (tx)
++#endif
++    {
 +        // Obtain the value for the unaliased local and add it to the
 +        // read set (same for all cases).
 +        RootedValue &local = rootValue0;
@@ -1157,7 +1178,7 @@
      regs.sp++;
  }
  END_CASE(JSOP_LOCALINC)
-@@ -2290,13 +3314,114 @@
+@@ -2290,13 +3335,114 @@
      lval = regs.sp[-1];
  
      RootedValue rval(cx);
@@ -1272,13 +1293,18 @@
  }
  END_CASE(JSOP_GETPROP)
  
-@@ -2308,6 +3433,15 @@
+@@ -2308,6 +3454,20 @@
  
      HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
 +#ifdef TxJS
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE))
++#else
++    if (tx)
++#endif
++    {
 +        RootedPropertyName name(cx, script->getName(regs.pc));
 +        RootedId &id = rootId0;
 +        id = NameToId(name);
@@ -1288,7 +1314,7 @@
      if (!SetNameOperation(cx, script, regs.pc, scope, value))
          goto error;
  
-@@ -2321,6 +3455,48 @@
+@@ -2321,6 +3481,55 @@
      HandleValue lval = HandleValue::fromMarkedLocation(&regs.sp[-2]);
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
@@ -1330,14 +1356,21 @@
 +            regs.sp -= 2;
 +            goto handle_tx;
 +        }
-+
-+        tx->recordAction(cx, obj, id, rval.get(), AX_WRITE);
++#ifdef TxJS_ITYPE
++        if (tx->itypes_ & AX_WRITE) {
++#endif
++            tx->recordAction(cx, obj, id, rval.get(), AX_WRITE);
++#ifdef TxJS_ITYPE
++        } else if (!SetPropertyOperation(cx, regs.pc, lval, rval)) {
++            goto error;
++        }
++#endif
 +    } else
 +#endif
      if (!SetPropertyOperation(cx, regs.pc, lval, rval))
          goto error;
  
-@@ -2336,9 +3512,126 @@
+@@ -2336,9 +3545,126 @@
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
@@ -1464,13 +1497,17 @@
      regs.sp--;
  }
  END_CASE(JSOP_GETELEM)
-@@ -2350,6 +3643,20 @@
+@@ -2350,6 +3676,24 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
      Value &value = regs.sp[-1];
 +
 +    tx = cx->getRunningTx();
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE) && obj->isTypedArray())
++#else
 +    if (tx && obj->isTypedArray())
++#endif
 +    {
 +        // Typed array objects (e.g. Int32Array) may share a buffer, so
 +        // index writes must suspend.
@@ -1485,7 +1522,7 @@
      if (!SetObjectElementOperation(cx, obj, id, value, script->strictModeCode))
          goto error;
      regs.sp[-3] = value;
-@@ -2376,6 +3683,18 @@
+@@ -2376,6 +3720,18 @@
  BEGIN_CASE(JSOP_EVAL)
  {
      CallArgs args = CallArgsFromSp(GET_ARGC(regs.pc), regs.sp);
@@ -1504,7 +1541,7 @@
      if (IsBuiltinEvalForScope(regs.fp()->scopeChain(), args.calleev())) {
          if (!DirectEval(cx, args))
              goto error;
-@@ -2407,6 +3726,20 @@
+@@ -2407,6 +3763,20 @@
      RootedFunction &fun = rootFunction0;
      /* Don't bother trying to fast-path calls to scripted non-constructors. */
      if (!IsFunctionObject(args.calleev(), fun.address()) || !fun->isInterpretedConstructor()) {
@@ -1525,7 +1562,7 @@
          if (construct) {
              if (!InvokeConstructorKernel(cx, args))
                  goto error;
-@@ -2437,6 +3770,13 @@
+@@ -2437,6 +3807,13 @@
  
      if (!cx->stack.pushInlineFrame(cx, regs, args, *fun, newScript, initial))
          goto error;
@@ -1539,7 +1576,7 @@
  
      SET_SCRIPT(regs.fp()->script());
      RESET_USE_METHODJIT();
-@@ -2780,6 +4120,19 @@
+@@ -2780,6 +4157,19 @@
  BEGIN_CASE(JSOP_CALLLOCAL)
  {
      unsigned i = GET_SLOTNO(regs.pc);
@@ -1559,7 +1596,7 @@
      PUSH_COPY_SKIP_CHECK(regs.fp()->unaliasedLocal(i));
  
      /*
-@@ -2788,14 +4141,22 @@
+@@ -2788,14 +4178,26 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1575,14 +1612,18 @@
      unsigned i = GET_SLOTNO(regs.pc);
 +#ifdef TxJS_LOCAL
 +    tx = cx->getRunningTx();
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE)) {
++#else
 +    if (tx) {
++#endif
 +        tx->recordAction(cx, regs.fp(), i, regs.sp[-1], AX_WRITE);
 +    } else
 +#endif
      regs.fp()->unaliasedLocal(i) = regs.sp[-1];
  }
  END_CASE(JSOP_SETLOCAL)
-@@ -2817,6 +4178,21 @@
+@@ -2817,6 +4219,21 @@
      RootedPropertyName &name = rootName0;
      name = script->getName(regs.pc);
  
@@ -1604,7 +1645,7 @@
      if (!DefVarOrConstOperation(cx, obj, name, attrs))
          goto error;
  }
-@@ -2880,6 +4256,19 @@
+@@ -2880,6 +4297,19 @@
      rval = ObjectValue(*fun);
  
      do {
@@ -1624,7 +1665,7 @@
          /* Steps 5d, 5f. */
          if (!shape || pobj != parent) {
              if (!JSObject::defineProperty(cx, parent, name, rval,
-@@ -2932,6 +4321,13 @@
+@@ -2932,6 +4362,13 @@
      RootedFunction &fun = rootFunction0;
      fun = script->getFunction(GET_UINT32_INDEX(regs.pc));
  
@@ -1638,7 +1679,7 @@
      JSFunction *obj = CloneFunctionObjectIfNotSingleton(cx, fun, regs.fp()->scopeChain());
      if (!obj)
          goto error;
-@@ -3046,6 +4442,9 @@
+@@ -3046,6 +4483,9 @@
  {
      uint8_t i = GET_UINT8(regs.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1648,27 +1689,35 @@
  
      RootedObject &obj = rootObject0;
      if (i == JSProto_Array) {
-@@ -3121,6 +4520,13 @@
+@@ -3121,6 +4561,17 @@
                                  JSPROP_ENUMERATE, 0, 0, 0)) {
          goto error;
      }
 +#ifdef TxJS
 +    // %%% Test this
 +    tx = cx->getRunningTx();
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE)) {
++#else
 +    if (tx) {
++#endif
 +        tx->recordAction(cx, obj, id, rval, AX_WRITE);
 +    }
 +#endif
  
      regs.sp--;
  }
-@@ -3144,6 +4550,17 @@
+@@ -3144,6 +4595,21 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
  
 +#ifdef TxJS
 +    tx = cx->getRunningTx();
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE)) {
++#else
 +    if (tx) {
++#endif
 +        // %%% Test this
 +        tx->recordAction(cx, obj, id, rref, AX_WRITE);
 +        regs.sp -= 2;
@@ -1680,7 +1729,7 @@
      /*
       * If rref is a hole, do not call JSObject::defineProperty. In this case,
       * obj must be an array, so if the current op is the last element
-@@ -3732,6 +5149,101 @@
+@@ -3732,6 +5198,101 @@
  END_CASE(JSOP_ARRAYPUSH)
  #endif /* JS_HAS_GENERATORS */
  
@@ -1782,7 +1831,7 @@
  #if JS_THREADED_INTERP
    L_JSOP_BACKPATCH:
    L_JSOP_BACKPATCH_POP:
-@@ -3867,6 +5379,18 @@
+@@ -3867,6 +5428,18 @@
                  len = 0;
                  DO_NEXT_OP(len);
  
@@ -1801,7 +1850,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -3904,6 +5428,41 @@
+@@ -3904,6 +5477,41 @@
          goto inline_return;
  
    exit:
