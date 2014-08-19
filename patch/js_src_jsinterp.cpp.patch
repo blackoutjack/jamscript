@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/jsinterp.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterp.cpp	2014-08-16 16:38:56.410152070 -0500
++++ mozilla-esr17/js/src/jsinterp.cpp	2014-08-16 22:05:23.585932083 -0500
 @@ -38,6 +38,10 @@
  #include "jsscope.h"
  #include "jsscript.h"
@@ -612,7 +612,7 @@
      /*
       * Help Debugger find frames running scripts that it has put in
       * single-step mode.
-@@ -1548,9 +2112,123 @@
+@@ -1548,9 +2112,114 @@
      CHECK_BRANCH();
  
      interpReturnOK = true;
@@ -621,15 +621,6 @@
    inline_return:
      {
 +#ifdef TxJS
-+#ifdef TxJS_LOCAL
-+        // If we're currently in transaction, we no longer need to
-+        // (or are able to) apply |tSlot| type writes for the
-+        // current frame. This applies to both the suspended case
-+        // (if the suspension handler is executing within an outer
-+        // transaction) or in the normal transaction case.
-+        TxContext::clearFrameLocals(cx, regs.fp());
-+#endif
-+
 +        // Resume the transaction if the frame that is returning is a
 +        // transaction handler function.
 +        if (regs.fp()->suspendedTx()) {
@@ -736,7 +727,7 @@
          if (cx->compartment->debugMode())
              interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
  
-@@ -1563,6 +2241,108 @@
+@@ -1563,6 +2232,108 @@
  #ifdef JS_METHODJIT
    jit_return:
  #endif
@@ -845,7 +836,7 @@
  
          /* The results of lowered call/apply frames need to be shifted. */
          bool shiftResult = regs.fp()->loweredCallOrApply();
-@@ -1570,8 +2350,14 @@
+@@ -1570,8 +2341,14 @@
          cx->stack.popInlineFrame(regs);
          SET_SCRIPT(regs.fp()->script());
  
@@ -860,7 +851,7 @@
  
          /* Resume execution in the calling frame. */
          RESET_USE_METHODJIT();
-@@ -1583,6 +2369,13 @@
+@@ -1583,6 +2360,13 @@
                  regs.sp--;
              }
  
@@ -874,14 +865,11 @@
              len = JSOP_CALL_LENGTH;
              DO_NEXT_OP(len);
          }
-@@ -1591,6 +2384,25 @@
+@@ -1591,6 +2375,22 @@
          regs.pc += JSOP_CALL_LENGTH;
          goto error;
      } else {
 +#ifdef TxJS
-+#ifdef TxJS_LOCAL
-+        TxContext::clearFrameLocals(cx, regs.fp());
-+#endif
 +        // Resume the transaction if the frame that is returning is a
 +        // transaction handler function.
 +        if (regs.fp()->suspendedTx()) {
@@ -900,7 +888,7 @@
          JS_ASSERT(regs.stackDepth() == 0);
      }
      interpReturnOK = true;
-@@ -1703,6 +2515,38 @@
+@@ -1703,6 +2503,43 @@
  BEGIN_CASE(JSOP_ITER)
  {
      JS_ASSERT(regs.stackDepth() >= 1);
@@ -909,7 +897,12 @@
 +    // speculatively written and deleted properties we suspend here
 +    // to sync the transaction with the real heap.
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#if 0//def TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_MODIFY))
++#else
++    if (tx)
++#endif
++    {
 +        Value val = regs.sp[-1];
 +
 +        JSObject *obj;
@@ -939,7 +932,7 @@
      uint8_t flags = GET_UINT8(regs.pc);
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!ValueToIterator(cx, flags, res))
-@@ -2134,6 +2978,49 @@
+@@ -2134,6 +2971,49 @@
      RootedObject &scope = rootObject1;
      RootedObject &pobj = rootObject2;
      RootedShape &prop = rootShape0;
@@ -989,7 +982,7 @@
      if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop))
          goto error;
  
-@@ -2157,6 +3044,79 @@
+@@ -2157,6 +3037,79 @@
  
      RootedObject &obj = rootObject0;
      FETCH_OBJECT(cx, -1, obj);
@@ -1069,7 +1062,7 @@
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!JSObject::deleteProperty(cx, obj, name, res, script->strictModeCode))
-@@ -2173,6 +3133,45 @@
+@@ -2173,6 +3126,45 @@
      RootedValue &propval = rootValue0;
      propval = regs.sp[-1];
  
@@ -1115,7 +1108,7 @@
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
      if (!JSObject::deleteByValue(cx, obj, propval, res, script->strictModeCode))
          goto error;
-@@ -2247,6 +3246,9 @@
+@@ -2247,6 +3239,9 @@
  BEGIN_CASE(JSOP_ARGINC)
  {
      unsigned i = GET_ARGNO(regs.pc);
@@ -1125,60 +1118,7 @@
      if (script->argsObjAliasesFormals()) {
          const Value &arg = regs.fp()->argsObj().arg(i);
          Value v;
-@@ -2268,9 +3270,52 @@
- BEGIN_CASE(JSOP_LOCALINC)
- {
-     unsigned i = GET_SLOTNO(regs.pc);
-+#ifdef TxJS_LOCAL
-+    tx = cx->getRunningTx();
-+#ifdef TxJS_ITYPE
-+    if (tx && (tx->itypes_ & AX_WRITE))
-+#else
-+    if (tx)
-+#endif
-+    {
-+        // Obtain the value for the unaliased local and add it to the
-+        // read set (same for all cases).
-+        RootedValue &local = rootValue0;
-+        if (tx->getUnaliasedLocal(cx, regs.fp(), i, &local)) {
-+        } else {
-+            local = regs.fp()->unaliasedLocal(i);
-+            tx->recordAction(cx, regs.fp(), i, local.get(), AX_READ);
-+        }
-+
-+        // Add it to the write set, with new value (calculated
-+        // differently for INC vs. DEC cases).
-+        const JSCodeSpec &cs = js_CodeSpec[*regs.pc];
-+        if (local.isInt32()) {
-+            int32_t vn = local.toInt32();
-+            if (vn > JSVAL_INT_MIN && vn < JSVAL_INT_MAX) {
-+                int32_t sum = vn + (cs.format & JOF_INC ? 1 : -1);
-+                tx->recordAction(cx, regs.fp(), i, Int32Value(sum), AX_WRITE);
-+                regs.sp[0] = (cs.format & JOF_POST) ? Int32Value(vn) : Int32Value(sum);
-+            }
-+        } else {
-+            double d;
-+            if (!ToNumber(cx, local, &d))
-+                goto error;
-+
-+            double sum = d + (cs.format & JOF_INC ? 1 : -1);
-+            tx->recordAction(cx, regs.fp(), i, NumberValue(sum), AX_WRITE);
-+            regs.sp[0] = (cs.format & JOF_POST) ? NumberValue(d) : NumberValue(sum);
-+            TypeScript::MonitorOverflow(cx, script, regs.pc);
-+        }
-+
-+    } else {
-+#endif
-     Value &local = regs.fp()->unaliasedLocal(i);
-     if (!DoIncDec(cx, script, regs.pc, local, &local, &regs.sp[0]))
-         goto error;
-+#ifdef TxJS_LOCAL
-+    }
-+#endif
-     regs.sp++;
- }
- END_CASE(JSOP_LOCALINC)
-@@ -2290,13 +3335,114 @@
+@@ -2290,13 +3285,118 @@
      lval = regs.sp[-1];
  
      RootedValue rval(cx);
@@ -1211,6 +1151,9 @@
 +                // Suspend on getters.
 +                bool hasGetter = false;
 +                if (lobj->isNative()) {
++#if 0//def TxJS_SUSPEND_NATIVE
++                    hasGetter = true;
++#else
 +                    // This call is apparently only for native objects.
 +                    // We use this lookup to see if we need to suspend,
 +                    // so this should only apply to natives.
@@ -1254,6 +1197,7 @@
 +
 +                        current = proto;
 +                    }
++#endif
 +                } else {
 +                    RootedShape &shape = rootShape0;
 +                    RootedObject &pobj = rootObject1;
@@ -1293,7 +1237,7 @@
  }
  END_CASE(JSOP_GETPROP)
  
-@@ -2308,6 +3454,20 @@
+@@ -2308,6 +3408,20 @@
  
      HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
@@ -1314,7 +1258,7 @@
      if (!SetNameOperation(cx, script, regs.pc, scope, value))
          goto error;
  
-@@ -2321,6 +3481,55 @@
+@@ -2321,6 +3435,62 @@
      HandleValue lval = HandleValue::fromMarkedLocation(&regs.sp[-2]);
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
@@ -1330,15 +1274,22 @@
 +        RootedId &id = rootId0;
 +        id = NameToId(name);
 +        RootedObject &pobj = rootObject1;
++        bool hasSetter = false;
 +        if (obj->isNative()) {
++#ifdef TxJS_SUSPEND_NATIVE
++            hasSetter = true;
++#else
 +            // This call is apparently only for native objects. We use
 +            // this lookup to see if we need to suspend, so this should
 +            // only apply to natives.
 +            if (!LookupPropertyWithFlags(cx, obj, id, cx->resolveFlags, &pobj, &shape))
 +                goto error;
++            hasSetter = shape && (shape->hasSetterValue() || !shape->hasDefaultSetter());
++#endif
 +        } else {
 +            if (!JSObject::lookupProperty(cx, obj, name, &pobj, &shape))
 +                goto error;
++            hasSetter = shape && (shape->hasSetterValue() || !shape->hasDefaultSetter());
 +        }
 +        // Urrgh, the |Shape| system doesn't seem to maintain the 
 +        // |suspend_| flag that is conditionally set at creation.
@@ -1347,7 +1298,7 @@
 +        // %%% object also.
 +        // %%% Might need to create a new table that hashes on an
 +        // %%% object/property pair and stores a flag for suspend.
-+        if (shape && (shape->hasSetterValue() || !shape->hasDefaultSetter()))
++        if (hasSetter)
 +        {
 +            // %%% This should get some intrinsic identifier for the
 +            // %%% native property.
@@ -1370,13 +1321,18 @@
      if (!SetPropertyOperation(cx, regs.pc, lval, rval))
          goto error;
  
-@@ -2336,9 +3545,126 @@
+@@ -2336,9 +3506,135 @@
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
 +#ifdef TxJS
 +    tx = cx->getRunningTx();
-+    if (tx) {
++#if 0//def TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_READ))
++#else
++    if (tx)
++#endif
++    {
 +        if (lval.isString() && rval.isInt32()) {
 +            JSString *fullstr = lval.toString();
 +            JSString *charstr = NULL;
@@ -1423,6 +1379,9 @@
 +            // Suspend on getters.
 +            bool hasGetter = false;
 +            if (lobj->isNative()) {
++#if 0//def TxJS_SUSPEND_NATIVE
++                hasGetter = true;
++#else
 +                // This call is apparently only for native objects.
 +                // We use this lookup to see if we need to suspend,
 +                // so this should only apply to natives.
@@ -1462,6 +1421,7 @@
 +
 +                    current = proto;
 +                }
++#endif
 +            } else {
 +                RootedShape &shape = rootShape0;
 +                RootedObject &pobj = rootObject1;
@@ -1497,16 +1457,20 @@
      regs.sp--;
  }
  END_CASE(JSOP_GETELEM)
-@@ -2350,6 +3676,24 @@
+@@ -2350,6 +3646,28 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
      Value &value = regs.sp[-1];
 +
 +    tx = cx->getRunningTx();
++#ifdef TxJS_SUSPEND_NATIVE
++    if (tx && obj->isNative())
++#else
 +#ifdef TxJS_ITYPE
 +    if (tx && (tx->itypes_ & AX_WRITE) && obj->isTypedArray())
 +#else
 +    if (tx && obj->isTypedArray())
++#endif
 +#endif
 +    {
 +        // Typed array objects (e.g. Int32Array) may share a buffer, so
@@ -1522,7 +1486,7 @@
      if (!SetObjectElementOperation(cx, obj, id, value, script->strictModeCode))
          goto error;
      regs.sp[-3] = value;
-@@ -2376,6 +3720,18 @@
+@@ -2376,6 +3694,18 @@
  BEGIN_CASE(JSOP_EVAL)
  {
      CallArgs args = CallArgsFromSp(GET_ARGC(regs.pc), regs.sp);
@@ -1541,7 +1505,7 @@
      if (IsBuiltinEvalForScope(regs.fp()->scopeChain(), args.calleev())) {
          if (!DirectEval(cx, args))
              goto error;
-@@ -2407,6 +3763,20 @@
+@@ -2407,6 +3737,20 @@
      RootedFunction &fun = rootFunction0;
      /* Don't bother trying to fast-path calls to scripted non-constructors. */
      if (!IsFunctionObject(args.calleev(), fun.address()) || !fun->isInterpretedConstructor()) {
@@ -1562,7 +1526,7 @@
          if (construct) {
              if (!InvokeConstructorKernel(cx, args))
                  goto error;
-@@ -2437,6 +3807,13 @@
+@@ -2437,6 +3781,13 @@
  
      if (!cx->stack.pushInlineFrame(cx, regs, args, *fun, newScript, initial))
          goto error;
@@ -1576,27 +1540,7 @@
  
      SET_SCRIPT(regs.fp()->script());
      RESET_USE_METHODJIT();
-@@ -2780,6 +4157,19 @@
- BEGIN_CASE(JSOP_CALLLOCAL)
- {
-     unsigned i = GET_SLOTNO(regs.pc);
-+#ifdef TxJS_LOCAL
-+    tx = cx->getRunningTx();
-+    if (tx) {
-+        RootedValue &val = rootValue0;
-+        if (tx->getUnaliasedLocal(cx, regs.fp(), i, &val)) {
-+            // %%% Compartment assertion violated? Maybe just use
-+            // %%% PUSH_COPY_SKIP_CHECK and hope for the best?
-+            PUSH_COPY(val);
-+            END_CASE(JSOP_GETLOCAL)
-+        }
-+        tx->recordAction(cx, regs.fp(), i, regs.fp()->unaliasedLocal(i), AX_READ);
-+    }
-+#endif
-     PUSH_COPY_SKIP_CHECK(regs.fp()->unaliasedLocal(i));
- 
-     /*
-@@ -2788,14 +4178,26 @@
+@@ -2788,8 +4139,10 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1607,23 +1551,7 @@
  }
  END_CASE(JSOP_GETLOCAL)
  
- BEGIN_CASE(JSOP_SETLOCAL)
- {
-     unsigned i = GET_SLOTNO(regs.pc);
-+#ifdef TxJS_LOCAL
-+    tx = cx->getRunningTx();
-+#ifdef TxJS_ITYPE
-+    if (tx && (tx->itypes_ & AX_WRITE)) {
-+#else
-+    if (tx) {
-+#endif
-+        tx->recordAction(cx, regs.fp(), i, regs.sp[-1], AX_WRITE);
-+    } else
-+#endif
-     regs.fp()->unaliasedLocal(i) = regs.sp[-1];
- }
- END_CASE(JSOP_SETLOCAL)
-@@ -2817,6 +4219,21 @@
+@@ -2817,6 +4170,21 @@
      RootedPropertyName &name = rootName0;
      name = script->getName(regs.pc);
  
@@ -1645,7 +1573,7 @@
      if (!DefVarOrConstOperation(cx, obj, name, attrs))
          goto error;
  }
-@@ -2880,6 +4297,19 @@
+@@ -2880,6 +4248,19 @@
      rval = ObjectValue(*fun);
  
      do {
@@ -1665,7 +1593,7 @@
          /* Steps 5d, 5f. */
          if (!shape || pobj != parent) {
              if (!JSObject::defineProperty(cx, parent, name, rval,
-@@ -2932,6 +4362,13 @@
+@@ -2932,6 +4313,13 @@
      RootedFunction &fun = rootFunction0;
      fun = script->getFunction(GET_UINT32_INDEX(regs.pc));
  
@@ -1679,7 +1607,7 @@
      JSFunction *obj = CloneFunctionObjectIfNotSingleton(cx, fun, regs.fp()->scopeChain());
      if (!obj)
          goto error;
-@@ -3046,6 +4483,9 @@
+@@ -3046,6 +4434,9 @@
  {
      uint8_t i = GET_UINT8(regs.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1689,7 +1617,7 @@
  
      RootedObject &obj = rootObject0;
      if (i == JSProto_Array) {
-@@ -3121,6 +4561,17 @@
+@@ -3121,6 +4512,17 @@
                                  JSPROP_ENUMERATE, 0, 0, 0)) {
          goto error;
      }
@@ -1707,7 +1635,7 @@
  
      regs.sp--;
  }
-@@ -3144,6 +4595,21 @@
+@@ -3144,6 +4546,21 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
  
@@ -1729,7 +1657,7 @@
      /*
       * If rref is a hole, do not call JSObject::defineProperty. In this case,
       * obj must be an array, so if the current op is the last element
-@@ -3732,6 +5198,101 @@
+@@ -3732,6 +5149,101 @@
  END_CASE(JSOP_ARRAYPUSH)
  #endif /* JS_HAS_GENERATORS */
  
@@ -1831,7 +1759,7 @@
  #if JS_THREADED_INTERP
    L_JSOP_BACKPATCH:
    L_JSOP_BACKPATCH_POP:
-@@ -3867,6 +5428,18 @@
+@@ -3867,6 +5379,18 @@
                  len = 0;
                  DO_NEXT_OP(len);
  
@@ -1850,14 +1778,11 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -3904,6 +5477,41 @@
+@@ -3904,6 +5428,38 @@
          goto inline_return;
  
    exit:
 +#ifdef TxJS
-+#ifdef TxJS_LOCAL
-+    TxContext::clearFrameLocals(cx, regs.fp());
-+#endif
 +    // Resume the transaction if the frame that is returning is a
 +    // transaction handler function.
 +    if (regs.fp()->suspendedTx()) {

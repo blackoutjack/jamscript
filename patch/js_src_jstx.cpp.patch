@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.cpp	2014-08-16 16:39:42.202151553 -0500
-@@ -0,0 +1,965 @@
++++ mozilla-esr17/js/src/jstx.cpp	2014-08-16 21:23:24.665960238 -0500
+@@ -0,0 +1,749 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -46,9 +46,6 @@
 +#endif
 +#ifdef TxJS_HASH
 +    tx->values_ = NULL;
-+#endif
-+#ifdef TxJS_LOCAL
-+    tx->frameActions_ = NULL;
 +#endif
 +
 +    tx->suspend_.active = false;
@@ -155,17 +152,6 @@
 +        delete values_;
 +    }
 +#endif
-+#ifdef TxJS_LOCAL
-+    if (frameActions_ != NULL) {
-+        for (FrameActions::Range r=frameActions_->all(); !r.empty(); r.popFront()) {
-+            HashSet<int> *fa = r.front().value;
-+            fa->finish();
-+            delete fa;
-+        }
-+        frameActions_->finish();
-+        delete frameActions_;
-+    }
-+#endif
 +
 +    if (seq_ != NULL) {
 +        cx->free_(seq_);
@@ -191,16 +177,6 @@
 +        values_->clear();
 +    }
 +#endif
-+#ifdef TxJS_LOCAL
-+    if (frameActions_ != NULL) {
-+        for (FrameActions::Range r=frameActions_->all(); !r.empty(); r.popFront()) {
-+            HashSet<int> *fa = r.front().value;
-+            fa->finish();
-+            delete fa;
-+        }
-+        frameActions_->clear();
-+    }
-+#endif
 +
 +    if (seq_ != NULL) {
 +        cx->free_(seq_);
@@ -218,41 +194,6 @@
 +    suspend_.active = false;
 +}
 +
-+#ifdef TxJS_LOCAL
-+// When a frame returns, we can (in fact, need to) avoid carrying out
-+// any writes to the unaliased locals for that frame. We make note of
-+// this by NULLing out the frame pointer for those write nodes.
-+// This needs to be static so we that we start at the top of the
-+// transaction stack and work all the way down/out.
-+void
-+TxContext::clearFrameLocals(JSContext *cx, StackFrame *fp)
-+{
-+    JS_ASSERT(fp != NULL);
-+    TxContext *tx = cx->getTxContext();
-+    while (tx != NULL) {
-+        if (tx->frameActions_ != NULL) {
-+            FrameActions::Ptr p = tx->frameActions_->lookup(fp);
-+            if (p) {
-+                HashSet<int> *fa = p->value;
-+                for (HashSet<int>::Range r=fa->all(); !r.empty(); r.popFront())
-+                {
-+                    TxAction *act = tx->getActionSequence() + r.front();
-+                    act->active = false;
-+#ifdef TxJS_HASH
-+                    if (tx->values_ != NULL) {
-+                        tx->values_->remove(act->prop);
-+                    }
-+#endif
-+                }
-+                tx->frameActions_->remove(p);
-+                delete fa;
-+            }
-+        }
-+
-+        tx = tx->next_;
-+    }
-+}
-+#endif
 +
 +JSBool
 +TxContext::recordSuspend(JSContext *cx, const CallArgs *args, bool construct)
@@ -446,103 +387,6 @@
 +    return JS_TRUE;
 +}
 +
-+#ifdef TxJS_LOCAL
-+JSBool
-+TxContext::recordSuspend(JSContext *cx, StackFrame *fp, uint32_t i, Value val, TxActionType type, bool active)
-+{
-+    // Invariant: only the topmost running transaction can suspend.
-+    JS_ASSERT(this == cx->getRunningTx());
-+    /*
-+    if (suspend_ != NULL) {
-+      cx->free_(suspend_);
-+    }
-+    */
-+
-+    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
-+    init_action(cx, &suspend_, fp, i, val, type, active);
-+
-+#ifdef TxJS_PROFILE_ACTIONS
-+    switch (type) {
-+        case AX_WRITE: ++writesize_; break;
-+        case AX_READ: ++readsize_; break;
-+        case AX_DELETE: ++deletesize_; break;
-+        case AX_FORIN: ++forinsize_; break;
-+        default: JS_ASSERT(false);
-+    }
-+#endif
-+
-+    // Clear the return value.
-+    setReturnValue(JSVAL_VOID);
-+    
-+    return JS_TRUE;
-+}
-+
-+JSBool
-+TxContext::recordAction(JSContext *cx, StackFrame *fp, uint32_t i, Value val, TxActionType type, bool active)
-+{
-+#ifdef TxJS_ITYPE
-+    if (!(itypes_ & type)) {
-+      //fprintf(stderr, "SKIPPING TYPE: %x\n", type);
-+      return JS_FALSE;
-+    }
-+#endif
-+    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
-+    TxAction *act = expandSequence(cx);
-+    init_action(cx, act, fp, i, val, type, active);
-+    //seq_ = append_action(seq_, act);
-+#ifdef TxJS_PROFILE_ACTIONS
-+    switch (type) {
-+      case AX_WRITE: ++writesize_; break;
-+      case AX_READ: ++readsize_; break;
-+      case AX_DELETE: ++deletesize_; break;
-+      case AX_FORIN: ++forinsize_; break;
-+      default: JS_ASSERT(false);
-+    }
-+#endif
-+
-+#ifdef TxJS_HASH
-+    if (type & AX_MODIFY) {
-+        if (values_ == NULL) {
-+            values_ = new Values(TempAllocPolicy(cx));
-+            values_->init(4);
-+            if (!values_->initialized()) {
-+                fprintf(stderr, "ERROR: could not initialize |values_| hash set");
-+                return JS_FALSE;
-+            }
-+        }
-+        values_->put(act->prop, val);
-+    }
-+#endif
-+    if (frameActions_ == NULL) {
-+        frameActions_ = new FrameActions(TempAllocPolicy(cx));
-+        frameActions_->init(4);
-+        if (!frameActions_->initialized()) {
-+            fprintf(stderr, "ERROR: could not initialize |frameActions_| hash map");
-+        }
-+    }
-+    FrameActions::AddPtr p = frameActions_->lookupForAdd(fp);
-+    HashSet<int> *fa;
-+    if (p) {
-+        fa = p->value;
-+    } else {
-+        fa = new HashSet<int>(TempAllocPolicy(cx));
-+        fa->init(4);
-+        if (!fa->initialized()) {
-+            fprintf(stderr, "ERROR: could not initialize |fa| hash set");
-+            return JS_FALSE;
-+        }
-+        
-+        if (!frameActions_->add(p, fp, fa)) {
-+            fprintf(stderr, "ERROR: could not add to |frameActions| hash map");
-+            return JS_FALSE;
-+        }
-+    }
-+    fa->putNew(seqsize_-1);
-+
-+    return JS_TRUE;
-+}
-+#endif
-+
 +JSBool
 +TxContext::lookupProperty(JSContext *cx, HandleObject obj, jsid id, MutableHandleObject pobj, MutableHandleValue vp)
 +{
@@ -643,52 +487,6 @@
 +    return JS_FALSE;
 +}
 +
-+#ifdef TxJS_LOCAL
-+JSBool
-+TxContext::getUnaliasedLocal(JSContext *cx, StackFrame *fp, uint32_t i, MutableHandleValue vp)
-+{
-+#ifdef TxJS_PROFILE_ACTIONS
-+    uint32_t missCount = 0;
-+#endif
-+    TxContext *tx = this;
-+    while (tx != NULL) {
-+#ifdef TxJS_HASH
-+        if (tx->values_ != NULL) {
-+            TxProperty prop;
-+            prop.type = TX_FRAME;
-+            prop.i.index = i;
-+            prop.frame = fp;
-+            Values::Ptr node = tx->values_->lookup(prop);
-+            if (node) {
-+#ifdef TxJS_PROFILE_ACTIONS
-+                js_jam_profileActionLookup(cx, 1, AX_WRITE);
-+                if (missCount)
-+                    js_jam_profileActionLookup(cx, missCount, AX_NULL);
-+#endif
-+                vp.set(node->value);
-+                return JS_TRUE;
-+            }
-+        }
-+#ifdef TxJS_PROFILE_ACTIONS
-+        ++missCount;
-+#endif
-+#else
-+        TxAction *node;
-+        if ((node = get_action_node(cx, getActionSequence(), fp, i, seqsize_, AX_MODIFY)) != NULL) {
-+            vp.set(get_node_val(node));
-+            return JS_TRUE;
-+        }
-+#endif
-+        tx = tx->getNext();
-+    }
-+#ifdef TxJS_PROFILE_ACTIONS
-+    // Only misses make it here.
-+    js_jam_profileActionLookup(cx, missCount, AX_NULL);
-+#endif
-+    return JS_FALSE;
-+}
-+#endif
-+
 +//JSBool tx_FindProperty(JSContext *, jsid, JSObject **, JSObject **, JSProperty **);
 +//JSBool tx_ObjectHasProperty(JSContext *, jsid, JSObject *, JSObject **, JSProperty **);
 +
@@ -781,46 +579,32 @@
 +JSBool
 +TxContext::commitAction(JSContext *cx, TxContext *nextTx, TxAction *act)
 +{
-+#ifdef TxJS_LOCAL
-+    if (act->prop.type == TX_FRAME) {
-+        if (nextTx) {
-+            nextTx->recordAction(cx, act->prop.frame, act->prop.i.index, act->value, act->type, act->active);
-+        } else if (act->active) {
-+            // If the node is inactive, it means that the
-+            // frame has already returned.
-+            act->prop.frame->unaliasedLocal(act->prop.i.index) = act->value;
-+        }
++    // If we're in a nested transaction, just propagate this
++    // write to the parent transaction's write set. Otherwise,
++    // actually perform the write.
++    JSObject *obj = act->prop.object.get();
++    if (nextTx) {
++        nextTx->recordAction(cx, obj, act->prop.i.id, act->value, act->type);
 +    } else {
-+#endif
-+        // If we're in a nested transaction, just propagate this
-+        // write to the parent transaction's write set. Otherwise,
-+        // actually perform the write.
-+        JSObject *obj = act->prop.object.get();
-+        if (nextTx) {
-+            nextTx->recordAction(cx, obj, act->prop.i.id, act->value, act->type);
++        cx->compartment->wrap(cx, &obj);
++        if ((act->type & AX_DELETE) || act->value.isMagic(JS_ARRAY_HOLE)) {
++            RootedValue rval(cx);
++            if (!JSObject::deleteByValue(cx, HandleObject::fromMarkedLocation(&obj), IdToValue(act->prop.i.id), &rval, false)) // %%% Strict? (last parameter)
++                return JS_FALSE;
 +        } else {
-+            cx->compartment->wrap(cx, &obj);
-+            if ((act->type & AX_DELETE) || act->value.isMagic(JS_ARRAY_HOLE)) {
-+                RootedValue rval(cx);
-+                if (!JSObject::deleteByValue(cx, HandleObject::fromMarkedLocation(&obj), IdToValue(act->prop.i.id), &rval, false)) // %%% Strict? (last parameter)
-+                    return JS_FALSE;
-+            } else {
-+                // %%% Does this already account for custom setters?
-+                Value v = act->value;
-+                cx->compartment->wrap(cx, &v);
-+                RootedValue writeVal(cx, v);
-+                RootedId rootId(cx, act->prop.i.id);
-+                RootedObject robj(cx, obj);
-+                if (robj->isGlobal()) {
-+                  // See jsinterpinlines.h:SetNameOperation.
-+                  return baseops::SetPropertyHelper(cx, robj, robj, rootId, DNP_UNQUALIFIED, &writeVal, false);
-+                }
-+                return JSObject::setGeneric(cx, robj, robj, rootId, &writeVal, false); // %%% Strict? (last parameter)
++            // %%% Does this already account for custom setters?
++            Value v = act->value;
++            cx->compartment->wrap(cx, &v);
++            RootedValue writeVal(cx, v);
++            RootedId rootId(cx, act->prop.i.id);
++            RootedObject robj(cx, obj);
++            if (robj->isGlobal()) {
++              // See jsinterpinlines.h:SetNameOperation.
++              return baseops::SetPropertyHelper(cx, robj, robj, rootId, DNP_UNQUALIFIED, &writeVal, false);
 +            }
++            return JSObject::setGeneric(cx, robj, robj, rootId, &writeVal, false); // %%% Strict? (last parameter)
 +        }
-+#ifdef TxJS_LOCAL
 +    }
-+#endif
 +
 +    return JS_TRUE;
 +}
