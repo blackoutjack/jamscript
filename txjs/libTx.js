@@ -3,6 +3,7 @@
 
 const PERFORMANCE_TESTING = true;
 const DEFAULT_ALLOW = true;
+const MIMIC = false;
 
 // Allow testing scripts with |alert| in the JS shell.
 if (typeof alert === "undefined" && typeof print === "function") {
@@ -608,9 +609,16 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 
       var ret;
       if (typeof ispect === "function") {
-        introspect(ispect) {
-          ret = JAM.newApply(c, args);
-        }
+        //if (MIMIC) {
+        //  nodeTx.node = { type: "new", value: c, obj: null, args: args, argc: len };
+        //  ispect(nodeTx);
+        //  ret = nodeTx.ret;
+        //  nodeTx.node = nodeTx.ret = _undefined;
+        //} else {
+          introspect(ispect) {
+            ret = JAM.newApply(c, args);
+          }
+        //}
       } else {
         ret = JAM.newApply(c, args);
       }
@@ -620,19 +628,6 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
     // This is just here for auto.js to use.
     bind: function(f, args) {
       return _bind_apply(f, args);
-    },
-
-    invoke: function(rec, prop, args, ispect) {
-      var f;
-      if (typeof ispect === "function") {
-        introspect(ispect) {
-          f = rec[prop];
-        }
-      } else {
-        f = rec[prop];
-      }
-
-      JAM.call(f, rec, args, ispect);
     },
 
     call: function(f, rec, args, ispect) {
@@ -748,12 +743,15 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 
       var ret;
       if (typeof ispect === "function") {
-        nodeTx.node = { type: "call", value: f, obj: rec, args: args, argc: len };
-        ispect(nodeTx);
-        ret = nodeTx.ret;
-        nodeTx.node = nodeTx.ret = _undefined;
-        //introspect(ispect) {
-        //  ret = _apply_apply(f, [rec, args]);
+        //if (MIMIC) {
+          nodeTx.node = { type: "call", value: f, obj: rec, args: args, argc: len };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
+        //} else {
+        //  introspect(ispect) {
+        //    ret = _apply_apply(f, [rec, args]);
+        //  }
         //}
       } else {
         ret = _apply_apply(f, [rec, args]);
@@ -765,9 +763,16 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       if (obj === null) obj = _global;
       var ret;
       if (ispect) {
-        introspect(ispect) {
-          ret = obj[memb];
-        }
+        //if (MIMIC) {
+        //  nodeTx.node = { type: "read", id: memb, obj: obj };
+        //  ispect(nodeTx);
+        //  ret = nodeTx.ret;
+        //  nodeTx.node = nodeTx.ret = _undefined;
+        //} else {
+          introspect(ispect) {
+            ret = obj[memb];
+          }
+        //}
       } else {
         ret = obj[memb];
       }
@@ -830,13 +835,17 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       
       if (typeof ispect === "function") {
         var ret;
-        // %%% Seg. fault occurs when return is inside the transaction.
-        //var prof = ispect.name + "/" + obj + "/" + memb + "/" + val;
-        //JAM.startProfile(prof);
-        //JAM.stopProfile(prof);
-        introspect(ispect) {
-          ret = obj[memb] = val;
-        }
+        //if (MIMIC) {
+        //  nodeTx.node = { type: "write", id: memb, value: val, obj: obj };
+        //  ispect(nodeTx);
+        //  ret = nodeTx.ret;
+        //  nodeTx.node = nodeTx.ret = _undefined;
+        //} else {
+          // %%% Seg. fault occurs when return is inside the transaction.
+          introspect(ispect) {
+            ret = obj[memb] = val;
+          }
+        //}
         return ret;
       } else {
         obj[memb] = val;
@@ -1082,8 +1091,6 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       }
       return str;
     },
-
-  };
 
   };
 
