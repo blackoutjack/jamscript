@@ -6,9 +6,10 @@ from subprocess import PIPE
 import time
 from optparse import OptionParser
 import tempfile
-from config import *
 
-sys.path.append(UTILDIR)
+JAMPKG = os.environ['JAMPKG']
+sys.path.append(os.path.join(os.environ['JAMPKG'], 'util'))
+from config import *
 from util import err
 from util import run_tx
 from util import load_policies
@@ -62,12 +63,12 @@ def load_testcases(from_dir, default_policy=None, filter=None):
 
   return cases
       
-def run_tx_tests(case=None, debug=False, jscmd=JSCOMMAND, moreopts=[]):
+def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
   tot = 0
   tot_ok = 0
   start = time.time()
 
-  testcases = load_testcases(TXTESTDIR, None, filter=case)
+  testcases = load_testcases(JAMSCRIPT_TESTDIR, None, filter=case)
 
   for inps in testcases:
     tot += 1
@@ -112,11 +113,11 @@ def main():
     moreopts.append('-t')
 
   if opts.builddir is not None:
-    global JSBUILDDIR, JSCOMMAND
-    JSBUILDDIR = opts.builddir
-    JSCOMMAND = os.path.join(JSBUILDDIR, 'dist', 'bin', 'js')
+    global JAMSCRIPT_BUILDDIR, JS_COMMAND
+    JAMSCRIPT_BUILDDIR = opts.builddir
+    JS_COMMAND = os.path.join(JSBUILDDIR, 'dist', 'bin', 'js')
 
-  run_tx_tests(case=testcase, debug=opts.debug, jscmd=JSCOMMAND, moreopts=moreopts)
+  run_tx_tests(case=testcase, debug=opts.debug, jscmd=JS_COMMAND, moreopts=moreopts)
 
 
 if __name__ == "__main__":

@@ -7,11 +7,11 @@ import os
 import sys
 
 JAMPKG = os.environ['JAMPKG']
-sys.path.append(os.path.join(os.environ['JAMPKG'], 'jamscript', 'tests'))
+sys.path.append(os.path.join(os.environ['JAMPKG'], 'util'))
 from config import *
 
-srcdir = os.path.join(JAMSCRIPTDIR, "..", "jamscript-release")
-OUTDIR = JAMSCRIPTDIR
+srcdir = os.path.join(JAMSCRIPT_DIR, "..", "jamscript-release")
+OUTDIR = JAMSCRIPT_DIR
 
 # The filter specifies a pattern that files must match. If the last
 # parameter is True, the match must be at the end of the filename.
@@ -20,9 +20,8 @@ FILES_TO_COPY = [
   (os.path.join(srcdir, 'doc', 'INSTALL.bash'), os.path.join('doc', 'INSTALL.bash')),
   (os.path.join(srcdir, 'doc', 'INSTALL-FREEBSD'), os.path.join('doc', 'INSTALL-FREEBSD')),
   (os.path.join(srcdir, 'doc', 'TRANSACTIONS'), os.path.join('doc', 'TRANSACTIONS')),
-  (os.path.join(srcdir, 'tests'), 'tests', '.py', True),
+  (os.path.join(srcdir, 'util'), 'util', '.py', True),
   (os.path.join(srcdir, 'tests', 'js'), os.path.join('tests', 'js')),
-  (os.path.join(srcdir, 'tests', 'ff'), os.path.join('tests', 'ff')),
   (os.path.join(srcdir, 'txjs', 'libTx.js'), os.path.join('txjs', 'libTx.js')),
   (os.path.join(srcdir, 'patch'), 'patch'),
   (os.path.join(srcdir, 'README'), 'README'),
