@@ -10,7 +10,10 @@ import tempfile
 JAMPKG = os.environ['JAMPKG']
 sys.path.append(os.path.join(os.environ['JAMPKG'], 'util'))
 from config import *
+from util import out
 from util import err
+from util import warn
+from util import fatal
 from util import run_tx
 from util import load_policies
 from util import validate_output
@@ -37,31 +40,15 @@ def load_testcases(from_dir, default_policy=None, filter=None):
       continue
 
     # Find any applicable policy files.
-    policies = load_policies(from_dir, base, '.policy.js').values()
-
-    # Some cases have a modified version with a "-bad"
-    # or "-ok" suffix. These can use the same policy as
-    # the non-modified version.
-    if len(policies) == 0:
-      subparts = base.split('-')
-      if subparts[-1] == 'bad' or subparts[-1] == 'ok':
-        base = '-'.join(subparts[:-1])
-        policies = load_policies(from_dir, base).values()
-        
-    # Default to the simple policy.
-    if len(policies) == 0:
-      if default_policy is not None:
-        polpath = os.path.join(from_dir, default_policy)
-        if not os.path.isfile(polpath):
-          err("Unable to find default policy file for %s: %s" % (flname, polpath))
-        else:
-          policies = [polpath]
+    # Not currently in use.
+    policies = {}
 
     flpath = os.path.join(from_dir, flname)
     specs = (flpath, policies)
     cases.append(specs)
 
   return cases
+# /load_testcases
       
 def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
   tot = 0
@@ -72,22 +59,26 @@ def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
 
   for inps in testcases:
     tot += 1
-    outp = run_tx(inps[0], inps[1], perf=debug, debug=debug, jscmd=jscmd)
-    stat = validate_output(inps[0], outp, '.exp')
+    jspath = inps[0]
+    policies = inps[1]
+    outp = run_tx(jspath, policies, perf=debug, debug=debug, jscmd=jscmd)
+    exppath = os.path.splitext(jspath)[0] + '.exp'
+    stat = validate_output(outp, exppath)
     if stat == 'ok':
       tot_ok += 1
-    jsname = os.path.basename(inps[0])
+    jsname = os.path.basename(jspath)
 
     if debug:
-      print outp
+      sys.stdout.write(outp)
     if debug or stat != 'ok':
-      print jsname, stat
+      out('%s %s\n' % (jsname, stat))
 
   end = time.time()
   tottime = end - start
 
-  print tot_ok, "of", tot, "transaction tests successful;", str(tottime) + "s"
-  print
+  vals = (tot_ok, tot, tottime)
+  out('%d of %d transaction tests successful; %.2fs\n' % vals)
+# /run_tx_tests
 
 def main():
   parser = OptionParser(usage="%prog")
