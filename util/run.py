@@ -64,13 +64,13 @@ def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
     outp = run_tx(jspath, policies, perf=debug, debug=debug, jscmd=jscmd)
     exppath = os.path.splitext(jspath)[0] + '.exp'
     stat = validate_output(outp, exppath)
-    if stat == 'ok':
+    if stat == 'match':
       tot_ok += 1
     jsname = os.path.basename(jspath)
 
     if debug:
       sys.stdout.write(outp)
-    if debug or stat != 'ok':
+    if debug or stat != 'match':
       out('%s %s\n' % (jsname, stat))
 
   end = time.time()
