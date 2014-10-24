@@ -1,8 +1,8 @@
 // We assume that first, some policy.js has been included in a script
 // tag in the HTML page, and then this file, followed by all others.
 
-const PERFORMANCE_TESTING = true;
-const DEFAULT_ALLOW = true;
+const PERFORMANCE_TESTING = false;
+const DEFAULT_ALLOW = false;
 const MIMIC = false;
 
 // Allow testing scripts with |alert| in the JS shell.
@@ -687,7 +687,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             || (fname === "insertBefore" && JAM.instanceof(rec, Element))
             || (fname === "replaceChild" && JAM.instanceof(rec, Element))
             || (fname === "setAttributeNode" && JAM.instanceof(rec, Element))) {
-          //ispect = pFull;
+          ispect = pFull;
         } else if (JAM.identical(f, _Array_prototype_sort)
             || JAM.identical(f, _setTimeout) || JAM.identical(f, _setInterval)) {
           // Only protect if a native function is being invoked, since
