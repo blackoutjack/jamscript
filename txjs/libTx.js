@@ -400,6 +400,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       // Mark this false if special invocation is done in place.
       var invoke = true;
       if (len > 0) {
+        var fname = fun.name;
         if (JAM.identical(fun, _Array_prototype_sort)) {
           // Array.prototype.sort may invoke a user-provided
           // comparison function.
@@ -431,7 +432,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           ret = _apply_apply(fun, [obj, args]);
           JAM.setDynamicIntrospector();
           invoke = false;
-        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+        } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttribute" || fname === "setAttributeNode") {
           // For |appendChild|, |replaceChild| and |insertBefore|,
           // the first argument is the element to be inserted.
           JAM.setDynamicIntrospector(pFull);
@@ -447,14 +448,14 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             if (typeof args[1] === "function") {
               args[1] = wrapMethod(pFull, args[1]);
             }
-          } else if (fun.name === "addEventListener") {
+          } else if (fname === "addEventListener") {
             // For |addEventListener|, the first argument is the type
             // of event and the second (index 1) is the event handler.
             // There may be optional further arguments.
             // %%% What if the second argument is an |EventListener|
             // %%% rather than a simple |Function|?
             args[1] = wrapMethod(pFull, args[1]);
-          } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+          } else if (fname === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
             // The second argument must specify the |Function| or
             // |EventListener| to remove, so we need to maintain a
             // mapping from the "original" functions to their
@@ -625,11 +626,6 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       return ret;
     },
 
-    // This is just here for auto.js to use.
-    bind: function(f, args) {
-      return _bind_apply(f, args);
-    },
-
     call: function(f, rec, args, ispect) {
       // General notes:
       // * |HTMLElement.prototype.setAttribute| cannot be used to
@@ -795,6 +791,10 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       //     contains an inline script, the script referenced by the src
       //     attribute will not be loaded.''
 
+      // Shortcut this common case that won't affect any policies.
+      if (typeof memb === "number")
+        return obj[memb] = val;
+
       if (obj === null) obj = _global;
       // %%% Need to be more general? |Node|, perhaps?
       if (JAM.instanceof(obj, _HTMLElement)) {
@@ -823,11 +823,11 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           // No action needed for |textContent|.
         }
         if (memb === "src") {
-          if (JAM.instanceof(rec, _HTMLScriptElement)) {
+          if (JAM.instanceof(obj, _HTMLScriptElement)) {
             ispect = pFull;
           }
         } else if (memb === "data") {
-          if (JAM.instanceof(rec, _HTMLObjectElement)) {
+          if (JAM.instanceof(obj, _HTMLObjectElement)) {
             ispect = pFull;
           }
         }
@@ -922,6 +922,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
         // Mark this false if special invocation is done in place.
         var invoke = true;
         if (len > 0) {
+          var fname = fun.name;
           if (JAM.identical(fun, _Array_prototype_sort)) {
             // Array.prototype.sort may invoke a user-provided
             // comparison function.
@@ -957,7 +958,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             invoke = false;
-          } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+          } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttribute" || fname === "setAttributeNode") {
             // For |appendChild|, |replaceChild| and |insertBefore|,
             // the first argument is the element to be inserted.
             JAM.setDynamicIntrospector(pFull);
@@ -973,7 +974,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
               if (JAM.isNativeFunction(args[1])) {
                 args[1] = wrapMethod(pFull, args[1]);
               }
-            } else if (fun.name === "addEventListener") {
+            } else if (fname === "addEventListener") {
               // For |addEventListener|, the first argument is the type
               // of event and the second (index 1) is the event handler.
               // There may be optional further arguments.
@@ -982,7 +983,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
               if (JAM.isNativeFunction(args[1])) {
                 args[1] = wrapMethod(pFull, args[1]);
               }
-            } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+            } else if (fname === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
               // The second argument must specify the |Function| or
               // |EventListener| to remove, so we need to maintain a
               // mapping from the "original" functions to their
@@ -1025,7 +1026,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 
         if (len > 0) {
           if (JAM.identical(c, _Function)) {
-              args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
+            args[len-1] = "introspect(JAM.policy.pFull) {" + args[len-1] + "}";
           }
         }
 
@@ -1099,8 +1100,6 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 if (PERFORMANCE_TESTING) {
   // Pass through violations for performance testing.
   JAM.prevent = JAM.process;
-  // Override |alert| for convenience (and perf. testing).
-  alert = JAM.log;
 }
 
 Object.freeze(JAM);
