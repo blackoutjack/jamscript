@@ -611,14 +611,14 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       var ret;
       if (typeof ispect === "function") {
         //if (MIMIC) {
-        //  nodeTx.node = { type: "new", value: c, obj: null, args: args, argc: len };
-        //  ispect(nodeTx);
-        //  ret = nodeTx.ret;
-        //  nodeTx.node = nodeTx.ret = _undefined;
+          nodeTx.node = { type: "new", value: c, obj: null, args: args, argc: len };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
         //} else {
-          introspect(ispect) {
-            ret = JAM.newApply(c, args);
-          }
+        //  introspect(ispect) {
+        //    ret = JAM.newApply(c, args);
+        //  }
         //}
       } else {
         ret = JAM.newApply(c, args);
@@ -760,14 +760,14 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       var ret;
       if (ispect) {
         //if (MIMIC) {
-        //  nodeTx.node = { type: "read", id: memb, obj: obj };
-        //  ispect(nodeTx);
-        //  ret = nodeTx.ret;
-        //  nodeTx.node = nodeTx.ret = _undefined;
+          nodeTx.node = { type: "read", id: memb, obj: obj };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
         //} else {
-          introspect(ispect) {
-            ret = obj[memb];
-          }
+        //  introspect(ispect) {
+        //    ret = obj[memb];
+        //  }
         //}
       } else {
         ret = obj[memb];
@@ -836,15 +836,15 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       if (typeof ispect === "function") {
         var ret;
         //if (MIMIC) {
-        //  nodeTx.node = { type: "write", id: memb, value: val, obj: obj };
-        //  ispect(nodeTx);
-        //  ret = nodeTx.ret;
-        //  nodeTx.node = nodeTx.ret = _undefined;
+          nodeTx.node = { type: "write", id: memb, value: val, obj: obj };
+          ispect(nodeTx);
+          ret = nodeTx.ret;
+          nodeTx.node = nodeTx.ret = _undefined;
         //} else {
           // %%% Seg. fault occurs when return is inside the transaction.
-          introspect(ispect) {
-            ret = obj[memb] = val;
-          }
+        //  introspect(ispect) {
+        //    ret = obj[memb] = val;
+        //  }
         //}
         return ret;
       } else {
