@@ -1,0 +1,13 @@
+How to acquire and build the Tor browser
+
+1) Clone the Tor browser repository.
+   git clone https://git.torproject.org/tor-browser.git
+2) View https://gitweb.torproject.org/tor-browser.git to determine what
+   branches (corresponding to Firefox versions) are available. Choose
+   one, e.g., tor-browser-31.3.0esr-4.5-1.
+3) Check out the chosen branch.
+   git checkout tor-browser-31.3.0esr-4.5-1
+4) Alter the .mozconfig file to contain the following line.
+   --with-tor-browser-version=31.3.0esr-4.5-1
+5) Run the build command.
+   make -f client.mk build
