@@ -564,7 +564,15 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
     violation: function() {
       //console.trace();
       var msg = "JAM prevented a policy violation";
-      JAM.log(msg);
+      JAM.log(msg + " at");
+
+      var e = new Error(msg);
+      var stack = e.stack;
+        //.replace(/^[^\(]+?[\n$]/gm, '')
+        //.replace(/^\s+at\s+/gm, '')
+        //.replace(/^Object.<anonymous>\s*\(/gm, '{anonymous}()@')
+        //.split('\n');
+      JAM.log(stack);
       throw new Error(msg);
     },
 
