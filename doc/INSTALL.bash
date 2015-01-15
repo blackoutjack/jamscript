@@ -36,6 +36,12 @@ cat ./patch/*.patch | patch -d mozilla-esr17 -p1
 #   used for normal operation, mozconfig-debug for a debug build.
 cd ./mozilla-esr17/ && cp mozconfig-release .mozconfig
 
+#5a) On Ubuntu 14.04, I encountered a problem during the virtualenv
+#   portion of the build. The following fixes this (you may need to
+#   sudo).
+# cd /usr/lib/python2.7
+# ln -s plat-x86_64-linux-gnu/_sysconfigdata_nd.py .
+
 #5) Build the browser (takes ~30 minutes from scratch with the -j4
 #   option in .mozconfig).
 make -f client.mk build
