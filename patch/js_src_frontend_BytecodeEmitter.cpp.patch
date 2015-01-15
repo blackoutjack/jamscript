@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/frontend/BytecodeEmitter.cpp	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/BytecodeEmitter.cpp	2014-05-02 14:57:37.550561655 -0500
++++ mozilla-esr17/js/src/frontend/BytecodeEmitter.cpp	2015-01-15 10:14:33.901065642 -0600
 @@ -339,6 +339,11 @@
      "if statement",          /* IF */
      "else statement",        /* ELSE */
@@ -34,7 +34,17 @@
            default:;
          }
  
-@@ -5469,6 +5489,98 @@
+@@ -4929,7 +4949,9 @@
+     if (!bce->sc->inFunction()) {
+         JS_ASSERT(pn->pn_cookie.isFree());
+         JS_ASSERT(pn->getOp() == JSOP_NOP);
++#ifndef TxJS_HOIST
+         JS_ASSERT(!bce->topStmt);
++#endif
+         bce->switchToProlog();
+         if (!EmitIndex32(cx, JSOP_DEFFUN, index, bce))
+             return false;
+@@ -5469,6 +5491,98 @@
      return true;
  }
  
@@ -133,7 +143,27 @@
  static bool
  EmitLogical(JSContext *cx, BytecodeEmitter *bce, ParseNode *pn)
  {
-@@ -6169,6 +6281,14 @@
+@@ -6102,6 +6216,19 @@
+                     if (!EmitTree(cx, bce, pn2))
+                         return false;
+                 }
++#ifdef TxJS_HOIST
++                if (pn2->isKind(PNK_TX)) {
++                    ParseNode *pnblock = pn2->pn_right;
++                    ParseNode *pnstmt = pnblock->pn_head;
++                    
++                    for (ParseNode *pn3 = pnstmt; pn3; pn3 = pn3->pn_next) {
++                        if (pn3->isKind(PNK_FUNCTION) && pn3->functionIsHoisted()) {
++                            if (!EmitTree(cx, bce, pn3))
++                                return false;
++                        }
++                    }
++                }
++#endif
+             }
+         }
+         if (fun->hasDefaults()) {
+@@ -6169,6 +6296,14 @@
          break;
        }
  
@@ -148,3 +178,4 @@
        case PNK_IF:
          ok = EmitIf(cx, bce, pn);
          break;
+

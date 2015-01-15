@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/frontend/TokenStream.cpp	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/TokenStream.cpp	2014-05-02 14:57:37.602561653 -0500
++++ mozilla-esr17/js/src/frontend/TokenStream.cpp	2015-01-15 10:14:33.925065642 -0600
 @@ -2314,6 +2314,9 @@
        case TOK_MULASSIGN:       return "TOK_MULASSIGN";
        case TOK_DIVASSIGN:       return "TOK_DIVASSIGN";
@@ -10,3 +10,4 @@
        case TOK_LIMIT:           break;
      }
  
+

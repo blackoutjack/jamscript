@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/frontend/Parser.cpp	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/Parser.cpp	2014-05-02 14:57:37.598561654 -0500
++++ mozilla-esr17/js/src/frontend/Parser.cpp	2015-01-15 10:14:33.917065642 -0600
 @@ -517,6 +517,11 @@
              return ENDS_IN_OTHER;
          return HasFinalReturn(pn->last());
@@ -88,7 +88,32 @@
  ParseNode *
  Parser::functionStmt()
  {
-@@ -2777,7 +2819,13 @@
+@@ -1908,7 +1950,11 @@
+     ParseNode *saveBlock = pc->blockNode;
+     pc->blockNode = pn;
+ 
++#ifdef TxJS_HOIST
++    if (pc->atBodyLevel() && !pc->hasTxTop && !processDirectives(pn))
++#else
+     if (pc->atBodyLevel() && !processDirectives(pn))
++#endif
+         return NULL;
+     for (;;) {
+         TokenKind tt = tokenStream.peekToken(TSF_OPERAND);
+@@ -1927,6 +1973,12 @@
+             return NULL;
+         }
+ 
++#ifdef TxJS_HOIST
++        if (next->isKind(PNK_TX) && next->pn_xflags ^ PNX_FUNCDEFS) {
++          next->pn_xflags ^= ~PNX_FUNCDEFS;
++          pn->pn_xflags |= PNX_FUNCDEFS;
++        }
++#endif
+         if (next->isKind(PNK_FUNCTION)) {
+             /*
+              * PNX_FUNCDEFS notifies the emitter that the block contains body-
+@@ -2777,7 +2829,13 @@
      }
  
      /* Make a new node for this declarator name (or destructuring pattern). */
@@ -102,7 +127,7 @@
      return NameNode::create(PNK_NAME, atom, parser, parser->pc);
  }
  
-@@ -3706,6 +3754,13 @@
+@@ -3706,6 +3764,13 @@
          return functionStmt();
        }
  
@@ -116,7 +141,7 @@
        case TOK_IF:
        {
          /* An IF node has three kids: condition, then, and optional else. */
-@@ -4096,13 +4151,28 @@
+@@ -4096,13 +4161,28 @@
          }
  #endif /* JS_HAS_DESTRUCTURING */
  
@@ -145,7 +170,7 @@
          pn2 = NewBindingNode(name, this, varContext);
          if (!pn2)
              return NULL;
-@@ -4380,6 +4450,91 @@
+@@ -4380,6 +4460,120 @@
      return pn;
  }
  
@@ -158,6 +183,10 @@
 +    ParseNode *pn, *pn1;
 +
 +    StmtInfoPC stmtInfo(context);
++#ifdef TxJS_HOIST
++    StmtInfoPC *txTop = pc->topStmt;
++    bool hasTxTop = pc->atBodyLevel();
++#endif
 +    PushStatementPC(pc, &stmtInfo, STMT_TX);
 +
 +    // Transaction statements may optionally be named.
@@ -181,7 +210,32 @@
 +    if (!txArguments(pn))
 +        return NULL;
 +
-+    pn1 = statement();
++#ifdef TxJS_HOIST
++    if (tokenStream.peekToken(TSF_OPERAND) == TOK_LC) {
++        tokenStream.getToken(TSF_OPERAND);
++        JS_CHECK_RECURSION(context, return NULL);
++
++        StmtInfoPC stmtInfo1(context);
++        if (!PushBlocklikeStatement(&stmtInfo1, STMT_BLOCK, pc))
++            return NULL;
++        if (hasTxTop) {
++            pc->txTop = txTop;
++            pc->hasTxTop = true;
++        }
++        bool hasFunctionStmt;
++        pn1 = statements(&hasFunctionStmt);
++        if (hasFunctionStmt) {
++          pn1->pn_xflags ^= ~PNX_FUNCDEFS;
++          pn->pn_xflags |= PNX_FUNCDEFS;
++        }
++        if (pn1) {
++            MUST_MATCH_TOKEN(TOK_RC, JSMSG_CURLY_IN_COMPOUND);
++            PopStatementPC(context, pc);
++        }
++    } else
++#endif
++        pn1 = statement();
++
 +    if (!pn1)
 +        return NULL;
 +    pn->pn_right = pn1;
@@ -237,7 +291,7 @@
  JS_ALWAYS_INLINE ParseNode *
  Parser::condExpr1()
  {
-@@ -4463,6 +4618,16 @@
+@@ -4463,6 +4657,16 @@
          return returnOrYield(true);
  #endif
  
@@ -254,3 +308,4 @@
      ParseNode *lhs = condExpr1();
      if (!lhs)
          return NULL;
+

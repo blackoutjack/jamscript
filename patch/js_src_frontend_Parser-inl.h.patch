@@ -1,0 +1,26 @@
+--- mozilla-esr17-orig/js/src/frontend/Parser-inl.h	2013-02-15 14:59:19.000000000 -0600
++++ mozilla-esr17/js/src/frontend/Parser-inl.h	2015-01-15 10:14:33.921065642 -0600
+@@ -22,7 +22,11 @@
+ inline bool
+ ParseContext::atBodyLevel()
+ {
++#ifdef TxJS_HOIST
++    return !topStmt || topStmt->isFunctionBodyBlock || hasTxTop;
++#else
+     return !topStmt || topStmt->isFunctionBodyBlock;
++#endif
+ }
+ 
+ inline
+@@ -32,6 +36,10 @@
+     blockidGen(bodyid),  // used to set |bodyid| and subsequently incremented in init()
+     topStmt(NULL),
+     topScopeStmt(NULL),
++#ifdef TxJS_HOIST
++    txTop(NULL),
++    hasTxTop(false),
++#endif
+     blockChain(prs->context),
+     staticLevel(staticLevel),
+     parenDepth(0),
+

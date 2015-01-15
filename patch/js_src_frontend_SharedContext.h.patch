@@ -1,5 +1,5 @@
 --- mozilla-esr17-orig/js/src/frontend/SharedContext.h	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/SharedContext.h	2014-05-02 14:57:37.602561653 -0500
++++ mozilla-esr17/js/src/frontend/SharedContext.h	2015-01-15 10:14:33.925065642 -0600
 @@ -14,6 +14,9 @@
  #include "jsscript.h"
  #include "jsprvtd.h"
@@ -20,3 +20,4 @@
      STMT_BLOCK,                 /* compound statement: { s1[;... sN] } */
      STMT_SWITCH,                /* switch statement */
      STMT_WITH,                  /* with statement */
+

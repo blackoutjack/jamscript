@@ -1,6 +1,6 @@
 --- mozilla-esr17-orig/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.h	2014-08-17 01:44:17.948518212 -0500
-@@ -0,0 +1,151 @@
++++ mozilla-esr17/js/src/jstx.h	2015-01-15 10:34:19.081030990 -0600
+@@ -0,0 +1,159 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -27,6 +27,14 @@
 +
 +// Use hashing rather than linear lookup for reads during transactions.
 +#define TxJS_HASH 1
++
++// Hoist function definitions outside of transactions. This is needed
++// in some cases to maintain correct semantics for coarse-grained
++// instrumentation.
++// %%% It might be useful/safer to just hoist function definitions to
++// %%% the top of the transaction block. This deviates from other
++// %%% cases, e.g. a definition inside of an IF block.
++#define TxJS_HOIST 1
 +
 +// Capture reads and writes to local variables.
 +//#define TxJS_LOCAL 1
@@ -152,3 +160,4 @@
 +#endif
 +
 +#endif
+
