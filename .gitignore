@@ -3,3 +3,4 @@ tests/browser/
 packages/
 *.pyc
 .svn/
+*.swp

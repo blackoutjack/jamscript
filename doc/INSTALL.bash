@@ -5,15 +5,7 @@
 # Set this to the checked-out repository root.
 #JAMSCRIPTPKG=/path/to/jamscript
 
-sudo apt-get -y install pkg-config
-sudo apt-get -y install gtk+-2.0
-sudo apt-get -y install libdbus-1-dev
-sudo apt-get -y install libdbus-glib-1-dev
-sudo apt-get -y install yasm
-sudo apt-get -y install libasound2-dev
-sudo apt-get -y install libcurl4-openssl-dev
-sudo apt-get -y install libiw-dev
-sudo apt-get -y install mesa-common-dev
+sudo apt-get -y install pkg-config gtk+-2.0 libdbus-1-dev libdbus-glib-1-dev yasm libasound2-dev libcurl4-openssl-dev libiw-dev mesa-common-dev
 
 if [[ -z "$JAMSCRIPTPKG" || ! -d $JAMSCRIPTPKG ]]; then
   echo "Set the JAMSCRIPTPKG environment variable first."
@@ -56,7 +48,5 @@ make -f client.mk build
 # ./obj-release/browser/dist/bin/js 
 
 # The following allow testing with a local web server.
-sudo apt-get -y install apache2
-sudo apt-get -y install php5
-sudo apt-get -y install libapache2-mod-php5
+sudo apt-get -y install apache2 php5 libapache2-mod-php5
 
