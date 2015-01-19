@@ -71,7 +71,7 @@ def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
     if debug:
       sys.stdout.write(outp)
     if debug or stat != 'match':
-      out('%s %s\n' % (jsname, stat))
+      out('%s %s' % (jsname, stat))
 
   end = time.time()
   tottime = end - start
@@ -83,7 +83,7 @@ def run_tx_tests(case=None, debug=False, jscmd=JS_COMMAND, moreopts=[]):
 def main():
   parser = OptionParser(usage="%prog")
   parser.add_option('-g', '--debug', action='store_true', default=False, dest='debug', help='generate debug output')
-  parser.add_option('-d', '--builddir', action='store', default=None, dest='builddir', help='build directory to test')
+  parser.add_option('-j', '--jsbin', action='store', default=None, dest='jsbin', help='js binary to test')
   parser.add_option('-a', '--always-mjit', action='store_true', default=False, dest='alwaysmjit', help='always use method JIT')
   parser.add_option('-m', '--methodjit', action='store_true', default=False, dest='methodjit', help='enable method JIT')
   parser.add_option('-t', '--typeinfer', action='store_true', default=False, dest='typeinfer', help='enable type inference')
@@ -103,10 +103,9 @@ def main():
   if opts.typeinfer:
     moreopts.append('-t')
 
-  if opts.builddir is not None:
-    global JAMSCRIPT_BUILDDIR, JS_COMMAND
-    JAMSCRIPT_BUILDDIR = opts.builddir
-    JS_COMMAND = os.path.join(JSBUILDDIR, 'dist', 'bin', 'js')
+  if opts.jsbin is not None:
+    global JS_COMMAND
+    JS_COMMAND = opts.jsbin
 
   run_tx_tests(case=testcase, debug=opts.debug, jscmd=JS_COMMAND, moreopts=moreopts)
 

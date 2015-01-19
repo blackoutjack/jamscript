@@ -1,7 +1,7 @@
 
-ORIGDIR = "mozilla-esr17-orig"
-DEVDIR = "mozilla-esr17"
-PATCHDIR = "patch"
+ORIGDIR = "ff-orig/mozilla-17.0.3esr"
+DEVDIR = "ff-dev/mozilla-17.0.3esr"
+PATCHDIR = "patch/mozilla-17.0.3esr"
 EXCLUSIONS = [
   '_virtualenv',
   'confdefs.h',
