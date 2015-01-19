@@ -4,3 +4,5 @@ packages/
 *.pyc
 .svn/
 *.swp
+ff-dev/
+ff-orig/
