@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-18.0.2/js/src/vm/GlobalObject.cpp	2013-02-01 09:02:33.000000000 -0600
++++ ff-dev/mozilla-18.0.2/js/src/vm/GlobalObject.cpp	2015-01-19 15:46:05.587340044 -0600
+@@ -14,6 +14,9 @@
+ #include "jsmath.h"
+ #include "json.h"
+ #include "jsweakmap.h"
++#ifdef TxJS
++#include "jsjam.h"
++#endif
+ 
+ #include "builtin/Eval.h"
+ #include "builtin/MapObject.h"
+@@ -538,6 +541,9 @@
+            js_InitMapClass(cx, global) &&
+            GlobalObject::initMapIteratorProto(cx, global) &&
+            js_InitSetClass(cx, global) &&
++#ifdef TxJS
++           js_InitJAMClass(cx, global) &&
++#endif
+            GlobalObject::initSetIteratorProto(cx, global);
+ }
+ 
+

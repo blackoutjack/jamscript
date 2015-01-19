@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-18.0.2/content/base/src/nsFrameLoader.h	2013-02-01 09:02:21.000000000 -0600
++++ ff-dev/mozilla-18.0.2/content/base/src/nsFrameLoader.h	2015-01-18 22:45:58.473129636 -0600
+@@ -433,6 +433,10 @@
+   // See nsIFrameLoader.idl. EVENT_MODE_NORMAL_DISPATCH automatically
+   // forwards some input events to out-of-process content.
+   uint32_t mEventMode;
++#ifdef TxJS
++public:
++  JS::Value mIntrospector;
++#endif
+ };
+ 
+ #endif
+

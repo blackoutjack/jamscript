@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-18.0.2/content/base/src/nsFrameLoader.cpp	2013-02-01 09:02:21.000000000 -0600
++++ ff-dev/mozilla-18.0.2/content/base/src/nsFrameLoader.cpp	2015-01-18 23:02:26.621100744 -0600
+@@ -302,6 +302,9 @@
+   , mRemoteBrowser(nullptr)
+   , mRenderMode(RENDER_MODE_DEFAULT)
+   , mEventMode(EVENT_MODE_NORMAL_DISPATCH)
++#ifdef TxJS
++  , mIntrospector(JS::UndefinedValue())
++#endif
+ {
+ }
+ 
+@@ -493,6 +496,9 @@
+   // Kick off the load...
+   bool tmpState = mNeedsAsyncDestroy;
+   mNeedsAsyncDestroy = true;
++#ifdef TxJS
++  mDocShell->SetIntrospector(mIntrospector);
++#endif
+   rv = mDocShell->LoadURI(mURIToLoad, loadInfo, flags, false);
+   mNeedsAsyncDestroy = tmpState;
+   mURIToLoad = nullptr;
+

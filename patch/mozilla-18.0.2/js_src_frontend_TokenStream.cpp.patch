@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-18.0.2/js/src/frontend/TokenStream.cpp	2013-02-01 09:02:30.000000000 -0600
++++ ff-dev/mozilla-18.0.2/js/src/frontend/TokenStream.cpp	2015-01-18 23:21:09.293067919 -0600
+@@ -2310,6 +2310,9 @@
+       case TOK_MULASSIGN:       return "TOK_MULASSIGN";
+       case TOK_DIVASSIGN:       return "TOK_DIVASSIGN";
+       case TOK_MODASSIGN:       return "TOK_MODASSIGN";
++#ifdef TxJS
++      case TOK_TX:              return "TOK_TX";
++#endif
+       case TOK_EXPORT:          return "TOK_EXPORT";
+       case TOK_IMPORT:          return "TOK_IMPORT";
+       case TOK_LIMIT:           break;
+

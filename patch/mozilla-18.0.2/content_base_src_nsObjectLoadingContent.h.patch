@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-18.0.2/content/base/src/nsObjectLoadingContent.h	2013-02-01 09:02:21.000000000 -0600
++++ ff-dev/mozilla-18.0.2/content/base/src/nsObjectLoadingContent.h	2015-01-18 22:45:58.473129636 -0600
+@@ -415,7 +415,9 @@
+     // as a root for other resource requests.
+     nsCOMPtr<nsIURI>            mBaseURI;
+ 
+-
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
+ 
+     // Type of the currently-loaded content.
+     ObjectType                  mType           : 8;
+

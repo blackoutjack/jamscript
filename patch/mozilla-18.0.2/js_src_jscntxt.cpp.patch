@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-18.0.2/js/src/jscntxt.cpp	2013-02-01 09:02:31.000000000 -0600
++++ ff-dev/mozilla-18.0.2/js/src/jscntxt.cpp	2015-01-18 22:45:58.493129636 -0600
+@@ -1182,6 +1182,9 @@
+     throwing(false),
+     exception(UndefinedValue()),
+     runOptions(0),
++#ifdef TxJS
++    tx_(NULL),
++#endif
+     reportGranularity(JS_DEFAULT_JITREPORT_GRANULARITY),
+     localeCallbacks(NULL),
+     resolvingList(NULL),
+@@ -1477,6 +1480,11 @@
+     TraceCycleDetectionSet(trc, cycleDetectorSet);
+ 
+     MarkValueRoot(trc, &iterValue, "iterValue");
++#ifdef TxJS
++    if (tx_) {
++        tx_->trace(trc);
++    }
++#endif
+ }
+ 
+ namespace JS {
+

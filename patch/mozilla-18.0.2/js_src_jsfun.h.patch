@@ -1,0 +1,56 @@
+--- ff-orig/mozilla-18.0.2/js/src/jsfun.h	2013-02-01 09:02:31.000000000 -0600
++++ ff-dev/mozilla-18.0.2/js/src/jsfun.h	2015-01-18 22:45:58.493129636 -0600
+@@ -235,6 +235,52 @@
+     return static_cast<const JSFunction *>(this);
+ }
+ 
++#ifdef TxJS
++// These must be defined in a header to be used outside the class.
++static const uint32_t JSSLOT_BOUND_FUNCTION_THIS       = 0;
++static const uint32_t JSSLOT_BOUND_FUNCTION_ARGS_COUNT = 1;
++
++static const uint32_t BOUND_FUNCTION_RESERVED_SLOTS = 2;
++
++inline JSObject *
++JSFunction::getBoundFunctionTarget() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    /* Bound functions abuse |parent| to store their target function. */
++    return getParent();
++}
++
++inline const js::Value &
++JSFunction::getBoundFunctionThis() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    return getSlot(JSSLOT_BOUND_FUNCTION_THIS);
++}
++
++inline const js::Value &
++JSFunction::getBoundFunctionArgument(unsigned which) const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++    JS_ASSERT(which < getBoundFunctionArgumentCount());
++
++    return getSlot(BOUND_FUNCTION_RESERVED_SLOTS + which);
++}
++
++inline size_t
++JSFunction::getBoundFunctionArgumentCount() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    return getSlot(JSSLOT_BOUND_FUNCTION_ARGS_COUNT).toPrivateUint32();
++}
++#endif
++
+ extern JSString *
+ fun_toStringHelper(JSContext *cx, js::HandleObject obj, unsigned indent);
+ 
+

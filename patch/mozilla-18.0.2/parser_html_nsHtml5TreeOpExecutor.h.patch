@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-18.0.2/parser/html/nsHtml5TreeOpExecutor.h	2013-02-01 09:02:44.000000000 -0600
++++ ff-dev/mozilla-18.0.2/parser/html/nsHtml5TreeOpExecutor.h	2015-01-18 22:45:58.509129635 -0600
+@@ -26,6 +26,10 @@
+ #include "nsTHashtable.h"
+ #include "nsHashKeys.h"
+ #include "mozilla/LinkedList.h"
++// TxJS begin
++// %%% Needed?
++#include "jsapi.h"
++// TxJS end
+ 
+ class nsHtml5Parser;
+ class nsHtml5TreeBuilder;
+@@ -53,6 +57,10 @@
+     NS_DECL_ISUPPORTS_INHERITED
+     NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(nsHtml5TreeOpExecutor, nsContentSink)
+ 
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
++
+   private:
+     static bool        sExternalViewSource;
+ #ifdef DEBUG_NS_HTML5_TREE_OP_EXECUTOR_FLUSH
+

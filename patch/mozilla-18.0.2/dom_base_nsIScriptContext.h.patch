@@ -1,0 +1,22 @@
+--- ff-orig/mozilla-18.0.2/dom/base/nsIScriptContext.h	2013-02-01 09:02:24.000000000 -0600
++++ ff-dev/mozilla-18.0.2/dom/base/nsIScriptContext.h	2015-01-18 22:45:58.481129636 -0600
+@@ -84,6 +84,18 @@
+    * @return NS_OK if the script was valid and got executed
+    *
+    **/
++#ifdef TxJS
++  virtual nsresult EvaluateString(const nsAString& aScript,
++                                  JSObject* aScopeObject,
++                                  nsIPrincipal *aPrincipal,
++                                  nsIPrincipal *aOriginPrincipal,
++                                  const char *aURL,
++                                  uint32_t aLineNo,
++                                  JSVersion aVersion,
++                                  nsAString *aRetValue,
++                                  bool* aIsUndefined,
++                                  const JS::Value &ispect) = 0;
++#endif
+   virtual nsresult EvaluateString(const nsAString& aScript,
+                                   JSObject* aScopeObject,
+                                   nsIPrincipal *aPrincipal,
+
