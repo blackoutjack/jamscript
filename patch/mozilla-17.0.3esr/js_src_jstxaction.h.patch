@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jstxaction.h	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstxaction.h	2014-07-22 21:56:28.909938407 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jstxaction.h	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jstxaction.h	2015-01-18 12:12:50.050240353 -0600
 @@ -0,0 +1,127 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -128,3 +128,4 @@
 +#endif
 +
 +#endif
+

@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/content/base/src/nsScriptLoader.cpp	2013-02-15 14:59:03.000000000 -0600
-+++ mozilla-esr17/content/base/src/nsScriptLoader.cpp	2014-06-23 22:00:01.381043214 -0500
+--- ff-orig/mozilla-17.0.3esr/content/base/src/nsScriptLoader.cpp	2013-02-15 14:59:03.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/content/base/src/nsScriptLoader.cpp	2015-01-18 12:12:50.010240354 -0600
 @@ -47,6 +47,9 @@
  #include "mozilla/FunctionTimer.h"
  #include "mozilla/CORSMode.h"
@@ -103,3 +103,4 @@
  
    // Put the old script back in case it wants to do anything else.
    mCurrentScript = oldCurrent;
+

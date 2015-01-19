@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsapi.cpp	2013-02-15 14:59:21.000000000 -0600
-+++ mozilla-esr17/js/src/jsapi.cpp	2014-06-24 13:23:50.584491137 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsapi.cpp	2013-02-15 14:59:21.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsapi.cpp	2015-01-18 12:12:50.022240354 -0600
 @@ -83,6 +83,11 @@
  #include "methodjit/Logging.h"
  #endif
@@ -76,3 +76,4 @@
  
      JS_ASSERT(script->getVersion() == options.version);
  
+

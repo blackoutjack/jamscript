@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/vm/Stack.cpp	2013-02-15 14:59:25.000000000 -0600
-+++ mozilla-esr17/js/src/vm/Stack.cpp	2014-05-02 14:57:37.622561652 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/vm/Stack.cpp	2013-02-15 14:59:25.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/vm/Stack.cpp	2015-01-18 12:12:50.050240353 -0600
 @@ -78,6 +78,9 @@
      hookData_ = (void *)0xbad;
      annotation_ = (void *)0xbad;
@@ -150,3 +150,4 @@
      DebugOnly<CallArgsList*> oldCall = calls_;
      JS_ASSERT(seg_->contains(oldCall));
      calls_ = calls_->prev();
+

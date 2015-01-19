@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/parser/html/nsHtml5TreeOpExecutor.cpp	2013-02-15 14:59:47.000000000 -0600
-+++ mozilla-esr17/parser/html/nsHtml5TreeOpExecutor.cpp	2014-06-23 20:55:32.241156342 -0500
+--- ff-orig/mozilla-17.0.3esr/parser/html/nsHtml5TreeOpExecutor.cpp	2013-02-15 14:59:47.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/parser/html/nsHtml5TreeOpExecutor.cpp	2015-01-18 12:12:50.054240353 -0600
 @@ -73,6 +73,9 @@
  
  nsHtml5TreeOpExecutor::nsHtml5TreeOpExecutor(bool aRunsToCompletion)
@@ -26,3 +26,4 @@
    
    if (!mParser) {
      NS_ASSERTION(sele->IsMalformed(), "Script wasn't marked as malformed.");
+

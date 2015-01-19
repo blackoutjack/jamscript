@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsstr.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsstr.cpp	2014-06-18 18:11:07.732803835 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsstr.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsstr.cpp	2015-01-18 12:12:50.046240353 -0600
 @@ -3233,7 +3233,11 @@
  }
  
@@ -12,3 +12,4 @@
      JS_FS_END
  };
  
+

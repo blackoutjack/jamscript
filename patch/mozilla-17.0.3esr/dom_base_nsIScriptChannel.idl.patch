@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/dom/base/nsIScriptChannel.idl	2013-02-15 14:59:08.000000000 -0600
-+++ mozilla-esr17/dom/base/nsIScriptChannel.idl	2014-06-24 17:09:11.849778532 -0500
+--- ff-orig/mozilla-17.0.3esr/dom/base/nsIScriptChannel.idl	2013-02-15 14:59:08.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/dom/base/nsIScriptChannel.idl	2015-01-18 12:12:50.014240354 -0600
 @@ -66,4 +66,8 @@
     * channel has no effect.
     */
@@ -9,3 +9,4 @@
 +  attribute jsval introspector;
 +  // TxJS end
  };
+

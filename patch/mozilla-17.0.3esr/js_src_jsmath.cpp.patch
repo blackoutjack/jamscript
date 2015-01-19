@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsmath.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsmath.cpp	2014-06-18 18:09:25.032806839 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsmath.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsmath.cpp	2015-01-18 12:12:50.042240353 -0600
 @@ -635,6 +635,29 @@
  #endif
  
@@ -38,3 +38,4 @@
      JS_FS_END
  };
  
+

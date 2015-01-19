@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsinterpinlines.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterpinlines.h	2014-08-16 17:08:47.798131934 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsinterpinlines.h	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsinterpinlines.h	2015-01-18 12:12:50.042240353 -0600
 @@ -17,6 +17,10 @@
  #include "jsnum.h"
  #include "jsprobes.h"
@@ -318,3 +318,4 @@
      return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
  }
  
+

@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsscript.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsscript.cpp	2014-05-23 14:23:41.192758307 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsscript.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsscript.cpp	2015-01-18 12:12:50.046240353 -0600
 @@ -1508,6 +1508,10 @@
      script->sourceStart = bufStart;
      script->sourceEnd = bufEnd;
@@ -21,3 +21,4 @@
  
      /*
       * initScriptCounts updates scriptCountsMap if necessary. The other script
+

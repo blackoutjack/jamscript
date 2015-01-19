@@ -2,6 +2,7 @@
 ORIGDIR = "ff-orig/mozilla-17.0.3esr"
 DEVDIR = "ff-dev/mozilla-17.0.3esr"
 PATCHDIR = "patch/mozilla-17.0.3esr"
+IGNORE_BINARY = True
 EXCLUSIONS = [
   '_virtualenv',
   'confdefs.h',
@@ -33,5 +34,23 @@ EXCLUSIONS = [
   'python',
   'mozinfo.json',
   '*.mk',
+  # Below here, we exclude to allow comparison of a compiled js/src
+  # directory to an uncompiled one.
+  '.deps',
+  'system_wrappers_js',
+  'Makefile',
+  'config.cache',
+  'config.log',
+  'config.status',
+  'host_*',
+  'js-conf*',
+  '*.a',
+  '*.a.desc',
+  'nsinstall',
+  'expandlibs_config.py',
+  'jsapi-tests',
+  'jsauto*',
+  '*.out.h',
+  'unallmakefiles',
 ]
 

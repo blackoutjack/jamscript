@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/dom/src/jsurl/nsJSProtocolHandler.cpp	2013-02-15 14:59:10.000000000 -0600
-+++ mozilla-esr17/dom/src/jsurl/nsJSProtocolHandler.cpp	2014-06-24 17:18:38.225761972 -0500
+--- ff-orig/mozilla-17.0.3esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2013-02-15 14:59:10.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-18 12:12:50.014240354 -0600
 @@ -61,6 +61,9 @@
                              PopupControlState aPopupState,
                              uint32_t aExecutionPolicy,
@@ -119,3 +119,4 @@
          nsresult rv = mIOThunk->EvaluateScript(mStreamChannel, mPopupState,
                                                 mExecutionPolicy,
                                                 mOriginalInnerWindow);
+

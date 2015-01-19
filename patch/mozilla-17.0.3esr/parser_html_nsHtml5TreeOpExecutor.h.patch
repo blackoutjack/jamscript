@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/parser/html/nsHtml5TreeOpExecutor.h	2013-02-15 14:59:47.000000000 -0600
-+++ mozilla-esr17/parser/html/nsHtml5TreeOpExecutor.h	2014-06-23 20:40:36.233182539 -0500
+--- ff-orig/mozilla-17.0.3esr/parser/html/nsHtml5TreeOpExecutor.h	2013-02-15 14:59:47.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/parser/html/nsHtml5TreeOpExecutor.h	2015-01-18 12:12:50.054240353 -0600
 @@ -26,6 +26,10 @@
  #include "nsTHashtable.h"
  #include "nsHashKeys.h"
@@ -22,3 +22,4 @@
    private:
      static bool        sExternalViewSource;
  #ifdef DEBUG_NS_HTML5_TREE_OP_EXECUTOR_FLUSH
+

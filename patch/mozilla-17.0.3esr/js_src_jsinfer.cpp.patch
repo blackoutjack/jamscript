@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsinfer.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinfer.cpp	2014-05-02 14:57:37.606561652 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsinfer.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsinfer.cpp	2015-01-18 12:12:50.042240353 -0600
 @@ -3471,6 +3471,10 @@
        case JSOP_LOOKUPSWITCH:
        case JSOP_TRY:
@@ -24,3 +24,4 @@
      AutoEnterTypeInference enter(cx);
  
      if (js_CodeSpec[*pc].format & JOF_DECOMPOSE)
+

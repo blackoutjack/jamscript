@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/docshell/base/nsIDocShell.idl	2013-02-15 14:59:08.000000000 -0600
-+++ mozilla-esr17/docshell/base/nsIDocShell.idl	2014-06-24 13:45:05.900453856 -0500
+--- ff-orig/mozilla-17.0.3esr/docshell/base/nsIDocShell.idl	2013-02-15 14:59:08.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/docshell/base/nsIDocShell.idl	2015-01-18 12:12:50.014240354 -0600
 @@ -165,6 +165,10 @@
     */ 
    void setCurrentURI(in nsIURI aURI);
@@ -11,3 +11,4 @@
    /**
     * Notify the associated content viewer and all child docshells that they are
     * about to be hidden.  If |isUnload| is true, then the document is being
+

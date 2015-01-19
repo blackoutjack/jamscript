@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/uriloader/base/nsURILoader.h	2013-02-15 14:59:57.000000000 -0600
-+++ mozilla-esr17/uriloader/base/nsURILoader.h	2014-06-23 22:02:00.861039721 -0500
+--- ff-orig/mozilla-17.0.3esr/uriloader/base/nsURILoader.h	2013-02-15 14:59:57.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/uriloader/base/nsURILoader.h	2015-01-18 12:12:50.070240353 -0600
 @@ -15,6 +15,9 @@
  #include "nsString.h"
  #include "nsIWeakReference.h"
@@ -21,3 +21,4 @@
  };
  
  #endif /* nsURILoader_h__ */
+

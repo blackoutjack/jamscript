@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsarray.cpp	2013-02-15 14:59:21.000000000 -0600
-+++ mozilla-esr17/js/src/jsarray.cpp	2014-05-02 14:57:37.602561653 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsarray.cpp	2013-02-15 14:59:21.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsarray.cpp	2015-01-18 12:12:50.022240354 -0600
 @@ -88,6 +88,9 @@
  #include "jsnum.h"
  #include "jsobj.h"
@@ -406,3 +406,4 @@
      /* If the desired properties overflow dense storage, we can't optimize. */
      if (UINT32_MAX - startingIndex < count)
          return false;
+

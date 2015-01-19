@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsproto.tbl	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsproto.tbl	2014-05-02 14:57:37.618561653 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsproto.tbl	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsproto.tbl	2015-01-18 12:12:50.046240353 -0600
 @@ -65,6 +65,10 @@
  JS_PROTO(Set,                   38,     js_InitSetClass)
  JS_PROTO(DataView,              39,     js_InitTypedArrayClasses)
@@ -11,3 +11,4 @@
  
  #undef XML_INIT
  #undef NAMESPACE_INIT
+

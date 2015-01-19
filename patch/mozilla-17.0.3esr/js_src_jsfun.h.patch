@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsfun.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsfun.h	2014-07-22 19:30:03.870037142 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsfun.h	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsfun.h	2015-01-18 12:12:50.038240353 -0600
 @@ -110,7 +110,9 @@
      }
  
@@ -64,3 +64,4 @@
  extern JSString *
  fun_toStringHelper(JSContext *cx, JSObject *obj, unsigned indent);
  
+

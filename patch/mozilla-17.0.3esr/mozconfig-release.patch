@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/mozconfig-release	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/mozconfig-release	2014-05-02 14:57:37.626561652 -0500
+--- ff-orig/mozilla-17.0.3esr/mozconfig-release	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/mozconfig-release	2015-01-18 12:12:50.054240353 -0600
 @@ -0,0 +1,17 @@
 +# Use pound sign for comments.
 +ac_add_options --enable-application=browser
@@ -18,3 +18,4 @@
 +mk_add_options MOZ_OBJDIR=obj-release
 +mk_add_options MOZ_BUILD_PROJECTS="browser"
 +mk_add_options MOZ_MAKE_FLAGS="-j4"
+

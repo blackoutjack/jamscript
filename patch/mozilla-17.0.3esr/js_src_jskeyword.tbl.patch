@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jskeyword.tbl	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jskeyword.tbl	2014-05-02 14:57:37.610561652 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jskeyword.tbl	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jskeyword.tbl	2015-01-18 12:12:50.042240353 -0600
 @@ -65,6 +65,10 @@
  JS_KEYWORD(yield,       TOK_STRICT_RESERVED, JSOP_NOP,  JSVERSION_1_7)
  #endif
@@ -11,3 +11,4 @@
  /* ES5 future reserved keywords in strict mode. */
  JS_KEYWORD(implements,  TOK_STRICT_RESERVED, JSOP_NOP,  JSVERSION_DEFAULT)
  JS_KEYWORD(interface,   TOK_STRICT_RESERVED, JSOP_NOP,  JSVERSION_DEFAULT)
+

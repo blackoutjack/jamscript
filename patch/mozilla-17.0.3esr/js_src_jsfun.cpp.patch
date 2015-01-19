@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsfun.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsfun.cpp	2014-07-22 19:30:43.698036696 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsfun.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsfun.cpp	2015-01-18 12:12:50.038240353 -0600
 @@ -639,7 +639,9 @@
          // Functions created with the constructor should not be using the
          // expression body extension.
@@ -54,3 +54,4 @@
      JS_FN("bind",            fun_bind,       1,0),
  #if JS_HAS_GENERATORS
      JS_FN("isGenerator",     fun_isGenerator,0,0),
+

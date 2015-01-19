@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ mozilla-esr17/js/src/jstx.cpp	2014-08-16 21:23:24.665960238 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jstx.cpp	2015-01-18 12:12:50.050240353 -0600
 @@ -0,0 +1,749 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -750,3 +750,4 @@
 +}
 +
 +#endif
+

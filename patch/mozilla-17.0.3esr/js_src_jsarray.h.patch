@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsarray.h	2013-02-15 14:59:21.000000000 -0600
-+++ mozilla-esr17/js/src/jsarray.h	2014-05-02 14:57:37.602561653 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsarray.h	2013-02-15 14:59:21.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsarray.h	2015-01-18 12:12:50.022240354 -0600
 @@ -14,6 +14,9 @@
  #include "jspubtd.h"
  #include "jsatom.h"
@@ -22,3 +22,4 @@
 +js_GetArrayElement(JSContext *cx, js::HandleObject obj, double index, JSBool *hole, js::MutableHandleValue vp);
 +#endif
  #endif /* jsarray_h___ */
+

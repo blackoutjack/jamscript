@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/parser/html/nsHtml5StreamParser.cpp	2013-02-15 14:59:47.000000000 -0600
-+++ mozilla-esr17/parser/html/nsHtml5StreamParser.cpp	2014-06-23 20:39:06.585185160 -0500
+--- ff-orig/mozilla-17.0.3esr/parser/html/nsHtml5StreamParser.cpp	2013-02-15 14:59:47.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/parser/html/nsHtml5StreamParser.cpp	2015-01-18 12:12:50.054240353 -0600
 @@ -166,6 +166,9 @@
    , mLoadFlusher(new nsHtml5LoadFlusher(aExecutor))
    , mFlushTimer(do_CreateInstance("@mozilla.org/timer;1"))
@@ -20,3 +20,4 @@
    mExecutor->Start();
    mExecutor->StartReadingFromStage();
  
+

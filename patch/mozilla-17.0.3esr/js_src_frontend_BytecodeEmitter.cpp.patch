@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/frontend/BytecodeEmitter.cpp	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/BytecodeEmitter.cpp	2015-01-15 10:14:33.901065642 -0600
+--- ff-orig/mozilla-17.0.3esr/js/src/frontend/BytecodeEmitter.cpp	2013-02-15 14:59:19.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/frontend/BytecodeEmitter.cpp	2015-01-18 12:12:50.018240354 -0600
 @@ -339,6 +339,11 @@
      "if statement",          /* IF */
      "else statement",        /* ELSE */

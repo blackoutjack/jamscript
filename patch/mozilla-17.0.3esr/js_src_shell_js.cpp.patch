@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/shell/js.cpp	2013-02-15 14:59:23.000000000 -0600
-+++ mozilla-esr17/js/src/shell/js.cpp	2014-06-24 13:23:34.520491608 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/shell/js.cpp	2013-02-15 14:59:23.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/shell/js.cpp	2015-01-18 12:12:50.050240353 -0600
 @@ -43,6 +43,10 @@
  #include "jsxml.h"
  #include "jsperf.h"
@@ -33,3 +33,4 @@
      JS_FN_HELP("print", Print, 0, 0,
  "print([exp ...])",
  "  Evaluate and print expressions to stdout."),
+

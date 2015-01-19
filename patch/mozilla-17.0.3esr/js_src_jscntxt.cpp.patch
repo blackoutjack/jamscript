@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jscntxt.cpp	2013-02-15 14:59:21.000000000 -0600
-+++ mozilla-esr17/js/src/jscntxt.cpp	2014-05-23 21:55:30.217430619 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jscntxt.cpp	2013-02-15 14:59:21.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jscntxt.cpp	2015-01-18 12:12:50.026240354 -0600
 @@ -1083,6 +1083,9 @@
      throwing(false),
      exception(UndefinedValue()),
@@ -22,3 +22,4 @@
  }
  
  namespace JS {
+

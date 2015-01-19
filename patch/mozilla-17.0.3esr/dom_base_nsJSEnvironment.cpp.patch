@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/dom/base/nsJSEnvironment.cpp	2013-02-15 14:59:08.000000000 -0600
-+++ mozilla-esr17/dom/base/nsJSEnvironment.cpp	2014-06-24 13:20:05.976497706 -0500
+--- ff-orig/mozilla-17.0.3esr/dom/base/nsJSEnvironment.cpp	2013-02-15 14:59:08.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/dom/base/nsJSEnvironment.cpp	2015-01-18 12:12:50.014240354 -0600
 @@ -1409,6 +1409,25 @@
                              nsAString *aRetValue,
                              bool* aIsUndefined)
@@ -36,3 +36,4 @@
      ok = JS::Evaluate(mContext, rootedScope, options,
                        PromiseFlatString(aScript).get(),
                        aScript.Length(), vp);
+

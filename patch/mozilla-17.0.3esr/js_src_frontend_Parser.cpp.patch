@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/frontend/Parser.cpp	2013-02-15 14:59:19.000000000 -0600
-+++ mozilla-esr17/js/src/frontend/Parser.cpp	2015-01-15 10:14:33.917065642 -0600
+--- ff-orig/mozilla-17.0.3esr/js/src/frontend/Parser.cpp	2013-02-15 14:59:19.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/frontend/Parser.cpp	2015-01-18 17:56:50.849636851 -0600
 @@ -517,6 +517,11 @@
              return ENDS_IN_OTHER;
          return HasFinalReturn(pn->last());
@@ -20,7 +20,19 @@
      argsbody->setOp(JSOP_NOP);
      argsbody->makeEmpty();
  
-@@ -1608,15 +1614,6 @@
+@@ -1477,7 +1483,11 @@
+     pn->pn_dflags = 0;
+ 
+     /* Function statements add a binding to the enclosing scope. */
++#ifdef TxJS_HOIST
++    bool bodyLevel = pc->atBodyLevel() || pc->hasTxTop;
++#else
+     bool bodyLevel = pc->atBodyLevel();
++#endif
+     if (kind == Statement) {
+         /*
+          * Handle redeclaration and optimize cases where we can statically bind the
+@@ -1608,15 +1618,6 @@
      if (hasRest)
          fun->setHasRest();
  
@@ -36,7 +48,7 @@
      FunctionBodyType bodyType = StatementListBody;
  #if JS_HAS_EXPR_CLOSURES
      if (tokenStream.getToken(TSF_OPERAND) != TOK_LC) {
-@@ -1715,6 +1712,51 @@
+@@ -1715,6 +1716,51 @@
      return pn;
  }
  
@@ -88,32 +100,32 @@
  ParseNode *
  Parser::functionStmt()
  {
-@@ -1908,7 +1950,11 @@
-     ParseNode *saveBlock = pc->blockNode;
-     pc->blockNode = pn;
- 
-+#ifdef TxJS_HOIST
-+    if (pc->atBodyLevel() && !pc->hasTxTop && !processDirectives(pn))
-+#else
-     if (pc->atBodyLevel() && !processDirectives(pn))
-+#endif
-         return NULL;
-     for (;;) {
-         TokenKind tt = tokenStream.peekToken(TSF_OPERAND);
 @@ -1927,6 +1973,12 @@
              return NULL;
          }
  
 +#ifdef TxJS_HOIST
-+        if (next->isKind(PNK_TX) && next->pn_xflags ^ PNX_FUNCDEFS) {
-+          next->pn_xflags ^= ~PNX_FUNCDEFS;
++        if (next->isKind(PNK_TX) && next->pn_xflags & PNX_FUNCDEFS) {
++          next->pn_xflags &= ~PNX_FUNCDEFS;
 +          pn->pn_xflags |= PNX_FUNCDEFS;
 +        }
 +#endif
          if (next->isKind(PNK_FUNCTION)) {
              /*
               * PNX_FUNCDEFS notifies the emitter that the block contains body-
-@@ -2777,7 +2829,13 @@
+@@ -1937,7 +1989,11 @@
+              * is relevant only for function definitions not at body-level,
+              * which we call function statements.
+              */
++#ifdef TxJS_HOIST
++            if (pc->atBodyLevel() || pc->hasTxTop) {
++#else
+             if (pc->atBodyLevel()) {
++#endif
+                 pn->pn_xflags |= PNX_FUNCDEFS;
+             } else {
+                 /*
+@@ -2777,7 +2833,13 @@
      }
  
      /* Make a new node for this declarator name (or destructuring pattern). */
@@ -127,7 +139,7 @@
      return NameNode::create(PNK_NAME, atom, parser, parser->pc);
  }
  
-@@ -3706,6 +3764,13 @@
+@@ -3706,6 +3768,13 @@
          return functionStmt();
        }
  
@@ -141,7 +153,7 @@
        case TOK_IF:
        {
          /* An IF node has three kids: condition, then, and optional else. */
-@@ -4096,13 +4161,28 @@
+@@ -4096,13 +4165,28 @@
          }
  #endif /* JS_HAS_DESTRUCTURING */
  
@@ -170,7 +182,7 @@
          pn2 = NewBindingNode(name, this, varContext);
          if (!pn2)
              return NULL;
-@@ -4380,6 +4460,120 @@
+@@ -4380,6 +4464,112 @@
      return pn;
  }
  
@@ -225,7 +237,7 @@
 +        bool hasFunctionStmt;
 +        pn1 = statements(&hasFunctionStmt);
 +        if (hasFunctionStmt) {
-+          pn1->pn_xflags ^= ~PNX_FUNCDEFS;
++          pn1->pn_xflags &= ~PNX_FUNCDEFS;
 +          pn->pn_xflags |= PNX_FUNCDEFS;
 +        }
 +        if (pn1) {
@@ -240,21 +252,14 @@
 +        return NULL;
 +    pn->pn_right = pn1;
 +
-+#ifndef TxJS_NOEXPR
-+    // Not needed if we don't allow transaction expressions.
-+    // To disable expressions, change jsopcode.tbl to indicate
-+    // that transaction blocks generate 0 stack values and define
-+    // TxJS_NOEXPR in jstx.h.
-+    // %%% Disabling expressions currently untested.
++    // Pop the value if the transaction is not an expression.
 +    pn->pn_xflags |= PNX_POPVAR;
-+#endif
 +
 +    PopStatementPC(context, pc);
 +
 +    return pn;
 +}
 +
-+#ifndef TxJS_NOEXPR
 +ParseNode *
 +Parser::txExpr()
 +{
@@ -286,23 +291,20 @@
 +    return pn;
 +}
 +#endif
-+#endif
 +
  JS_ALWAYS_INLINE ParseNode *
  Parser::condExpr1()
  {
-@@ -4463,6 +4657,16 @@
+@@ -4463,6 +4653,14 @@
          return returnOrYield(true);
  #endif
  
 +#ifdef TxJS
-+#ifndef TxJS_NOEXPR
 +    // If the right-hand side of the assignment is a transaction,
 +    // parse it as such.
 +    ParseNode *pn = txExpr();
 +    if (pn)
 +        return pn;
-+#endif
 +#endif
 +
      ParseNode *lhs = condExpr1();

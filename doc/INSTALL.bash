@@ -1,9 +1,11 @@
 #!/bin/bash
 # This file can be run as a shell script to obtain, patch and build
-# firefox 17.0.3esr with JAMScript modifications.
+# firefox version $VERSION with JAMScript modifications.
 
 # Set this to the checked-out repository root.
 #JAMSCRIPTPKG=/path/to/jamscript
+
+VERSION=17.0.3esr
 
 sudo apt-get -y install pkg-config gtk+-2.0 libdbus-1-dev libdbus-glib-1-dev yasm libasound2-dev libcurl4-openssl-dev libiw-dev mesa-common-dev
 
@@ -15,18 +17,28 @@ fi
 #0) Get to the right directory.
 cd $JAMSCRIPTPKG
 
-#1) Obtain the Firefox 17.0.3esr source code from the following URL.
-wget http://ftp.mozilla.org/pub/mozilla.org/firefox/releases/17.0.3esr/source/firefox-17.0.3esr.source.tar.bz2
+#1) Obtain the Firefox source code from the following URL.
+wget http://ftp.mozilla.org/pub/mozilla.org/firefox/releases/$VERSION/source/firefox-$VERSION.source.tar.bz2
 
-#2) Untar the archive. This creates the mozilla-esr17 directory.
-tar -xjf firefox-17.0.3esr.source.tar.bz2
+#2a) Untar the archive. This creates the mozilla-esr17 directory.
+tar -xjf firefox-$VERSION.source.tar.bz2
+
+if [[ ${VERSION%esr} != $VERSION ]]; then
+  major=${VERSION%%.*}
+  dist=esr$major
+else
+  dist=release
+fi
+
+#2b) Move the directory.
+mkdir -p ff-dev/ && mv mozilla-$dist ff-dev/mozilla-$VERSION
 
 #3) Apply all patches.
-cat ./patch/*.patch | patch -d mozilla-esr17 -p1
+cat ./patch/mozilla-$VERSION/*.patch | patch -d ff-dev/mozilla-$VERSION -p2
 
 #4) Copy the appropriate mozconfig file. The file mozconfig-release is
 #   used for normal operation, mozconfig-debug for a debug build.
-cd ./mozilla-esr17/ && cp mozconfig-release .mozconfig
+cd ./ff-dev/mozilla-$VERSION/ && cp mozconfig-release .mozconfig
 
 #5a) On Ubuntu 14.04, I encountered a problem during the virtualenv
 #   portion of the build. The following fixes this (you may need to

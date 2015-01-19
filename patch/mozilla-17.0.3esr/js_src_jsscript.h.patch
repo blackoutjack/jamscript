@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsscript.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsscript.h	2014-05-23 14:00:56.110518228 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsscript.h	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsscript.h	2015-01-18 12:12:50.046240353 -0600
 @@ -43,6 +43,9 @@
      JSTRY_CATCH,
      JSTRY_FINALLY,
@@ -27,3 +27,4 @@
    private:
      js::ScriptSource *scriptSource_; /* source code */
  #ifdef JS_METHODJIT
+

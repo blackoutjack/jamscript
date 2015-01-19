@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsversion.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsversion.h	2014-05-02 14:57:37.622561652 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsversion.h	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsversion.h	2015-01-18 12:12:50.050240353 -0600
 @@ -142,6 +142,9 @@
  
  #endif
@@ -10,3 +10,4 @@
  /* Support for JS_NewGlobalObject. */
  #define JS_HAS_NEW_GLOBAL_OBJECT        1
  
+

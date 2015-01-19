@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/content/base/src/nsFrameLoader.cpp	2013-02-15 14:59:03.000000000 -0600
-+++ mozilla-esr17/content/base/src/nsFrameLoader.cpp	2014-06-24 13:46:32.380451322 -0500
+--- ff-orig/mozilla-17.0.3esr/content/base/src/nsFrameLoader.cpp	2013-02-15 14:59:03.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/content/base/src/nsFrameLoader.cpp	2015-01-18 12:12:50.006240354 -0600
 @@ -310,6 +310,9 @@
    , mRemoteBrowser(nullptr)
    , mRenderMode(RENDER_MODE_DEFAULT)
@@ -20,3 +20,4 @@
    rv = mDocShell->LoadURI(mURIToLoad, loadInfo,
                            nsIWebNavigation::LOAD_FLAGS_NONE, false);
    mNeedsAsyncDestroy = tmpState;
+

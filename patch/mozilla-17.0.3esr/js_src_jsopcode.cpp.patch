@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsopcode.cpp	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsopcode.cpp	2014-05-02 14:57:37.610561652 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsopcode.cpp	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsopcode.cpp	2015-01-18 12:12:50.046240353 -0600
 @@ -175,8 +175,17 @@
          return NumBlockSlots(script, pc) + 1;
        default:
@@ -18,3 +18,4 @@
          return 2 + GET_ARGC(pc);
      }
  }
+

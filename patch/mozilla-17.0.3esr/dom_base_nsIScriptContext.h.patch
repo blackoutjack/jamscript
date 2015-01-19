@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/dom/base/nsIScriptContext.h	2013-02-15 14:59:08.000000000 -0600
-+++ mozilla-esr17/dom/base/nsIScriptContext.h	2014-05-25 14:43:31.075425984 -0500
+--- ff-orig/mozilla-17.0.3esr/dom/base/nsIScriptContext.h	2013-02-15 14:59:08.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/dom/base/nsIScriptContext.h	2015-01-18 12:12:50.014240354 -0600
 @@ -84,6 +84,18 @@
     * @return NS_OK if the script was valid and got executed
     *
@@ -19,3 +19,4 @@
    virtual nsresult EvaluateString(const nsAString& aScript,
                                    JSObject* aScopeObject,
                                    nsIPrincipal *aPrincipal,
+

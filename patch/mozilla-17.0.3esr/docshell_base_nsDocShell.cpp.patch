@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/docshell/base/nsDocShell.cpp	2013-02-15 14:59:08.000000000 -0600
-+++ mozilla-esr17/docshell/base/nsDocShell.cpp	2014-06-24 17:13:53.453770299 -0500
+--- ff-orig/mozilla-17.0.3esr/docshell/base/nsDocShell.cpp	2013-02-15 14:59:08.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/docshell/base/nsDocShell.cpp	2015-01-18 12:12:50.010240354 -0600
 @@ -767,6 +767,9 @@
      mInEnsureScriptEnv(false),
  #endif
@@ -61,3 +61,4 @@
      rv = DoChannelLoad(channel, uriLoader, aBypassClassifier);
  
      //
+

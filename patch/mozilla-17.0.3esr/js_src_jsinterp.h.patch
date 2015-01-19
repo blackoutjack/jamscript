@@ -1,5 +1,5 @@
---- mozilla-esr17-orig/js/src/jsinterp.h	2013-02-15 14:59:22.000000000 -0600
-+++ mozilla-esr17/js/src/jsinterp.h	2014-07-25 12:54:25.475010550 -0500
+--- ff-orig/mozilla-17.0.3esr/js/src/jsinterp.h	2013-02-15 14:59:22.000000000 -0600
++++ ff-dev/mozilla-17.0.3esr/js/src/jsinterp.h	2015-01-18 12:12:50.042240353 -0600
 @@ -207,6 +207,20 @@
  extern JSBool
  HasInstance(JSContext *cx, HandleObject obj, const js::Value *v, JSBool *bp);
@@ -21,3 +21,4 @@
  /*
   * A linked list of the |FrameRegs regs;| variables belonging to all
   * js::Interpret C++ frames on this thread's stack.
+
