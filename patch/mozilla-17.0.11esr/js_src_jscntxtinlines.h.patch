@@ -1,0 +1,18 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jscntxtinlines.h	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jscntxtinlines.h	2015-01-18 22:03:23.933204327 -0600
+@@ -368,10 +368,14 @@
+ #ifdef DEBUG
+     bool alreadyThrowing = cx->isExceptionPending();
+ #endif
++#ifndef TxJS
+     assertSameCompartment(cx, args);
++#endif
+     bool ok = native(cx, args.length(), args.base());
+     if (ok) {
++//#ifndef TxJS
+         assertSameCompartment(cx, args.rval());
++//#endif
+         JS_ASSERT_IF(!alreadyThrowing, !cx->isExceptionPending());
+     }
+     return ok;
+

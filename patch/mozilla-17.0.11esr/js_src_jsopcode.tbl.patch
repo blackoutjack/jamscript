@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsopcode.tbl	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsopcode.tbl	2015-01-18 22:03:23.941204326 -0600
+@@ -536,3 +536,10 @@
+ OPDEF(JSOP_LOOPENTRY,     227, "loopentry",    NULL,  1,  0,  0,  0,  JOF_BYTE)
+ 
+ OPDEF(JSOP_ACTUALSFILLED, 228, "actualsfilled", NULL,  3,  0,  1,  0,  JOF_UINT16)
++
++// TxJS begin
++// %%% Guarding with a preprocessor directive causes
++// %%% inconsistencies.
++OPDEF(JSOP_BEGIN_TX,      229, "begin_tx",     NULL,  3,  1,  0,  0,  JOF_UINT16)
++OPDEF(JSOP_END_TX,        230, "end_tx",       NULL,  1,  0,  1,  0,  JOF_BYTE)
++// TxJS end
+

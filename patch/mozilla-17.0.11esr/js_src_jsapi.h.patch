@@ -1,0 +1,46 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsapi.h	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsapi.h	2015-01-18 22:03:23.933204327 -0600
+@@ -2543,6 +2543,12 @@
+                                            without creating a this object */
+ #define JSFUN_HAS_DEFAULTS      0x0400  /* function has at least one default
+                                            parameter */
++#ifdef TxJS
++#define JSFUN_TX_NOSUSPEND      0x20    /* indicates that a call to this
++                                           function should not suspend
++                                           an active transaction */
++#endif
++
+ 
+ #define JSFUN_FLAGS_MASK      0x07f8    /* overlay JSFUN_* attributes --
+                                            bits 12-15 are used internally to
+@@ -2596,6 +2602,11 @@
+ extern JS_PUBLIC_API(JSString *)
+ JS_GetEmptyString(JSRuntime *rt);
+ 
++#ifdef TxJS
++extern JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx);
++#endif
++
+ /*
+  * Format is a string of the following characters (spaces are insignificant),
+  * specifying the tabulated type conversions:
+@@ -4850,6 +4861,7 @@
+  * Security protocol.
+  */
+ struct JSPrincipals {
++
+     /* Don't call "destroy"; use reference counting macros below. */
+     int refcount;
+ 
+@@ -5140,6 +5152,9 @@
+     bool compileAndGo;
+     bool noScriptRval;
+     bool selfHostingMode;
++#ifdef TxJS
++    Value introspector;
++#endif
+     enum SourcePolicy {
+         NO_SOURCE,
+         LAZY_SOURCE,
+

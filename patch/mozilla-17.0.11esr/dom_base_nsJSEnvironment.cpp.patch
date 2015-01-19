@@ -1,0 +1,39 @@
+--- ff-orig/mozilla-17.0.11esr/dom/base/nsJSEnvironment.cpp	2013-11-13 17:35:12.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/dom/base/nsJSEnvironment.cpp	2015-01-18 22:03:23.921204327 -0600
+@@ -1409,6 +1409,25 @@
+                             nsAString *aRetValue,
+                             bool* aIsUndefined)
+ {
++#ifdef TxJS
++  return EvaluateString(aScript, aScopeObject, aPrincipal,
++      aOriginPrincipal, aURL, aLineNo, aVersion, aRetValue,
++      aIsUndefined, JS::UndefinedValue());
++}
++
++nsresult
++nsJSContext::EvaluateString(const nsAString& aScript,
++                            JSObject* aScopeObject,
++                            nsIPrincipal *aPrincipal,
++                            nsIPrincipal *aOriginPrincipal,
++                            const char *aURL,
++                            uint32_t aLineNo,
++                            JSVersion aVersion,
++                            nsAString *aRetValue,
++                            bool* aIsUndefined,
++                            const JS::Value &ispect)
++{
++#endif
+   NS_TIME_FUNCTION_MIN_FMT(1.0, "%s (line %d) (url: %s, line: %d)", MOZ_FUNCTION_NAME,
+                            __LINE__, aURL, aLineNo);
+ 
+@@ -1495,6 +1514,9 @@
+            .setPrincipals(nsJSPrincipals::get(principal))
+            .setOriginPrincipals(nsJSPrincipals::get(aOriginPrincipal))
+            .setVersion(JSVersion(aVersion));
++#ifdef TxJS
++    options.introspector = ispect;
++#endif
+     ok = JS::Evaluate(mContext, rootedScope, options,
+                       PromiseFlatString(aScript).get(),
+                       aScript.Length(), vp);
+

@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsproto.tbl	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsproto.tbl	2015-01-18 22:03:23.941204326 -0600
+@@ -65,6 +65,10 @@
+ JS_PROTO(Set,                   38,     js_InitSetClass)
+ JS_PROTO(DataView,              39,     js_InitTypedArrayClasses)
+ JS_PROTO(ParallelArray,         40,     js_InitParallelArrayClass)
++#ifdef TxJS
++JS_PROTO(Tx,                    41,     js_InitTxClass)
++JS_PROTO(JAM,                   42,     js_InitJAMClass)
++#endif
+ 
+ #undef XML_INIT
+ #undef NAMESPACE_INIT
+

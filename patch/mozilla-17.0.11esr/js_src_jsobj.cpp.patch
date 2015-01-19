@@ -1,0 +1,51 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsobj.cpp	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsobj.cpp	2015-01-18 22:03:23.937204327 -0600
+@@ -41,6 +41,9 @@
+ #include "jswatchpoint.h"
+ #include "jswrapper.h"
+ #include "jsxml.h"
++#ifdef TxJS
++#include "jstransaction.h"
++#endif
+ 
+ #include "builtin/MapObject.h"
+ #include "frontend/BytecodeCompiler.h"
+@@ -2329,6 +2332,17 @@
+ js_CreateThisForFunction(JSContext *cx, HandleObject callee, bool newType)
+ {
+     RootedValue protov(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid protoId = AtomToId(cx->runtime->atomState.classPrototypeAtom);
++        if (tx->getProperty(cx, callee, protoId, &protov)) {
++        } else {
++            if (!JSObject::getProperty(cx, callee, callee, cx->runtime->atomState.classPrototypeAtom, &protov))
++                return NULL;
++        }
++    } else
++#endif
+     if (!JSObject::getProperty(cx, callee, callee, cx->runtime->atomState.classPrototypeAtom, &protov))
+         return NULL;
+     JSObject *proto;
+@@ -4269,8 +4283,18 @@
+ js_GetPropertyHelperInline(JSContext *cx, HandleObject obj, HandleObject receiver, jsid id_,
+                            uint32_t getHow, MutableHandleValue vp)
+ {
+-    RootedId id(cx, id_);
++#if 0//TxJS
++    // %%% Does this ever get called, or is it redundant with previous
++    // %%% transaction intervention?
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        if (tx->getProperty(cx, obj, id_, vp)) { 
++            return JS_TRUE;
++        }
++    }
++#endif
+ 
++    RootedId id(cx, id_);
+     /* This call site is hot -- use the always-inlined variant of LookupPropertyWithFlags(). */
+     RootedObject obj2(cx);
+     RootedShape shape(cx);
+

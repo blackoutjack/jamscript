@@ -1,0 +1,79 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsapi.cpp	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsapi.cpp	2015-01-18 22:03:23.929204327 -0600
+@@ -83,6 +83,11 @@
+ #include "methodjit/Logging.h"
+ #endif
+ 
++#ifdef TxJS
++#include "jstransaction.h"
++#include "jsjam.h"
++#endif
++
+ using namespace js;
+ using namespace js::gc;
+ using namespace js::types;
+@@ -218,6 +223,14 @@
+     return rt->emptyString;
+ }
+ 
++#ifdef TxJS
++JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx)
++{
++  return cx->getIntrospector();
++}
++#endif
++
+ static JSBool
+ TryArgumentFormatter(JSContext *cx, const char **formatp, JSBool fromJS, jsval **vpp, va_list *app)
+ {
+@@ -1830,6 +1843,12 @@
+     {js_InitMapClass,                   EAGER_CLASS_ATOM(Map), &js::MapObject::class_},
+     {js_InitSetClass,                   EAGER_CLASS_ATOM(Set), &js::SetObject::class_},
+     {js_InitParallelArrayClass,         EAGER_CLASS_ATOM(ParallelArray), &js::ParallelArrayObject::class_},
++#ifdef TxJS
++    /* %%% What does the EAGER_ATOM_AND_CLASP mean? 
++       %%% Convert to &js::Tx::class_ following pattern. */
++    {js_InitTxClass,                    EAGER_CLASS_ATOM(Tx), &TxClass},
++    {js_InitJAMClass,                   EAGER_CLASS_ATOM(JAM), &JAMClass},
++#endif
+     {NULL,                              0, NULL}
+ };
+ 
+@@ -3818,7 +3837,6 @@
+             JSFunction *setobj = JS_NewFunction(cx, (Native) setter, 1, 0, global, NULL);
+             if (!setobj)
+                 return false;
+-
+             if (set.info)
+                 setobj->setJitInfo(set.info);
+ 
+@@ -4975,7 +4993,6 @@
+                 if (!ctor)
+                     return JS_FALSE;
+             }
+-
+             flags &= ~JSFUN_GENERIC_NATIVE;
+             fun = js_DefineFunction(cx, ctor, id, js_generic_native_method_dispatcher,
+                                     fs->nargs + 1, flags, NULL, JSFunction::ExtendedFinalizeKind);
+@@ -5156,6 +5173,9 @@
+       compileAndGo(cx->hasRunOption(JSOPTION_COMPILE_N_GO)),
+       noScriptRval(cx->hasRunOption(JSOPTION_NO_SCRIPT_RVAL)),
+       selfHostingMode(false),
++#ifdef TxJS
++      introspector(JS::UndefinedValue()),
++#endif
+       sourcePolicy(SAVE_SOURCE)
+ {
+ }
+@@ -5666,6 +5686,9 @@
+     RootedScript script(cx, frontend::CompileScript(cx, obj, NULL, options, chars, length));
+     if (!script)
+         return false;
++#ifdef TxJS
++    script->setIntrospector(options.introspector);
++#endif
+ 
+     JS_ASSERT(script->getVersion() == options.version);
+ 
+

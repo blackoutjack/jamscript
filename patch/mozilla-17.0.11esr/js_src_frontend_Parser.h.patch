@@ -1,0 +1,35 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/frontend/Parser.h	2013-11-13 17:35:23.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/frontend/Parser.h	2015-01-18 22:03:23.925204327 -0600
+@@ -62,6 +62,10 @@
+ 
+     StmtInfoPC      *topStmt;       /* top of statement info stack */
+     StmtInfoPC      *topScopeStmt;  /* top lexical scope statement */
++#ifdef TxJS
++    StmtInfoPC      *txTop;         /* top statement to use for tx */
++    bool             hasTxTop;
++#endif
+     Rooted<StaticBlockObject *> blockChain;
+                                     /* compile time block scope chain */
+ 
+@@ -395,6 +399,10 @@
+     ParseNode *expr();
+     ParseNode *assignExpr();
+     ParseNode *assignExprWithoutYield(unsigned err);
++#ifdef TxJS
++    ParseNode *txStmt();
++    ParseNode *txExpr();
++#endif
+     ParseNode *condExpr1();
+     ParseNode *orExpr1();
+     ParseNode *andExpr1i();
+@@ -427,6 +435,9 @@
+     bool functionArguments(ParseNode **list, ParseNode *funcpn, bool &hasRest);
+ 
+     ParseNode *functionDef(HandlePropertyName name, FunctionType type, FunctionSyntaxKind kind);
++#ifdef TxJS
++    bool txArguments(ParseNode *txpn);
++#endif
+ 
+     ParseNode *unaryOpExpr(ParseNodeKind kind, JSOp op);
+ 
+

@@ -1,0 +1,71 @@
+--- ff-orig/mozilla-17.0.11esr/uriloader/base/nsURILoader.cpp	2013-11-13 17:36:08.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/uriloader/base/nsURILoader.cpp	2015-01-18 22:03:23.949204326 -0600
+@@ -49,6 +49,10 @@
+ #include "mozilla/Attributes.h"
+ 
+ #include "mozilla/FunctionTimer.h"
++#ifdef TxJS
++#include "nsHtml5StreamParser.h"
++#include "jsapi.h"
++#endif
+ #ifdef NS_FUNCTION_TIMER
+ #define TIME_URILOADER_FUNCTION(req)                         \
+     nsCAutoString name__("N/A");                             \
+@@ -163,6 +167,11 @@
+    * nsIURIContentListeners.
+    */
+   nsRefPtr<nsURILoader> mURILoader;
++
++#ifdef TxJS
++public:
++  JS::Value mIntrospector;
++#endif
+ };
+ 
+ NS_IMPL_THREADSAFE_ADDREF(nsDocumentOpenInfo)
+@@ -184,6 +193,9 @@
+                                        nsURILoader* aURILoader)
+   : m_originalContext(aWindowContext),
+     mFlags(aFlags),
++#ifdef TxJS
++    mIntrospector(JS::UndefinedValue()),
++#endif
+     mURILoader(aURILoader)
+ {
+ }
+@@ -693,6 +705,14 @@
+     LOG(("  Listener has aborted the load"));
+     m_targetStreamListener = nullptr;
+   }
++#ifdef TxJS
++  else if (!mIntrospector.isUndefined()) {
++    if (mContentType.LowerCaseEqualsASCII(TEXT_HTML)) {
++      nsHtml5StreamParser *l = (nsHtml5StreamParser *)m_targetStreamListener.get();
++      l->mIntrospector = mIntrospector;
++    }
++  }
++#endif
+ 
+   NS_ASSERTION(abort || m_targetStreamListener, "DoContent returned no listener?");
+ 
+@@ -712,6 +732,9 @@
+     mLog = PR_NewLogModule("URILoader");
+   }
+ #endif
++#ifdef TxJS
++  mIntrospector = JS::UndefinedValue();
++#endif
+ }
+ 
+ nsURILoader::~nsURILoader()
+@@ -837,6 +860,9 @@
+   // the url and discover the content type....
+   nsCOMPtr<nsDocumentOpenInfo> loader =
+     new nsDocumentOpenInfo(aWindowContext, aFlags, this);
++#ifdef TxJS
++  loader->mIntrospector = mIntrospector;
++#endif
+ 
+   if (!loader) return NS_ERROR_OUT_OF_MEMORY;
+ 
+

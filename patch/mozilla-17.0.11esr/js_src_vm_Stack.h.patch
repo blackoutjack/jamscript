@@ -1,0 +1,56 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/vm/Stack.h	2013-11-13 17:35:28.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/vm/Stack.h	2015-01-18 22:03:23.945204326 -0600
+@@ -11,6 +11,11 @@
+ #include "jsapi.h"
+ #include "jsfun.h"
+ #include "jsautooplen.h"
++#include "vm/Stack.h"
++
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ struct JSContext;
+ struct JSCompartment;
+@@ -261,6 +266,9 @@
+ 
+         /* Used in tracking calls and profiling (see vm/SPSProfiler.cpp) */
+         HAS_PUSHED_SPS_FRAME = 0x200000  /* SPS was notified of enty */
++#ifdef TxJS
++       ,HAS_SUSPENDED_TX =     0x400000
++#endif
+     };
+ 
+   private:
+@@ -285,6 +293,13 @@
+     void                *annotation_;   /* if HAS_ANNOTATION, perhaps remove with bug 546848 */
+     FrameRejoinState    rejoin_;        /* for a jit frame rejoining the interpreter
+                                          * from JIT code, state at rejoin. */
++#ifdef TxJS
++    // When the handler is called on suspend or at the end of a
++    // transaction, the transaction object is saved here. When this
++    // frame returns, we know to resume or terminate the transaction
++    // (depending on the transaction state).
++    TxContext *suspendedTx_;
++#endif
+ 
+     static void staticAsserts() {
+         JS_STATIC_ASSERT(offsetof(StackFrame, rval_) % sizeof(Value) == 0);
+@@ -746,6 +761,16 @@
+         rejoin_ = state;
+     }
+ 
++#ifdef TxJS
++    inline TxContext *suspendedTx() const {
++        return (flags_ & HAS_SUSPENDED_TX) ? suspendedTx_ : NULL;
++    }
++    inline void setSuspendedTx(TxContext *tx) {
++        flags_ |= HAS_SUSPENDED_TX;
++        suspendedTx_ = tx;
++    }
++
++#endif
+     /* Down frame expansion state */
+ 
+     void setDownFramesExpanded() {
+

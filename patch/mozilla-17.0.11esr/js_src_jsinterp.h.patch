@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/jsinterp.h	2013-11-13 17:35:25.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/jsinterp.h	2015-01-18 22:03:23.937204327 -0600
+@@ -207,6 +207,20 @@
+ extern JSBool
+ HasInstance(JSContext *cx, HandleObject obj, const js::Value *v, JSBool *bp);
+ 
++#ifdef TxJS
++extern bool 
++BeginTx(JSContext *cx, const js::Value &tx_handler);
++
++extern bool 
++IntrospectTx(JSContext *cx, TxContext *tx, bool isEnd, HandleScript script, int *path, bool *newType);
++
++extern bool
++TxSubsumed(JSContext *cx, const js::Value &ispect);
++
++extern bool
++SuspendCall(JSContext *cx, TxContext *tx, CallArgs &args, bool *construct);
++#endif
++
+ /*
+  * A linked list of the |FrameRegs regs;| variables belonging to all
+  * js::Interpret C++ frames on this thread's stack.
+

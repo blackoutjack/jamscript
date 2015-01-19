@@ -1,0 +1,122 @@
+--- ff-orig/mozilla-17.0.11esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2013-11-13 17:35:14.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-18 22:03:23.921204327 -0600
+@@ -61,6 +61,9 @@
+                             PopupControlState aPopupState,
+                             uint32_t aExecutionPolicy,
+                             nsPIDOMWindow *aOriginalInnerWindow);
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
+ 
+ protected:
+     virtual ~nsJSThunk();
+@@ -96,6 +99,10 @@
+     rv = uri->GetSpec(mURL);
+     if (NS_FAILED(rv)) return rv;
+ 
++#ifdef TxJS
++    mIntrospector = JS::UndefinedValue();
++#endif
++
+     return NS_OK;
+ }
+ 
+@@ -330,6 +337,18 @@
+     } else {
+         // No need to use the sandbox, evaluate the script directly in
+         // the given scope.
++#ifdef TxJS
++        rv = scriptContext->EvaluateString(NS_ConvertUTF8toUTF16(script),
++                                           globalJSObject, // obj
++                                           principal,
++                                           principal,
++                                           mURL.get(),     // url
++                                           1,              // line no
++                                           JSVERSION_DEFAULT,
++                                           &result,
++                                           &isUndefined,
++                                           mIntrospector);
++#else
+         rv = scriptContext->EvaluateString(NS_ConvertUTF8toUTF16(script),
+                                            globalJSObject, // obj
+                                            principal,
+@@ -339,6 +358,7 @@
+                                            JSVERSION_DEFAULT,
+                                            &result,
+                                            &isUndefined);
++#endif
+ 
+         // If there's an error on cx as a result of that call, report
+         // it now -- either we're just running under the event loop,
+@@ -443,6 +463,9 @@
+     bool                    mIsAsync;
+     bool                    mIsActive;
+     bool                    mOpenedStreamChannel;
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
+ };
+ 
+ nsJSChannel::nsJSChannel() :
+@@ -453,6 +476,9 @@
+     mExecutionPolicy(EXECUTE_IN_SANDBOX),
+     mIsAsync(true),
+     mIsActive(false),
++#ifdef TxJS
++    mIntrospector(JS::UndefinedValue()),
++#endif
+     mOpenedStreamChannel(false)
+ {
+ }
+@@ -521,6 +547,22 @@
+                    nsIStreamListener, nsIScriptChannel, nsIPropertyBag,
+                    nsIPropertyBag2)
+ 
++#ifdef TxJS
++NS_IMETHODIMP
++nsJSChannel::GetIntrospector(JS::Value *aIntrospector)
++{
++    *aIntrospector = mIntrospector;
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsJSChannel::SetIntrospector(const JS::Value &aIntrospector)
++{
++    mIntrospector = aIntrospector;
++    return NS_OK;
++}
++#endif
++
+ //
+ // nsIRequest implementation...
+ //
+@@ -634,6 +676,17 @@
+ 
+     mIsActive = true;
+ 
++#ifdef TxJS
++    nsCOMPtr<nsIScriptContext> scriptContext = global->GetContext();
++    if (scriptContext) {
++        JSContext* cx = scriptContext->GetNativeContext();
++        JS::Value ispect = JS_GetIntrospector(cx);
++        if (!ispect.isUndefined()) {
++            SetIntrospector(ispect);
++        }
++    }
++#endif
++
+     // Temporarily set the LOAD_BACKGROUND flag to suppress load group observer
+     // notifications (and hence nsIWebProgressListener notifications) from
+     // being dispatched.  This is required since we suppress LOAD_DOCUMENT_URI,
+@@ -733,6 +786,9 @@
+     // script returns it).
+     
+     if (NS_SUCCEEDED(mStatus)) {
++#ifdef TxJS
++        GetIntrospector(&mIOThunk->mIntrospector);
++#endif
+         nsresult rv = mIOThunk->EvaluateScript(mStreamChannel, mPopupState,
+                                                mExecutionPolicy,
+                                                mOriginalInnerWindow);
+

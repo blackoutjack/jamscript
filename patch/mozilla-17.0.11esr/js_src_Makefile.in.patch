@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-17.0.11esr/js/src/Makefile.in	2013-11-13 17:35:23.000000000 -0600
++++ ff-dev/mozilla-17.0.11esr/js/src/Makefile.in	2015-01-18 22:03:23.941204326 -0600
+@@ -85,6 +85,7 @@
+ 		jsinfer.cpp \
+ 		jsinterp.cpp \
+ 		jsiter.cpp \
++    jsjam.cpp \
+ 		jslog2.cpp \
+ 		jsmath.cpp \
+ 		jsnativestack.cpp \
+@@ -102,6 +103,9 @@
+ 		jsscope.cpp \
+ 		jsscript.cpp \
+ 		jsstr.cpp \
++    jstransaction.cpp \
++    jstx.cpp \
++    jstxaction.cpp \
+ 		jstypedarray.cpp \
+ 		jsutil.cpp \
+ 		jswatchpoint.cpp \
+

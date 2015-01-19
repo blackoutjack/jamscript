@@ -14,6 +14,13 @@ if [[ -z "$JAMSCRIPTPKG" || ! -d $JAMSCRIPTPKG ]]; then
   exit
 fi
 
+if [[ ${VERSION%esr} != $VERSION ]]; then
+  major=${VERSION%%.*}
+  dist=esr$major
+else
+  dist=release
+fi
+
 #0) Get to the right directory.
 cd $JAMSCRIPTPKG
 
@@ -22,13 +29,6 @@ wget http://ftp.mozilla.org/pub/mozilla.org/firefox/releases/$VERSION/source/fir
 
 #2a) Untar the archive. This creates the mozilla-esr17 directory.
 tar -xjf firefox-$VERSION.source.tar.bz2
-
-if [[ ${VERSION%esr} != $VERSION ]]; then
-  major=${VERSION%%.*}
-  dist=esr$major
-else
-  dist=release
-fi
 
 #2b) Move the directory.
 mkdir -p ff-dev/ && mv mozilla-$dist ff-dev/mozilla-$VERSION
