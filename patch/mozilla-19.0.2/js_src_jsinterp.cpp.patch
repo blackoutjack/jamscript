@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-19.0.2/js/src/jsinterp.cpp	2013-03-07 04:48:48.000000000 -0600
-+++ ff-dev/mozilla-19.0.2/js/src/jsinterp.cpp	2015-01-19 19:44:10.238922385 -0600
++++ ff-dev/mozilla-19.0.2/js/src/jsinterp.cpp	2015-01-19 21:45:03.138710323 -0600
 @@ -38,6 +38,10 @@
  #include "jsscope.h"
  #include "jsscript.h"
@@ -1543,27 +1543,7 @@
      if (!DefVarOrConstOperation(cx, obj, name, attrs))
          goto error;
  }
-@@ -2809,6 +4165,19 @@
-     rval = ObjectValue(*fun);
- 
-     do {
-+#ifdef TxJS
-+        /*
-+        tx = cx->getRunningTx();
-+        if (tx) {
-+            // Treat a function definition just like a write.
-+            RootedId &id = rootId0;
-+            id = NameToId(name);
-+            tx->recordAction(cx, parent, id, rval, AX_WRITE);
-+            continue;
-+        }
-+        */
-+#endif
-+
-         /* Steps 5d, 5f. */
-         if (!shape || pobj != parent) {
-             if (!JSObject::defineProperty(cx, parent, name, rval,
-@@ -2861,6 +4230,13 @@
+@@ -2861,6 +4217,13 @@
      RootedFunction &fun = rootFunction0;
      fun = script->getFunction(GET_UINT32_INDEX(regs.pc));
  
@@ -1577,7 +1557,7 @@
      JSFunction *obj = CloneFunctionObjectIfNotSingleton(cx, fun, regs.fp()->scopeChain());
      if (!obj)
          goto error;
-@@ -2975,6 +4351,9 @@
+@@ -2975,6 +4338,9 @@
  {
      uint8_t i = GET_UINT8(regs.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1587,7 +1567,7 @@
  
      RootedObject &obj = rootObject0;
      if (i == JSProto_Array) {
-@@ -3050,6 +4429,17 @@
+@@ -3050,6 +4416,17 @@
                                  JSPROP_ENUMERATE, 0, 0, 0)) {
          goto error;
      }
@@ -1605,7 +1585,7 @@
  
      regs.sp--;
  }
-@@ -3073,6 +4463,21 @@
+@@ -3073,6 +4450,21 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
  
@@ -1627,7 +1607,7 @@
      /*
       * If rref is a hole, do not call JSObject::defineProperty. In this case,
       * obj must be an array, so if the current op is the last element
-@@ -3661,6 +5066,99 @@
+@@ -3661,6 +5053,99 @@
  END_CASE(JSOP_ARRAYPUSH)
  #endif /* JS_HAS_GENERATORS */
  
@@ -1727,7 +1707,7 @@
            default:
            {
              char numBuf[12];
-@@ -3748,6 +5246,18 @@
+@@ -3748,6 +5233,18 @@
                  len = 0;
                  DO_NEXT_OP(len);
  
@@ -1746,7 +1726,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -3787,6 +5297,38 @@
+@@ -3787,6 +5284,38 @@
          goto inline_return;
  
    exit:
