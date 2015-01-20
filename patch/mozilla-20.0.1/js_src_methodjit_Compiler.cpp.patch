@@ -1,0 +1,35 @@
+--- ff-orig/mozilla-20.0.1/js/src/methodjit/Compiler.cpp	2013-04-09 22:01:53.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/methodjit/Compiler.cpp	2015-01-19 21:29:37.094737399 -0600
+@@ -978,6 +978,10 @@
+   checkOutput:
+     if (!cx->methodJitEnabled)
+         return Compile_Abort;
++#ifndef TxJS_LOCAL
++    if (cx->getRunningTx())
++        return Compile_Abort;
++#endif
+ 
+     /*
+      * If SPS (profiling) is enabled, then the emitted instrumentation has to be
+@@ -3263,6 +3267,20 @@
+           }
+           END_CASE(JSOP_DEBUGGER)
+ 
++#ifdef TxJS
++          BEGIN_CASE(JSOP_BEGIN_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_BEGIN_TX\n");
++          }
++          END_CASE(JSOP_BEGIN_TX)
++
++          BEGIN_CASE(JSOP_END_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_END_TX\n");
++          }
++          END_CASE(JSOP_END_TX)
++#endif
++
+           default:
+             JS_NOT_REACHED("Opcode not implemented");
+         }
+

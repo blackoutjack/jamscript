@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-20.0.1/js/src/vm/CommonPropertyNames.h	2013-04-09 22:01:57.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/vm/CommonPropertyNames.h	2015-01-19 21:29:37.114737398 -0600
+@@ -155,6 +155,17 @@
+     macro(boolean, boolean, "boolean") \
+     macro(null, null, "null") \
+     macro(xml, xml, "xml") \
++    /* TxJS begin */ \
++    macro(subsumedBy, subsumedBy, "subsumedBy") \
++    macro(read, read, "read") \
++    macro(write, write, "write") \
++    macro(forin, forin, "forin") \
++    macro(type, type, "type") \
++    macro(obj, obj, "obj") \
++    macro(id, id, "id") \
++    macro(argc, argc, "argc") \
++    macro(args, args, "args") \
++    /* TxJS end */ \
+     FOR_EACH_XML_ONLY_NAME(macro)
+ 
+ #endif /* CommonPropertyNames_h__ */
+

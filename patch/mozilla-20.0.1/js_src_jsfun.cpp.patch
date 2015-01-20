@@ -1,0 +1,57 @@
+--- ff-orig/mozilla-20.0.1/js/src/jsfun.cpp	2013-04-09 22:01:52.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/jsfun.cpp	2015-01-19 21:29:36.902737405 -0600
+@@ -653,7 +653,9 @@
+         // Functions created with the constructor should not be using the
+         // expression body extension.
+         JS_ASSERT_IF(funCon, !exprBody);
++#ifndef TxJS
+         JS_ASSERT_IF(!funCon, src->length() > 0 && chars[0] == '(');
++#endif
+ 
+         // If a function inherits strict mode by having scopes above it that
+         // have "use strict", we insert "use strict" into the body of the
+@@ -964,10 +966,12 @@
+     return true;
+ }
+ 
++#ifndef TxJS
+ static const uint32_t JSSLOT_BOUND_FUNCTION_THIS       = 0;
+ static const uint32_t JSSLOT_BOUND_FUNCTION_ARGS_COUNT = 1;
+ 
+ static const uint32_t BOUND_FUNCTION_RESERVED_SLOTS = 2;
++#endif
+ 
+ inline bool
+ JSFunction::initBoundFunction(JSContext *cx, HandleValue thisArg,
+@@ -999,6 +1003,8 @@
+     return true;
+ }
+ 
++#ifndef TxJS
++// These must be in the header to use them outside this file.
+ inline JSObject *
+ JSFunction::getBoundFunctionTarget() const
+ {
+@@ -1036,6 +1042,7 @@
+ 
+     return getSlot(JSSLOT_BOUND_FUNCTION_ARGS_COUNT).toPrivateUint32();
+ }
++#endif
+ 
+ bool
+ JSFunction::initializeLazyScript(JSContext *cx)
+@@ -1205,8 +1212,13 @@
+     JS_FN(js_toSource_str,   fun_toSource,   0,0),
+ #endif
+     JS_FN(js_toString_str,   fun_toString,   0,0),
++#ifdef TxJS
++    JS_FN(js_apply_str,      js_fun_apply,   2,JSFUN_TX_NOSUSPEND),
++    JS_FN(js_call_str,       js_fun_call,    1,JSFUN_TX_NOSUSPEND),
++#else
+     JS_FN(js_apply_str,      js_fun_apply,   2,0),
+     JS_FN(js_call_str,       js_fun_call,    1,0),
++#endif
+     JS_FN("bind",            fun_bind,       1,0),
+ #if JS_HAS_GENERATORS
+     JS_FN("isGenerator",     fun_isGenerator,0,0),
+

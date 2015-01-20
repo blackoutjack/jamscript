@@ -1,0 +1,22 @@
+--- ff-orig/mozilla-20.0.1/js/src/jsobjinlines.h	2013-04-09 22:01:52.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/jsobjinlines.h	2015-01-19 21:29:36.978737402 -0600
+@@ -474,7 +474,18 @@
+     JS_ASSERT(dstStart + count <= getDenseArrayCapacity());
+     JSCompartment *comp = compartment();
+     for (unsigned i = 0; i < count; ++i)
++#ifdef TxJS
++    {
++#endif
+         elements[dstStart + i].init(comp, this, dstStart + i, src[i]);
++#ifdef TxJS
++        // %%% To maintain efficiency of dense arrays during
++        // %%% transactions, we might want to create a new ptype for
++        // %%% write sets, and record the speculative writes here.
++        // Callers are responsible for adding the source elements to the
++        // read set.
++    }
++#endif
+ }
+ 
+ inline void
+

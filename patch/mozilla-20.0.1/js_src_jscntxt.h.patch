@@ -1,0 +1,55 @@
+--- ff-orig/mozilla-20.0.1/js/src/jscntxt.h	2013-04-09 22:01:51.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/jscntxt.h	2015-01-19 21:29:36.890737405 -0600
+@@ -1368,6 +1368,51 @@
+     /* Default locale for Internationalization API */
+     char                *defaultLocale;
+ 
++#ifdef TxJS
++  private:
++    /* Tx data */
++    TxContext *tx_;
++
++    inline TxContext *getTxInState(int state) {
++        TxContext *tx = tx_;
++        while (tx != NULL) {
++            if (tx->inState(state))
++                break;
++            tx = tx->getNext();
++        }
++        return tx;
++    }
++
++  public:
++    inline TxContext *getRunningTx() {
++        return getTxInState(TX_RUNNING);
++    }
++    inline TxContext *getClosingTx() {
++        return getTxInState(TX_RUNNING | TX_DUMMY);
++    }
++    inline TxContext *getSuspendingTx() {
++        return getTxInState(TX_SUSPEND0 | TX_END0);
++    }
++    inline TxContext *getSuspendedTx() {
++        return getTxInState(TX_SUSPEND1 | TX_END1);
++    }
++
++    inline TxContext *getTxContext() { return tx_; }
++    // Return the new transaction to simplify jsinterp.cpp.
++    inline TxContext *setTxContext(TxContext *tx) { tx_ = tx; return tx_; }
++
++    inline const js::Value getIntrospector() {
++        if (hasfp()) {
++            return fp()->script()->getIntrospector();
++        }
++        return JS::UndefinedValue();
++    }
++    inline void setIntrospector(const js::Value &ispect) {
++        JS_ASSERT(hasfp());
++        fp()->script()->setIntrospector(ispect);
++    }
++#endif
++
+   public:
+     int32_t             reportGranularity;  /* see jsprobes.h */
+ 
+

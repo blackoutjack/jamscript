@@ -1,0 +1,48 @@
+--- ff-orig/mozilla-20.0.1/js/src/jsapi.h	2013-04-09 22:01:51.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/jsapi.h	2015-01-19 21:34:30.378728824 -0600
+@@ -2624,7 +2624,14 @@
+  */
+ #define JSFUN_GENERIC_NATIVE   0x800
+ 
++#ifdef TxJS
++#define JSFUN_TX_NOSUSPEND     0x1000   /* indicates that a call to this
++                                           function should not suspend
++                                           an active transaction */
++#define JSFUN_FLAGS_MASK       0x1e00   /* | of all the JSFUN_* flags */
++#else
+ #define JSFUN_FLAGS_MASK       0xe00    /* | of all the JSFUN_* flags */
++#endif
+ 
+ /*
+  * The first call to JS_CallOnce by any thread in a process will call 'func'.
+@@ -2657,6 +2664,11 @@
+ extern JS_PUBLIC_API(JSString *)
+ JS_GetEmptyString(JSRuntime *rt);
+ 
++#ifdef TxJS
++extern JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx);
++#endif
++
+ /*
+  * Format is a string of the following characters (spaces are insignificant),
+  * specifying the tabulated type conversions:
+@@ -4832,6 +4844,7 @@
+  * Security protocol.
+  */
+ struct JSPrincipals {
++
+     /* Don't call "destroy"; use reference counting macros below. */
+     int refcount;
+ 
+@@ -5056,6 +5069,9 @@
+     bool compileAndGo;
+     bool noScriptRval;
+     bool selfHostingMode;
++#ifdef TxJS
++    Value introspector;
++#endif
+     bool userBit;
+     enum SourcePolicy {
+         NO_SOURCE,
+

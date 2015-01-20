@@ -1,0 +1,22 @@
+--- ff-orig/mozilla-20.0.1/dom/base/nsJSEnvironment.h	2013-04-09 22:01:30.000000000 -0500
++++ ff-dev/mozilla-20.0.1/dom/base/nsJSEnvironment.h	2015-01-19 21:29:36.758737409 -0600
+@@ -44,6 +44,18 @@
+ 
+   virtual nsIScriptObjectPrincipal* GetObjectPrincipal();
+ 
++#ifdef TxJS
++  virtual nsresult EvaluateString(const nsAString& aScript,
++                                  JSObject* aScopeObject,
++                                  nsIPrincipal *principal,
++                                  nsIPrincipal *originPrincipal,
++                                  const char *aURL,
++                                  uint32_t aLineNo,
++                                  JSVersion aVersion,
++                                  nsAString *aRetValue,
++                                  bool* aIsUndefined,
++                                  const JS::Value &ispect);
++#endif
+   virtual nsresult EvaluateString(const nsAString& aScript,
+                                   JSObject* aScopeObject,
+                                   nsIPrincipal *principal,
+

@@ -1,0 +1,40 @@
+--- ff-orig/mozilla-20.0.1/js/src/jsobj.cpp	2013-04-09 22:01:52.000000000 -0500
++++ ff-dev/mozilla-20.0.1/js/src/jsobj.cpp	2015-01-19 21:29:36.978737402 -0600
+@@ -29,6 +29,10 @@
+ #include "jsiter.h"
+ #include "jslock.h"
+ #include "jsmath.h"
++#ifdef TxJS
++#include "jstransaction.h"
++#include "jsjam.h"
++#endif
+ #include "jsnum.h"
+ #include "jsobj.h"
+ #include "jsonparser.h"
+@@ -1430,6 +1434,17 @@
+ js_CreateThisForFunction(JSContext *cx, HandleObject callee, bool newType)
+ {
+     RootedValue protov(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid protoId = AtomToId(cx->names().classPrototype);
++        if (tx->getProperty(cx, callee, protoId, &protov)) {
++        } else {
++            if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
++                return NULL;
++        }
++    } else
++#endif
+     if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
+         return NULL;
+     JSObject *proto;
+@@ -3326,7 +3341,6 @@
+                            uint32_t getHow, MutableHandleValue vp)
+ {
+     RootedId id(cx, id_);
+-
+     /* This call site is hot -- use the always-inlined variant of LookupPropertyWithFlags(). */
+     RootedObject obj2(cx);
+     RootedShape shape(cx);
+
