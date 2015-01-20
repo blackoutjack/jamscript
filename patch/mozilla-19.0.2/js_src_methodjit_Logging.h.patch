@@ -1,0 +1,12 @@
+--- ff-orig/mozilla-19.0.2/js/src/methodjit/Logging.h	2013-03-07 04:48:48.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/methodjit/Logging.h	2015-01-19 17:33:10.023152205 -0600
+@@ -36,7 +36,7 @@
+     JSpew_Terminator
+ };
+ 
+-#if defined(DEBUG) && !defined(JS_METHODJIT_SPEW)
++#if defined(DEBUG) && defined(JS_METHODJIT) && !defined(JS_METHODJIT_SPEW)
+ # define JS_METHODJIT_SPEW
+ #endif
+ 
+

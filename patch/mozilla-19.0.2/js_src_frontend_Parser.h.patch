@@ -1,0 +1,45 @@
+--- ff-orig/mozilla-19.0.2/js/src/frontend/Parser.h	2013-03-07 04:48:46.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/frontend/Parser.h	2015-01-19 17:33:09.655152216 -0600
+@@ -17,6 +17,9 @@
+ #include "jsatom.h"
+ #include "jsscript.h"
+ #include "jswin.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ #include "frontend/ParseMaps.h"
+ #include "frontend/ParseNode.h"
+@@ -59,6 +62,10 @@
+ 
+     StmtInfoPC      *topStmt;       /* top of statement info stack */
+     StmtInfoPC      *topScopeStmt;  /* top lexical scope statement */
++#ifdef TxJS_HOIST
++    StmtInfoPC      *txTop;         /* top statement to use for tx */
++    bool             hasTxTop;
++#endif
+     Rooted<StaticBlockObject *> blockChain;
+                                     /* compile time block scope chain */
+ 
+@@ -393,6 +400,10 @@
+     ParseNode *expr();
+     ParseNode *assignExpr();
+     ParseNode *assignExprWithoutYield(unsigned err);
++#ifdef TxJS
++    ParseNode *txStmt();
++    ParseNode *txExpr();
++#endif
+     ParseNode *condExpr1();
+     ParseNode *orExpr1();
+     ParseNode *andExpr1i();
+@@ -425,6 +436,9 @@
+     bool functionArguments(ParseNode **list, ParseNode *funcpn, bool &hasRest);
+ 
+     ParseNode *functionDef(HandlePropertyName name, FunctionType type, FunctionSyntaxKind kind);
++#ifdef TxJS
++    bool txArguments(ParseNode *txpn);
++#endif
+ 
+     ParseNode *unaryOpExpr(ParseNodeKind kind, JSOp op);
+ 
+

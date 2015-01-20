@@ -1,0 +1,383 @@
+--- ff-orig/mozilla-19.0.2/js/src/jsarray.cpp	2013-03-07 04:48:48.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/jsarray.cpp	2015-01-19 17:33:09.795152211 -0600
+@@ -88,6 +88,9 @@
+ #include "jsnum.h"
+ #include "jsobj.h"
+ #include "jsscope.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ #include "jswrapper.h"
+ #include "methodjit/MethodJIT.h"
+ #include "methodjit/StubCalls.h"
+@@ -125,12 +128,23 @@
+ JSBool
+ GetLengthProperty(JSContext *cx, HandleObject obj, uint32_t *lengthp)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++#endif
+     if (obj->isArray()) {
++#ifdef TxJS
++        if (tx) {
++            *lengthp = tx->getArrayLength(cx, obj);
++            // %%% Any reason to add to read set again?
++            return true;
++        }
++#endif
+         *lengthp = obj->getArrayLength();
+         return true;
+     }
+ 
+     if (obj->isArguments()) {
++        // %%% Handle this for TxJS.
+         ArgumentsObject &argsobj = obj->asArguments();
+         if (!argsobj.hasOverriddenLength()) {
+             *lengthp = argsobj.initialLength();
+@@ -138,6 +152,18 @@
+         }
+     }
+ 
++#ifdef TxJS
++    if (tx) {
++        // Check if the length property has been overwritten.
++        jsid lenId = NON_INTEGER_ATOM_TO_JSID(cx->names().length);
++        RootedValue val(cx);
++        if (tx->getProperty(cx, obj, lenId, &val)) {
++            // %%% Any reason to add to read set again?
++            return ToUint32(cx, val.get(), (uint32_t *)lengthp);
++        }
++    }
++#endif
++
+     RootedValue value(cx);
+     if (!JSObject::getProperty(cx, obj, obj, cx->names().length, &value))
+         return false;
+@@ -298,6 +324,18 @@
+     if (!DoubleIndexToId(cx, index, id.address()))
+         return false;
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        // %%% |lookupProperty| or |getProperty| for element indexes?
++        if (tx->getProperty(cx, obj, id, vp)) {
++            *hole = false;
++            // %%% Any reason to add to read set again?
++            return true;
++        }
++    }
++#endif
++
+     RootedObject obj2(cx);
+     RootedShape prop(cx);
+     if (!JSObject::lookupGeneric(cx, obj, id, &obj2, &prop))
+@@ -311,12 +349,29 @@
+             return false;
+         *hole = false;
+     }
++#ifdef TxJS
++    if (tx) {
++        tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++    }
++#endif
+     return true;
+ }
+ 
+ static inline bool
+ DoGetElement(JSContext *cx, HandleObject obj, uint32_t index, JSBool *hole, MutableHandleValue vp)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    jsid id = INT_TO_JSID(index);
++    if (tx) {
++        if (tx->getProperty(cx, obj, id, vp)) {
++            *hole = false;
++            // %%% Any reason to add to read set again?
++            return true;
++        }
++    }
++#endif
++
+     bool present;
+     if (!JSObject::getElementIfPresent(cx, obj, obj, index, vp, &present))
+         return false;
+@@ -325,6 +380,12 @@
+     if (*hole)
+         vp.setUndefined();
+ 
++#ifdef TxJS
++    if (tx) {
++        tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++    }
++#endif
++
+     return true;
+ }
+ 
+@@ -347,16 +408,37 @@
+ GetElement(JSContext *cx, HandleObject obj, IndexType index, JSBool *hole, MutableHandleValue vp)
+ {
+     AssertGreaterThanZero(index);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    jsid id = INT_TO_JSID(index);
++    if (tx) {
++        if (tx->getProperty(cx, obj, id, vp)) {
++            *hole = false;
++            // %%% Any reason to add to read set again?
++            return true;
++        }
++    }
++#endif
+     if (obj->isDenseArray() && index < obj->getDenseArrayInitializedLength()) {
+         vp.set(obj->getDenseArrayElement(uint32_t(index)));
+         if (!vp.isMagic(JS_ARRAY_HOLE)) {
+             *hole = JS_FALSE;
++#ifdef TxJS
++            if (tx) {
++                tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++            }
++#endif
+             return JS_TRUE;
+         }
+     }
+     if (obj->isArguments()) {
+         if (obj->asArguments().maybeGetElement(uint32_t(index), vp)) {
+             *hole = JS_FALSE;
++#ifdef TxJS
++            if (tx) {
++                tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++            }
++#endif
+             return true;
+         }
+     }
+@@ -369,9 +451,26 @@
+ static bool
+ GetElementsSlow(JSContext *cx, HandleObject aobj, uint32_t length, Value *vp)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++#endif
+     for (uint32_t i = 0; i < length; i++) {
++#ifdef TxJS
++        jsid id = INT_TO_JSID(i);
++        if (tx) {
++            if (tx->getProperty(cx, aobj, id, MutableHandleValue::fromMarkedLocation(&vp[i]))) {
++                // %%% Any reason to add to read set again?
++                continue;
++            }
++        }
++#endif
+         if (!JSObject::getElement(cx, aobj, aobj, i, MutableHandleValue::fromMarkedLocation(&vp[i])))
+             return false;
++#ifdef TxJS
++        if (tx) {
++            tx->recordAction(cx, aobj.get(), id, *vp, AX_READ);
++        }
++#endif
+     }
+ 
+     return true;
+@@ -380,6 +479,10 @@
+ bool
+ GetElements(JSContext *cx, HandleObject aobj, uint32_t length, Value *vp)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    uint32_t i = 0;
++#endif
+     if (aobj->isDenseArray() && length <= aobj->getDenseArrayInitializedLength() &&
+         !js_PrototypeHasIndexedProperties(aobj)) {
+         /* The prototype does not have indexed properties so hole = undefined */
+@@ -387,13 +490,31 @@
+         const Value *srcend = srcbeg + length;
+         const Value *src = srcbeg;
+         for (Value *dst = vp; src < srcend; ++dst, ++src)
++#ifdef TxJS
++        {
++            jsid id = INT_TO_JSID(i);
++            if (tx) {
++                i++;
++                if (tx->getProperty(cx, aobj, id, MutableHandleValue::fromMarkedLocation(dst))) {
++                    // %%% Any reason to add to read set again?
++                    continue;
++                }
++            }
++#endif
+             *dst = src->isMagic(JS_ARRAY_HOLE) ? UndefinedValue() : *src;
++#ifdef TxJS
++            if (tx) {
++                tx->recordAction(cx, aobj, id, *dst, AX_READ);
++            }
++        }
++#endif
+         return true;
+     }
+ 
+     if (aobj->isArguments()) {
+         ArgumentsObject &argsobj = aobj->asArguments();
+         if (!argsobj.hasOverriddenLength()) {
++            // %%% Need handle TxJS retrieval/read set collection.
+             if (argsobj.maybeGetElements(0, length, vp))
+                 return true;
+         }
+@@ -412,6 +533,42 @@
+ {
+     JS_ASSERT(index >= 0);
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        // %%% Need to root?
++        jsid id;
++        bool ok = DoubleIndexToId(cx, index, &id);
++        if (!ok) {
++            // The given index is not a proper id. This may happen with
++            // very large numeric indices.
++            return false;
++        }
++
++        tx->recordAction(cx, obj, id, v, AX_WRITE);
++
++        // %%% Should add length property to the write set in a way
++        // %%% that doesn't play it back explicitely during commit.
++        // %%% Maybe add an |implicit| flag to write sets.
++
++        /* Get length
++        uint32_t length;
++        if (!GetLengthProperty(cx, obj, &length))
++            return false;
++        // Set length property
++        jsid id;
++        if (!IndexToId(cx, length + 1, &id)) {
++            return false;
++        }
++        jsval rval = IdToValue(id);
++        jsid len_id = NameToId(cx->names().length);
++        
++        tx->recordAction(cx, obj, len_id, rval, AX_WRITE);
++        */
++        return true;
++    }
++#endif
++
+     if (obj->isDenseArray()) {
+         /* Predicted/prefetched code should favor the remains-dense case. */
+         JSObject::EnsureDenseResult result = JSObject::ED_SPARSE;
+@@ -443,6 +600,23 @@
+     return JSObject::setGeneric(cx, obj, obj, id, &tmp, true);
+ }
+ 
++#ifdef TxJS
++JSBool
++js_SetArrayElement(JSContext *cx, HandleObject obj, double index, js::HandleValue v)
++{
++    // %%% Convert to handle objects
++    return SetArrayElement(cx, obj, index, v);
++}
++
++JSBool
++js_GetArrayElement(JSContext *cx, HandleObject obj, double index, JSBool *hole, MutableHandleValue vp)
++{
++    // %%% Convert to handle objects
++    return GetElement(cx, obj, index, hole, vp);
++}
++
++#endif
++
+ /*
+  * Delete the element |index| from |obj|. If |strict|, do a strict
+  * deletion: throw if the property is not configurable.
+@@ -462,6 +636,27 @@
+     JS_ASSERT(index >= 0);
+     JS_ASSERT(floor(index) == index);
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid id;
++        if (!DoubleIndexToId(cx, index, &id)) {
++            // The given index is not a proper id. This may happen with
++            // very large numeric indices.
++            return 0;
++        }
++
++        JSBool hole;
++        RootedValue vp(cx);
++        // This adds to the read set as well. %%% Correct?
++        if (!GetElement(cx, obj, index, &hole, &vp))
++            return 0;
++        if (!hole)
++            tx->recordAction(cx, obj, id, vp, AX_DELETE);
++        return 1;
++    }
++#endif
++
+     if (obj->isDenseArray()) {
+         if (index <= UINT32_MAX) {
+             uint32_t idx = uint32_t(index);
+@@ -507,6 +702,13 @@
+ {
+     RootedValue v(cx, NumberValue(length));
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        tx->recordAction(cx, obj, AtomToId(cx->names().length), v, AX_WRITE);
++        return JS_TRUE;
++    } else
++#endif
+     /* We don't support read-only array length yet. */
+     return JSObject::setProperty(cx, obj, obj, cx->names().length, &v, false);
+ }
+@@ -650,6 +852,24 @@
+ array_lookupGeneric(JSContext *cx, HandleObject obj, HandleId id,
+                     MutableHandleObject objp, MutableHandleShape propp)
+ {
++#ifdef TxJS
++    // %%% Find a way to trigger this.
++    // %%% Might not actually be possible, since SetPropertyOperation
++    // %%% is blocked off during transactions. In general, we need to
++    // %%% model custom getters and setters better.
++    /*
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        RootedValue v(cx);
++        if (tx->lookupProperty(cx, obj, id, objp, &v)) {
++            objp.set(objp);
++            // %%% This isn't right. How to propagate the value back?
++            propp.set(objp->nativeLookup(cx, id));
++            return true;
++        }
++    }
++    */
++#endif
+     if (!obj->isDenseArray())
+         return baseops::LookupProperty(cx, obj, id, objp, propp);
+ 
+@@ -2468,6 +2688,7 @@
+     if (args.length() > 0) {
+         /* Slide up the array to make room for all args at the bottom. */
+         if (length > 0) {
++
+             bool optimized = false;
+             do {
+                 if (!obj->isDenseArray())
+@@ -2542,6 +2763,14 @@
+ static inline bool
+ CanOptimizeForDenseStorage(JSObject *arr, uint32_t startingIndex, uint32_t count, JSContext *cx)
+ {
++#ifdef TxJS
++    // %%% If we intervene on NewDenseCopiedArray, we may be able to
++    // %%% support copying dense arrays, but not at the moment.
++    // %%% It may not be worth it though, since we'll still have to do
++    // %%% a lookup for all the values.
++    if (cx->getRunningTx())
++        return false;
++#endif
+     /* If the desired properties overflow dense storage, we can't optimize. */
+     if (UINT32_MAX - startingIndex < count)
+         return false;
+

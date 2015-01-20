@@ -1,0 +1,5 @@
+--- ff-orig/mozilla-19.0.2/js/src/selfhosted.js	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/selfhosted.js	2015-01-19 18:57:08.299004894 -0600
+@@ -0,0 +1 @@
++//this space intentionally left blank
+

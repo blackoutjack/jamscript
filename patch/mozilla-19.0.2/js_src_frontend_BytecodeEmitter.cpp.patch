@@ -1,0 +1,181 @@
+--- ff-orig/mozilla-19.0.2/js/src/frontend/BytecodeEmitter.cpp	2013-03-07 04:48:46.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/frontend/BytecodeEmitter.cpp	2015-01-19 17:33:09.631152216 -0600
+@@ -333,6 +333,11 @@
+     "if statement",          /* IF */
+     "else statement",        /* ELSE */
+     "destructuring body",    /* BODY */
++#ifdef TxJS
++    "transaction block",     /* TX */
++    // %%% Weird, these next two seem to be switched relative to 
++    // %%% enum StmtType in SharedContext.h.
++#endif
+     "switch statement",      /* SWITCH */
+     "block",                 /* BLOCK */
+     js_with_statement_str,   /* WITH */
+@@ -596,6 +601,21 @@
+             npops += 2;
+             break;
+ 
++#ifdef TxJS
++          case STMT_TX:
++            /*
++             * We need to close any transactions that will be escaped.
++             */
++            FLUSH_POPS();
++            if (NewSrcNote(cx, bce, SRC_HIDDEN) < 0)
++                return false;
++            if (Emit1(cx, bce, JSOP_END_TX) < 0)
++                return false;
++            if (Emit1(cx, bce, JSOP_POP) < 0)
++                return false;
++            break;
++#endif
++
+           default:;
+         }
+ 
+@@ -4911,7 +4931,9 @@
+     if (!bce->sc->isFunction) {
+         JS_ASSERT(pn->pn_cookie.isFree());
+         JS_ASSERT(pn->getOp() == JSOP_NOP);
++#ifndef TxJS_HOIST
+         JS_ASSERT(!bce->topStmt);
++#endif
+         bce->switchToProlog();
+         if (!EmitIndex32(cx, JSOP_DEFFUN, index, bce))
+             return false;
+@@ -5461,6 +5483,98 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++static bool
++EmitTx(JSContext *cx, BytecodeEmitter *bce, ParseNode *pn)
++{
++    StmtInfoBCE stmtInfo(cx);
++    stmtInfo.type = STMT_TX;
++
++    ptrdiff_t top = bce->offset();
++    PushStatementBCE(bce, &stmtInfo, STMT_TX, top);
++
++    // Emit code for the policy evaluator expressions.
++    if (pn->pn_left && !EmitTree(cx, bce, pn->pn_left) < 0)
++        return false;
++
++    uint32_t argc = 1;
++    /*
++    ParseNode *pnargs = pn->pn_left;
++    if (pnargs) {
++        // Emit code for each argument in order, then emit JSOP_BEGIN_TX
++        // with a two-byte immediate telling how many args were pushed
++        // on the operand stack.
++        ParseNode *pnfirst = pnargs->pn_head;
++        bool oldEmittingForInit = bce->emittingForInit;
++        bce->emittingForInit = false;
++        for (ParseNode *pn2 = pnfirst; pn2; pn2 = pn2->pn_next) {
++            if (!EmitTree(cx, bce, pn2))
++                return false;
++            // Count the arguments.
++            argc++;
++        }
++        bce->emittingForInit = oldEmittingForInit;
++    }
++    */
++    if (NewSrcNote2(cx, bce, SRC_PCBASE, bce->offset() - top) < 0)
++        return false;
++
++    //if (Emit1(cx, bce, pn->getOp()) < 0)
++    if (Emit3(cx, bce, pn->getOp(), ARGC_HI(argc), ARGC_LO(argc)) < 0)
++        return false;
++
++    //if (EmitJump(cx, bce, JSOP_BEGIN_TX, 0) < 0)
++    //    return false;
++
++    // When creating the TryNote below, this new value of |top| needs to
++    // be provided so that exceptions during the evaluation of the
++    // transaction evaluator expressions aren't caught by the TryNote.
++    top = bce->offset();
++    SET_STATEMENT_TOP(&stmtInfo, top);
++
++    // Emit code for the body of the transaction.
++    if (pn->pn_right && !EmitTree(cx, bce, pn->pn_right))
++        return false;
++    // Since EmitCallOrNew (below) generates a stack push, but EmitTree
++    // does not, we simulate a stack push here to make the definitions
++    // in jsopcode.tbl work with either.
++    //if (Emit1(cx, bce, JSOP_UNDEFINED) < 0)
++    //    return false;
++    /*
++    // %%% Removed option TxJS_INLINE
++    // %%% This will no longer work because of changes in jsopcode.tbl.
++    // Emit code for the transaction lambda.
++    if (pn->pn_right && !EmitCallOrNew(cx, bce, pn->pn_right, top))
++        return false;
++    */
++
++    //ptrdiff_t txEnd = Emit1(cx, bce, JSOP_END_TX);
++    //if (txEnd < 0)
++    //    return false;
++
++    //if (!EmitNumberOp(cx, 1, bce))
++    //SET_UINT16(bce->code(top + ), 1);
++
++    if (!bce->tryNoteList.append(JSTRY_TX, bce->stackDepth, top, bce->offset()))
++        return false;
++
++    if (Emit1(cx, bce, JSOP_END_TX) < 0)
++        return false;
++
++    //if (Emit1(cx, bce, JSOP_POP) < 0)
++    //    return false;
++
++    //SetJumpOffsetAt(bce, txEnd);
++
++    if (pn->pn_xflags & PNX_POPVAR) {
++        if (Emit1(cx, bce, JSOP_POP) < 0)
++            return false;
++    }
++
++    return PopStatementBCE(cx, bce);
++}
++#endif
++
+ static bool
+ EmitLogical(JSContext *cx, BytecodeEmitter *bce, ParseNode *pn)
+ {
+@@ -6053,6 +6167,19 @@
+                     if (!EmitTree(cx, bce, pn2))
+                         return false;
+                 }
++#ifdef TxJS_HOIST
++                if (pn2->isKind(PNK_TX)) {
++                    ParseNode *pnblock = pn2->pn_right;
++                    ParseNode *pnstmt = pnblock->pn_head;
++                    
++                    for (ParseNode *pn3 = pnstmt; pn3; pn3 = pn3->pn_next) {
++                        if (pn3->isKind(PNK_FUNCTION) && pn3->functionIsHoisted()) {
++                            if (!EmitTree(cx, bce, pn3))
++                                return false;
++                        }
++                    }
++                }
++#endif
+             }
+         }
+         if (fun->hasDefaults()) {
+@@ -6120,6 +6247,14 @@
+         break;
+       }
+ 
++#if TxJS
++      case PNK_TX:
++      {
++        ok = EmitTx(cx, bce, pn);
++        break;
++      }
++#endif
++
+       case PNK_IF:
+         ok = EmitIf(cx, bce, pn);
+         break;
+

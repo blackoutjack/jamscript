@@ -1,0 +1,39 @@
+--- ff-orig/mozilla-19.0.2/dom/base/nsJSEnvironment.cpp	2013-03-07 04:48:40.000000000 -0600
++++ ff-dev/mozilla-19.0.2/dom/base/nsJSEnvironment.cpp	2015-01-19 17:33:09.503152220 -0600
+@@ -1251,6 +1251,25 @@
+                                      JS::Value* aRetValue,
+                                      bool* aIsUndefined)
+ {
++#ifdef TxJS
++  return EvaluateString(aScript, aScopeObject, aPrincipal,
++      aOriginPrincipal, aURL, aLineNo, aVersion, aRetValue,
++      aIsUndefined, JS::UndefinedValue());
++}
++
++nsresult
++nsJSContext::EvaluateString(const nsAString& aScript,
++                            JSObject* aScopeObject,
++                            nsIPrincipal *aPrincipal,
++                            nsIPrincipal *aOriginPrincipal,
++                            const char *aURL,
++                            uint32_t aLineNo,
++                            uint32_t aVersion,
++                            JS::Value* aRetValue,
++                            bool* aIsUndefined,
++                            const JS::Value &ispect)
++{
++#endif
+   SAMPLE_LABEL("JS", "EvaluateStringWithValue");
+   NS_ABORT_IF_FALSE(aScopeObject,
+     "Shouldn't call EvaluateStringWithValue with null scope object.");
+@@ -1517,6 +1536,9 @@
+            .setPrincipals(nsJSPrincipals::get(principal))
+            .setOriginPrincipals(nsJSPrincipals::get(aOriginPrincipal))
+            .setVersion(JSVersion(aVersion));
++#ifdef TxJS
++    options.introspector = ispect;
++#endif
+     ok = JS::Evaluate(mContext, rootedScope, options,
+                       PromiseFlatString(aScript).get(),
+                       aScript.Length(), vp);
+

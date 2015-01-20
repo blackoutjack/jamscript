@@ -1,0 +1,36 @@
+--- ff-orig/mozilla-19.0.2/js/src/shell/js.cpp	2013-03-07 04:48:48.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/shell/js.cpp	2015-01-19 17:33:10.039152204 -0600
+@@ -43,6 +43,10 @@
+ #include "jsxml.h"
+ #include "jsperf.h"
+ 
++// TxJS begin
++#include "jsversion.h"
++// TxJS end
++
+ #include "builtin/TestingFunctions.h"
+ #include "frontend/BytecodeEmitter.h"
+ #include "frontend/Parser.h"
+@@ -1727,8 +1731,12 @@
+ JS_STATIC_ASSERT(JSTRY_CATCH == 0);
+ JS_STATIC_ASSERT(JSTRY_FINALLY == 1);
+ JS_STATIC_ASSERT(JSTRY_ITER == 2);
+-
++#ifdef TxJS
++JS_STATIC_ASSERT(JSTRY_TX == 3);
++static const char* const TryNoteNames[] = { "catch", "finally", "iter", "tx" };
++#else
+ static const char* const TryNoteNames[] = { "catch", "finally", "iter" };
++#endif
+ 
+ static JSBool
+ TryNotes(JSContext *cx, JSScript *script, Sprinter *sp)
+@@ -3478,7 +3486,6 @@
+     JS_FN_HELP("readline", ReadLine, 0, 0,
+ "readline()",
+ "  Read a single line from stdin."),
+-
+     JS_FN_HELP("print", Print, 0, 0,
+ "print([exp ...])",
+ "  Evaluate and print expressions to stdout."),
+

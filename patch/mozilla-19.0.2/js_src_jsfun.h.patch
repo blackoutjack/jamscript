@@ -1,0 +1,102 @@
+--- ff-orig/mozilla-19.0.2/js/src/jsfun.h	2013-03-07 04:48:48.000000000 -0600
++++ ff-dev/mozilla-19.0.2/js/src/jsfun.h	2015-01-19 19:39:03.798931345 -0600
+@@ -39,6 +39,14 @@
+                                        must be constructible but not decompilable. */
+         HAS_REST         = 0x0400,  /* function has a rest (...) parameter */
+         HAS_DEFAULTS     = 0x0800,  /* function has at least one default parameter */
++#ifdef TxJS
++        NO_SUSPEND       = 0x1000,  /* indicates that a call to this
++                                       function should not suspend
++                                       an active transaction */
++        NCTOR_NOSUSP     = 0x1002,  /* both a native constructor and
++                                       no suspend; necessary to return
++                                       from JSAPIToJSFunctionFlags */
++#endif
+ 
+         /* Derived Flags values for convenience: */
+         NATIVE_FUN = 0,
+@@ -91,6 +99,9 @@
+     bool isSelfHostedConstructor()  const { return flags & SELF_HOSTED_CTOR; }
+     bool hasRest()                  const { return flags & HAS_REST; }
+     bool hasDefaults()              const { return flags & HAS_DEFAULTS; }
++#ifdef TxJS
++    bool noSuspend()                const { return flags & NO_SUSPEND; }
++#endif
+ 
+     /* Compound attributes: */
+     bool isBuiltin() const {
+@@ -265,15 +276,73 @@
+     return static_cast<const JSFunction *>(this);
+ }
+ 
++#ifdef TxJS
++// These must be defined in a header to be used outside the class.
++static const uint32_t JSSLOT_BOUND_FUNCTION_THIS       = 0;
++static const uint32_t JSSLOT_BOUND_FUNCTION_ARGS_COUNT = 1;
++
++static const uint32_t BOUND_FUNCTION_RESERVED_SLOTS = 2;
++
++inline JSObject *
++JSFunction::getBoundFunctionTarget() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    /* Bound functions abuse |parent| to store their target function. */
++    return getParent();
++}
++
++inline const js::Value &
++JSFunction::getBoundFunctionThis() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    return getSlot(JSSLOT_BOUND_FUNCTION_THIS);
++}
++
++inline const js::Value &
++JSFunction::getBoundFunctionArgument(unsigned which) const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++    JS_ASSERT(which < getBoundFunctionArgumentCount());
++
++    return getSlot(BOUND_FUNCTION_RESERVED_SLOTS + which);
++}
++
++inline size_t
++JSFunction::getBoundFunctionArgumentCount() const
++{
++    JS_ASSERT(isFunction());
++    JS_ASSERT(isBoundFunction());
++
++    return getSlot(JSSLOT_BOUND_FUNCTION_ARGS_COUNT).toPrivateUint32();
++}
++#endif
++
+ extern JSString *
+ fun_toStringHelper(JSContext *cx, js::HandleObject obj, unsigned indent);
+ 
+ inline JSFunction::Flags
+ JSAPIToJSFunctionFlags(unsigned flags)
+ {
++#ifdef TxJS
++    if (flags & JSFUN_TX_NOSUSPEND) {
++      return (flags & JSFUN_CONSTRUCTOR)
++           ? JSFunction::NCTOR_NOSUSP
++           : JSFunction::NO_SUSPEND;
++    } else {
++      return (flags & JSFUN_CONSTRUCTOR)
++           ? JSFunction::NATIVE_CTOR
++           : JSFunction::NATIVE_FUN;
++    }
++#else
+     return (flags & JSFUN_CONSTRUCTOR)
+            ? JSFunction::NATIVE_CTOR
+            : JSFunction::NATIVE_FUN;
++#endif
+ }
+ 
+ extern JSFunction *
+
