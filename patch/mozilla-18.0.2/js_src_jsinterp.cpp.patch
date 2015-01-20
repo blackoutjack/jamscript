@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-18.0.2/js/src/jsinterp.cpp	2013-02-01 09:02:31.000000000 -0600
-+++ ff-dev/mozilla-18.0.2/js/src/jsinterp.cpp	2015-01-19 17:01:04.763208496 -0600
++++ ff-dev/mozilla-18.0.2/js/src/jsinterp.cpp	2015-01-19 18:40:16.159034487 -0600
 @@ -38,6 +38,10 @@
  #include "jsscope.h"
  #include "jsscript.h"
@@ -581,17 +581,7 @@
  bool
  js::HasInstance(JSContext *cx, HandleObject obj, HandleValue v, JSBool *bp)
  {
-@@ -1107,8 +1658,7 @@
-                                 op = (JSOp) *(regs.pc += (n));                \
-                                 DO_OP();                                      \
-                             JS_END_MACRO
--
--# define BEGIN_CASE(OP)     L_##OP:
-+# define BEGIN_CASE(OP)     L_##OP: 
- # define END_CASE(OP)       DO_NEXT_OP(OP##_LENGTH);
- # define END_VARLEN_CASE    DO_NEXT_OP(len);
- # define ADD_EMPTY_CASE(OP) BEGIN_CASE(OP)                                    \
-@@ -1212,6 +1762,11 @@
+@@ -1212,6 +1763,11 @@
      FrameRegs regs = cx->regs();
      PreserveRegsGuard interpGuard(cx, regs);
  
@@ -603,7 +593,7 @@
      /*
       * Help Debugger find frames running scripts that it has put in
       * single-step mode.
-@@ -1612,9 +2167,114 @@
+@@ -1612,9 +2168,114 @@
      CHECK_BRANCH();
  
      interpReturnOK = true;
@@ -718,7 +708,7 @@
          if (cx->compartment->debugMode())
              interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
  
-@@ -1627,6 +2287,108 @@
+@@ -1627,6 +2288,108 @@
  #ifdef JS_METHODJIT
    jit_return:
  #endif
@@ -827,7 +817,7 @@
  
          /* The results of lowered call/apply frames need to be shifted. */
          bool shiftResult = regs.fp()->loweredCallOrApply();
-@@ -1634,8 +2396,14 @@
+@@ -1634,8 +2397,14 @@
          cx->stack.popInlineFrame(regs);
          SET_SCRIPT(regs.fp()->script());
  
@@ -842,7 +832,7 @@
  
          /* Resume execution in the calling frame. */
          if (JS_LIKELY(interpReturnOK)) {
-@@ -1646,6 +2414,14 @@
+@@ -1646,6 +2415,14 @@
                  regs.sp--;
              }
  
@@ -857,7 +847,7 @@
              len = JSOP_CALL_LENGTH;
              DO_NEXT_OP(len);
          }
-@@ -1654,6 +2430,22 @@
+@@ -1654,6 +2431,22 @@
          regs.pc += JSOP_CALL_LENGTH;
          goto error;
      } else {
@@ -880,7 +870,7 @@
          JS_ASSERT(regs.stackDepth() == 0);
      }
      interpReturnOK = true;
-@@ -1766,6 +2558,43 @@
+@@ -1766,6 +2559,43 @@
  BEGIN_CASE(JSOP_ITER)
  {
      JS_ASSERT(regs.stackDepth() >= 1);
@@ -924,7 +914,7 @@
      uint8_t flags = GET_UINT8(regs.pc);
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!ValueToIterator(cx, flags, res))
-@@ -2194,6 +3023,49 @@
+@@ -2194,6 +3024,49 @@
      RootedObject &scope = rootObject1;
      RootedObject &pobj = rootObject2;
      RootedShape &prop = rootShape0;
@@ -974,7 +964,7 @@
      if (!LookupName(cx, name, scopeObj, &scope, &pobj, &prop))
          goto error;
  
-@@ -2217,6 +3089,79 @@
+@@ -2217,6 +3090,79 @@
  
      RootedObject &obj = rootObject0;
      FETCH_OBJECT(cx, -1, obj);
@@ -1054,7 +1044,7 @@
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
      if (!JSObject::deleteProperty(cx, obj, name, res, script->strictModeCode))
-@@ -2233,6 +3178,45 @@
+@@ -2233,6 +3179,45 @@
      RootedValue &propval = rootValue0;
      propval = regs.sp[-1];
  
@@ -1100,7 +1090,7 @@
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
      if (!JSObject::deleteByValue(cx, obj, propval, res, script->strictModeCode))
          goto error;
-@@ -2306,6 +3290,9 @@
+@@ -2306,6 +3291,9 @@
  BEGIN_CASE(JSOP_ARGINC)
  {
      unsigned i = GET_ARGNO(regs.pc);
@@ -1110,7 +1100,7 @@
      if (script->argsObjAliasesFormals()) {
          const Value &arg = regs.fp()->argsObj().arg(i);
          Value v;
-@@ -2349,13 +3336,117 @@
+@@ -2349,13 +3337,117 @@
      lval = regs.sp[-1];
  
      RootedValue rval(cx);
@@ -1228,7 +1218,7 @@
  }
  END_CASE(JSOP_GETPROP)
  
-@@ -2367,6 +3458,20 @@
+@@ -2367,6 +3459,20 @@
  
      HandleValue value = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
@@ -1249,7 +1239,7 @@
      if (!SetNameOperation(cx, script, regs.pc, scope, value))
          goto error;
  
-@@ -2380,6 +3485,62 @@
+@@ -2380,6 +3486,62 @@
      HandleValue lval = HandleValue::fromMarkedLocation(&regs.sp[-2]);
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
@@ -1312,7 +1302,7 @@
      if (!SetPropertyOperation(cx, regs.pc, lval, rval))
          goto error;
  
-@@ -2395,9 +3556,135 @@
+@@ -2395,9 +3557,135 @@
      HandleValue rval = HandleValue::fromMarkedLocation(&regs.sp[-1]);
  
      MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-2]);
@@ -1448,7 +1438,7 @@
      regs.sp--;
  }
  END_CASE(JSOP_GETELEM)
-@@ -2409,6 +3696,28 @@
+@@ -2409,6 +3697,28 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
      Value &value = regs.sp[-1];
@@ -1477,7 +1467,7 @@
      if (!SetObjectElementOperation(cx, obj, id, value, script->strictModeCode))
          goto error;
      regs.sp[-3] = value;
-@@ -2435,6 +3744,18 @@
+@@ -2435,6 +3745,18 @@
  BEGIN_CASE(JSOP_EVAL)
  {
      CallArgs args = CallArgsFromSp(GET_ARGC(regs.pc), regs.sp);
@@ -1496,7 +1486,7 @@
      if (IsBuiltinEvalForScope(regs.fp()->scopeChain(), args.calleev())) {
          if (!DirectEval(cx, args))
              goto error;
-@@ -2466,6 +3787,20 @@
+@@ -2466,6 +3788,20 @@
      RootedFunction &fun = rootFunction0;
      /* Don't bother trying to fast-path calls to scripted non-constructors. */
      if (!IsFunctionObject(args.calleev(), fun.address()) || !fun->isInterpretedConstructor()) {
@@ -1517,7 +1507,7 @@
          if (construct) {
              if (!InvokeConstructorKernel(cx, args))
                  goto error;
-@@ -2489,6 +3824,13 @@
+@@ -2489,6 +3825,13 @@
  
      if (!cx->stack.pushInlineFrame(cx, regs, args, *fun, newScript, initial))
          goto error;
@@ -1531,7 +1521,7 @@
  
      SET_SCRIPT(regs.fp()->script());
  #ifdef JS_METHODJIT
-@@ -2855,8 +4197,10 @@
+@@ -2855,8 +4198,10 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1542,7 +1532,7 @@
  }
  END_CASE(JSOP_GETLOCAL)
  
-@@ -2884,6 +4228,21 @@
+@@ -2884,6 +4229,21 @@
      RootedPropertyName &name = rootName0;
      name = script->getName(regs.pc);
  
@@ -1564,7 +1554,7 @@
      if (!DefVarOrConstOperation(cx, obj, name, attrs))
          goto error;
  }
-@@ -2947,6 +4306,19 @@
+@@ -2947,6 +4307,19 @@
      rval = ObjectValue(*fun);
  
      do {
@@ -1584,7 +1574,7 @@
          /* Steps 5d, 5f. */
          if (!shape || pobj != parent) {
              if (!JSObject::defineProperty(cx, parent, name, rval,
-@@ -2999,6 +4371,13 @@
+@@ -2999,6 +4372,13 @@
      RootedFunction &fun = rootFunction0;
      fun = script->getFunction(GET_UINT32_INDEX(regs.pc));
  
@@ -1598,7 +1588,7 @@
      JSFunction *obj = CloneFunctionObjectIfNotSingleton(cx, fun, regs.fp()->scopeChain());
      if (!obj)
          goto error;
-@@ -3113,6 +4492,9 @@
+@@ -3113,6 +4493,9 @@
  {
      uint8_t i = GET_UINT8(regs.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1608,7 +1598,7 @@
  
      RootedObject &obj = rootObject0;
      if (i == JSProto_Array) {
-@@ -3188,6 +4570,17 @@
+@@ -3188,6 +4571,17 @@
                                  JSPROP_ENUMERATE, 0, 0, 0)) {
          goto error;
      }
@@ -1626,7 +1616,7 @@
  
      regs.sp--;
  }
-@@ -3211,6 +4604,21 @@
+@@ -3211,6 +4605,21 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(obj, -2, id);
  
@@ -1648,7 +1638,7 @@
      /*
       * If rref is a hole, do not call JSObject::defineProperty. In this case,
       * obj must be an array, so if the current op is the last element
-@@ -3799,6 +5207,99 @@
+@@ -3799,6 +5208,99 @@
  END_CASE(JSOP_ARRAYPUSH)
  #endif /* JS_HAS_GENERATORS */
  
@@ -1748,7 +1738,7 @@
  #if JS_THREADED_INTERP
    L_JSOP_BACKPATCH:
    L_JSOP_BACKPATCH_POP:
-@@ -3934,6 +5435,18 @@
+@@ -3934,6 +5436,18 @@
                  len = 0;
                  DO_NEXT_OP(len);
  
@@ -1767,7 +1757,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -3973,6 +5486,38 @@
+@@ -3973,6 +5487,38 @@
          goto inline_return;
  
    exit:

@@ -1,11 +1,11 @@
 --- ff-orig/mozilla-18.0.2/js/src/jsapi.h	2013-02-01 09:02:31.000000000 -0600
-+++ ff-dev/mozilla-18.0.2/js/src/jsapi.h	2015-01-18 22:45:58.489129636 -0600
++++ ff-dev/mozilla-18.0.2/js/src/jsapi.h	2015-01-19 19:06:35.626988306 -0600
 @@ -2538,6 +2538,12 @@
                                             without creating a this object */
  #define JSFUN_HAS_DEFAULTS      0x0400  /* function has at least one default
                                             parameter */
 +#ifdef TxJS
-+#define JSFUN_TX_NOSUSPEND      0x20    /* indicates that a call to this
++#define JSFUN_TX_NOSUSPEND      0x10  /* indicates that a call to this
 +                                           function should not suspend
 +                                           an active transaction */
 +#endif
