@@ -1,0 +1,163 @@
+--- ff-orig/mozilla-22.0/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-22.0/js/src/jstx.h	2015-01-20 21:57:07.135546486 -0600
+@@ -0,0 +1,159 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef jstx_h___
++#define jstx_h___
++
++#ifdef TxJS
++
++//#define TxJS_ITYPE 1
++//#define TxJS_ITYPE_MOD 1
++//#define TxJS_SUSPEND_NATIVE 1
++
++/* Use "transparent" transaction semantics. */
++//#define TxJS_TRANSPARENT
++
++#ifdef DEBUG
++#define TxJS_PROFILE_TX 1
++#define TxJS_PROFILE_ACTIONS 1
++#define TxJS_PROFILE_MEM 1
++#endif // ifdef DEBUG
++
++// Use hashing rather than linear lookup for reads during transactions.
++#define TxJS_HASH 1
++
++// Hoist function definitions outside of transactions. This is needed
++// in some cases to maintain correct semantics for coarse-grained
++// instrumentation.
++// %%% It might be useful/safer to just hoist function definitions to
++// %%% the top of the transaction block. This deviates from other
++// %%% cases, e.g. a definition inside of an IF block.
++#define TxJS_HOIST 1
++
++// Capture reads and writes to local variables.
++//#define TxJS_LOCAL 1
++
++
++
++class TxContext;
++
++#include "jstypes.h"
++#include "jstxaction.h"
++#include "vm/Stack.h"
++
++typedef enum TxState {
++    TX_INIT = 0x1,
++    TX_RUNNING = 0x2,
++    TX_SUSPENDING = 0x4,
++    TX_SUSPEND0 = 0x8,
++    TX_SUSPEND1 = 0x10,
++    TX_RESUME = 0x20,
++    TX_ENDING = 0x40,
++    TX_END0 = 0x80,
++    TX_END1 = 0x100,
++    TX_DONE = 0x200,
++    TX_DUMMY = 0x400
++} TxState;
++
++class TxContext
++{
++  private:
++    // Used within the interpreter to figure out what's happening.
++    TxState state_;
++    // Sequence of all actions
++    void *seq_;
++    // Action sequence size
++    uint32_t seqsize_;
++    uint32_t capacity_;
++#ifdef TxJS_PROFILE_ACTIONS
++    uint32_t writesize_;
++    uint32_t readsize_;
++    uint32_t callsize_;
++    uint32_t deletesize_;
++    uint32_t forinsize_;
++#endif
++#ifdef TxJS_HASH
++    // HashMap of current (modified) values
++    js::Values *values_;
++#endif
++    // Suspended transaction state
++    TxAction suspend_;
++    // Return value of the suspended expression
++    js::Value retval_;
++    // Suspend/finish handler function (i.e. the policy.
++    js::Value handler_;
++    // The enclosing transaction, if there is one
++    TxContext *next_;
++
++  public:
++#ifdef TxJS_ITYPE
++    // %%% Make private
++    int itypes_;
++#endif
++    static TxContext *initTx(JSContext *, TxContext *tx, const js::Value &handler);
++    //JSBool suspend(JSContext *, JSString *);
++    void finish(JSContext *);
++    void clear(JSContext *);
++    inline bool inState(int test) { return !!(state_ & test); }
++    void advanceState();
++    void setState(TxState);
++    inline TxAction *getActionSequence() { return (TxAction*)seq_; }
++    inline uint32_t getSequenceSize() { return seqsize_; }
++#ifdef TxJS_PROFILE_ACTIONS
++    inline uint32_t getWriteCount() { return writesize_; }
++    inline uint32_t getReadCount() { return readsize_; }
++    inline uint32_t getCallCount() { return callsize_; }
++    inline uint32_t getDeleteCount() { return deletesize_; }
++    inline uint32_t getForinCount() { return forinsize_; }
++#endif
++    inline const js::Value getHandler() { return handler_; }
++    inline TxAction *getSuspend() { return &suspend_; }
++    inline const js::Value getReturnValue() { return retval_; }
++    inline void setReturnValue(const js::Value &val) { retval_ = val; }
++
++    inline TxContext *getNext() { return next_; }
++    inline uint32_t depth() {
++        int ret = -1;
++        TxContext *tx = this;
++        while (tx != NULL) {
++          ret++;
++          tx = tx->getNext();
++        }
++        return ret;
++    }
++
++  private:
++    TxAction *expandSequence(JSContext *);
++   
++  public:  
++    JSBool recordSuspend(JSContext *, const js::CallArgs *, bool construct);
++    JSBool recordSuspend(JSContext *, JSObject *, jsid, js::Value, TxActionType);
++    JSBool recordAction(JSContext *, const js::CallArgs *, bool);
++    JSBool recordAction(JSContext *, JSObject *, jsid, js::Value, TxActionType);
++
++    JSBool getProperty(JSContext *, js::HandleObject, jsid, js::MutableHandleValue);
++    JSBool lookupProperty(JSContext *, js::HandleObject, jsid, js::MutableHandleObject, js::MutableHandleValue);
++    JSBool lookupName(JSContext *, js::HandlePropertyName, js::HandleObject, js::MutableHandleObject, js::MutableHandleObject, js::MutableHandleValue);
++    //JSBool findProperty(JSContext *, jsid, JSObject **, JSObject **, JSProperty **);
++    //JSBool objectHasProperty(JSContext *, jsid, JSObject *, JSObject **, JSProperty **);
++    uint32_t getArrayLength(JSContext *, js::HandleObject);
++
++    JSBool loadActionSequenceIntoArray(JSContext *, TxActionType, js::MutableHandleValue);
++
++    JSBool commitAction(JSContext *, TxContext *, TxAction *);
++    JSBool commit(JSContext *);
++
++#ifdef DEBUG
++#ifdef TxJS_HASH
++    JSBool checkConsistency(JSContext *);
++#endif
++#endif
++    void trace(JSTracer *trc);
++};
++
++#endif
++
++#endif
+

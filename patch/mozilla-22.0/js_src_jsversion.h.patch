@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-22.0/js/src/jsversion.h	2013-06-18 06:01:26.000000000 -0500
++++ ff-dev/mozilla-22.0/js/src/jsversion.h	2015-01-20 21:57:07.135546486 -0600
+@@ -150,6 +150,9 @@
+ 
+ #endif
+ 
++/* Enable transactions */
++#define TxJS 1
++
+ /* Support for JS_NewGlobalObject. */
+ #define JS_HAS_NEW_GLOBAL_OBJECT        1
+ 
+

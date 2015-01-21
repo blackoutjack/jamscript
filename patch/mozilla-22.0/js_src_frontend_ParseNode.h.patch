@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-22.0/js/src/frontend/ParseNode.h	2013-06-18 06:01:24.000000000 -0500
++++ ff-dev/mozilla-22.0/js/src/frontend/ParseNode.h	2015-01-20 21:57:06.799546496 -0600
+@@ -187,6 +187,9 @@
+ #define EMIT_ENUM(name) PNK_##name,
+     FOR_EACH_PARSE_NODE_KIND(EMIT_ENUM)
+ #undef EMIT_ENUM
++#ifdef TxJS
++    PNK_TX,
++#endif
+     PNK_LIMIT, /* domain size */
+     PNK_BINOP_FIRST = PNK_OR,
+     PNK_BINOP_LAST = PNK_MOD,
+

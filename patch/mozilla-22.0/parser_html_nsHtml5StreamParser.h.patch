@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-22.0/parser/html/nsHtml5StreamParser.h	2013-06-18 06:01:38.000000000 -0500
++++ ff-dev/mozilla-22.0/parser/html/nsHtml5StreamParser.h	2015-01-20 21:57:07.583546473 -0600
+@@ -20,6 +20,9 @@
+ #include "nsHtml5Speculation.h"
+ #include "nsITimer.h"
+ #include "nsICharsetDetector.h"
++// TxJS begin
++#include "jsapi.h"
++// TxJS end
+ 
+ class nsHtml5Parser;
+ 
+@@ -546,6 +549,11 @@
+      * timer has already fired previously in this parse.
+      */
+     static int32_t                sTimerSubsequentDelay;
++
++#ifdef TxJS
++  public:
++    JS::Value mIntrospector;
++#endif
+ };
+ 
+ #endif // nsHtml5StreamParser_h__
+

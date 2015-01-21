@@ -1,0 +1,27 @@
+--- ff-orig/mozilla-22.0/js/src/jsinfer.cpp	2013-06-18 06:01:26.000000000 -0500
++++ ff-dev/mozilla-22.0/js/src/jsinfer.cpp	2015-01-20 21:57:07.003546490 -0600
+@@ -4124,6 +4124,10 @@
+       case JSOP_TABLESWITCH:
+       case JSOP_TRY:
+       case JSOP_LABEL:
++#ifdef TxJS
++      case JSOP_BEGIN_TX:
++      case JSOP_END_TX:
++#endif
+         break;
+ 
+         /* Bytecodes pushing values of known type. */
+@@ -6012,6 +6016,12 @@
+ /* static */ void
+ TypeScript::CheckBytecode(JSContext *cx, HandleScript script, jsbytecode *pc, const js::Value *sp)
+ {
++#ifdef TxJS
++    // The host can potentially push any value as the result of
++    // evaluating a suspending expression.
++    //if (cx->getRunningTx())
++    return;
++#endif
+     AutoEnterAnalysis enter(cx);
+ 
+     if (js_CodeSpec[*pc].format & JOF_DECOMPOSE)
+

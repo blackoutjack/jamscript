@@ -1,0 +1,56 @@
+--- ff-orig/mozilla-22.0/js/src/vm/Stack.h	2013-06-18 06:01:27.000000000 -0500
++++ ff-dev/mozilla-22.0/js/src/vm/Stack.h	2015-01-20 22:09:54.691524044 -0600
+@@ -14,6 +14,11 @@
+ #include "ion/IonFrameIterator.h"
+ #endif
+ #include "jsautooplen.h"
++#include "vm/Stack.h"
++
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ struct JSContext;
+ struct JSCompartment;
+@@ -398,6 +403,9 @@
+ 
+         /* Miscellaneous state. */
+         USE_NEW_TYPE       =  0x1000000   /* Use new type for constructed |this| object. */
++#ifdef TxJS
++       ,HAS_SUSPENDED_TX   =  0x2000000
++#endif
+     };
+ 
+   private:
+@@ -421,6 +429,13 @@
+     void                *hookData_;     /* if HAS_HOOK_DATA, closure returned by call hook */
+     FrameRejoinState    rejoin_;        /* for a jit frame rejoining the interpreter
+                                          * from JIT code, state at rejoin. */
++#ifdef TxJS
++    // When the handler is called on suspend or at the end of a
++    // transaction, the transaction object is saved here. When this
++    // frame returns, we know to resume or terminate the transaction
++    // (depending on the transaction state).
++    TxContext *suspendedTx_;
++#endif
+ 
+     static void staticAsserts() {
+         JS_STATIC_ASSERT(offsetof(StackFrame, rval_) % sizeof(Value) == 0);
+@@ -874,6 +889,16 @@
+         rejoin_ = state;
+     }
+ 
++#ifdef TxJS
++    inline TxContext *suspendedTx() const {
++        return (flags_ & HAS_SUSPENDED_TX) ? suspendedTx_ : NULL;
++    }
++    inline void setSuspendedTx(TxContext *tx) {
++        flags_ |= HAS_SUSPENDED_TX;
++        suspendedTx_ = tx;
++    }
++
++#endif
+     /* Down frame expansion state */
+ 
+     void setDownFramesExpanded() {
+

@@ -1,5 +1,5 @@
---- ff-orig/mozilla-21.0/js/src/jsinterpinlines.h	2013-05-11 14:19:34.000000000 -0500
-+++ ff-dev/mozilla-21.0/js/src/jsinterpinlines.h	2015-01-20 22:34:18.007481259 -0600
+--- ff-orig/mozilla-22.0/js/src/jsinterpinlines.h	2013-06-18 06:01:26.000000000 -0500
++++ ff-dev/mozilla-22.0/js/src/jsinterpinlines.h	2015-01-20 22:35:13.531479636 -0600
 @@ -17,6 +17,10 @@
  #include "jsnum.h"
  #include "jsprobes.h"
@@ -11,7 +11,7 @@
  
  #include "methodjit/MethodJIT.h"
  #include "vm/ForkJoin.h"
-@@ -128,6 +132,34 @@
+@@ -129,6 +133,34 @@
      return vp->isMagic(JS_OPTIMIZED_ARGUMENTS);
  }
  
@@ -193,7 +193,7 @@
      }
  
      return true;
-@@ -874,6 +985,10 @@
+@@ -873,6 +984,10 @@
              if (!str)
                  return false;
              res.setString(str);
@@ -204,7 +204,7 @@
              return true;
          }
      }
-@@ -898,6 +1013,9 @@
+@@ -897,6 +1012,9 @@
      RootedScript script(cx, maybeScript);
      types::TypeScript::MonitorAssign(cx, obj, id);
  
@@ -214,7 +214,7 @@
      if (obj->isArray() && JSID_IS_INT(id)) {
          uint32_t length = obj->getDenseInitializedLength();
          int32_t i = JSID_TO_INT(id);
-@@ -911,6 +1029,9 @@
+@@ -910,6 +1028,9 @@
                  if (!script)
                      types::TypeScript::GetPcScript(cx, script.address(), &pc);
  
@@ -224,7 +224,7 @@
                  if (script->hasAnalysis())
                      script->analysis()->getCode(pc).arrayWriteHole = true;
              }
-@@ -918,6 +1039,17 @@
+@@ -917,6 +1038,17 @@
      }
  
      RootedValue tmp(cx, value);
