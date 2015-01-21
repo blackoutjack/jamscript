@@ -1,0 +1,50 @@
+--- ff-orig/mozilla-21.0/js/src/jsobj.cpp	2013-05-11 14:19:34.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/jsobj.cpp	2015-01-20 21:08:39.931631488 -0600
+@@ -29,6 +29,10 @@
+ #include "jsiter.h"
+ #include "jslock.h"
+ #include "jsmath.h"
++#ifdef TxJS
++#include "jstransaction.h"
++#include "jsjam.h"
++#endif
+ #include "jsnum.h"
+ #include "jsobj.h"
+ #include "jsonparser.h"
+@@ -1424,6 +1428,17 @@
+ js::CreateThis(JSContext *cx, Class *newclasp, HandleObject callee)
+ {
+     RootedValue protov(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid protoId = AtomToId(cx->names().classPrototype);
++        if (tx->getProperty(cx, callee, protoId, &protov)) {
++        } else {
++            if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
++                return NULL;
++        }
++    } else
++#endif
+     if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
+         return NULL;
+ 
+@@ -1484,6 +1499,17 @@
+ js::CreateThisForFunction(JSContext *cx, HandleObject callee, bool newType)
+ {
+     RootedValue protov(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid protoId = AtomToId(cx->names().classPrototype);
++        if (tx->getProperty(cx, callee, protoId, &protov)) {
++        } else {
++            if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
++                return NULL;
++        }
++    } else
++#endif
+     if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &protov))
+         return NULL;
+     JSObject *proto;
+

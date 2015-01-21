@@ -1,0 +1,1349 @@
+--- ff-orig/mozilla-21.0/js/src/selfhosted.js	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-21.0/js/src/selfhosted.js	2015-01-20 21:39:36.427577207 -0600
+@@ -0,0 +1,1345 @@
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++var std_isFinite=isFinite;
++var std_isNaN=isNaN;
++var std_Array_indexOf=ArrayIndexOf;
++var std_Array_join=Array.prototype.join;
++var std_Array_push=Array.prototype.push;
++var std_Array_shift=Array.prototype.shift;
++var std_Array_slice=Array.prototype.slice;
++var std_Array_sort=Array.prototype.sort;
++var std_Boolean_toString=Boolean.prototype.toString;
++var Std_Date=Date;
++var std_Date_now=Date.now;
++var std_Function_bind=Function.prototype.bind;
++var std_Math_floor=Math.floor;
++var std_Math_max=Math.max;
++var std_Math_min=Math.min;
++var std_Object_create=Object.create;
++var std_Object_defineProperty=Object.defineProperty;
++var std_Object_getOwnPropertyNames=Object.getOwnPropertyNames;
++var std_Object_hasOwnProperty=Object.prototype.hasOwnProperty;
++var std_RegExp_test=RegExp.prototype.test;
++var Std_String=String;
++var std_String_indexOf=String.prototype.indexOf;
++var std_String_lastIndexOf=String.prototype.lastIndexOf;
++var std_String_match=String.prototype.match;
++var std_String_replace=String.prototype.replace;
++var std_String_split=String.prototype.split;
++var std_String_startsWith=String.prototype.startsWith;
++var std_String_substring=String.prototype.substring;
++var std_String_toLowerCase=String.prototype.toLowerCase;
++var std_String_toUpperCase=String.prototype.toUpperCase;
++
++
++
++
++
++
++function List(){
++if((typeof(List.prototype)==='undefined')){
++var a=std_Object_create(null);
++a.indexOf=std_Array_indexOf;
++a.join=std_Array_join;
++a.push=std_Array_push;
++a.slice=std_Array_slice;
++a.sort=std_Array_sort;
++List.prototype=a;
++}
++}
++MakeConstructible(List);
++
++
++
++
++
++
++function Record(){
++return std_Object_create(null);
++}
++MakeConstructible(Record);
++
++
++
++
++
++
++function HasProperty(a,b){
++return b in a;
++}
++
++
++
++function ToBoolean(a){
++return!!a;
++}
++
++
++
++function ToNumber(a){
++return+a;
++}
++
++
++
++function ToString(a){
++assert(arguments.length>0,"__toString");
++return Std_String(a);
++}
++
++
++
++
++
++
++function IsObject(a){
++
++
++
++
++return(typeof a==="object"&&a!==null)||
++(typeof a==="undefined"&&a!==undefined);
++}
++
++
++
++
++
++function assert(a,c){
++if(!a)
++AssertionFailed(c);
++}
++
++
++
++
++
++
++function ArrayIndexOf(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(d===0)
++return-1;
++
++
++var e=arguments.length>1?ToInteger(arguments[1]):0;
++
++
++if(e>=d)
++return-1;
++
++var f;
++
++if(e>=0)
++f=e;
++
++else{
++
++f=d+e;
++
++if(f<0)
++f=0;
++}
++
++
++for(;f<d;f++){
++if(f in c&&c[f]===a)
++return f;
++}
++
++
++return-1;
++}
++
++function ArrayStaticIndexOf(a,c){
++if(arguments.length<1)
++ThrowError(227,0,'Array.indexOf');
++var d=arguments.length>2?arguments[2]:0;
++return callFunction(ArrayIndexOf,a,c,d);
++}
++
++
++function ArrayLastIndexOf(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(d===0)
++return-1;
++
++
++var e=arguments.length>1?ToInteger(arguments[1]):d-1;
++
++
++var f;
++if(e>d-1)
++f=d-1;
++else if(e<0)
++f=d+e;
++else
++f=e;
++
++
++for(;f>=0;f--){
++if(f in c&&c[f]===a)
++return f;
++}
++
++
++return-1;
++}
++
++function ArrayStaticLastIndexOf(a,c){
++if(arguments.length<1)
++ThrowError(227,0,'Array.lastIndexOf');
++var d;
++if(arguments.length>2){
++d=arguments[2];
++}else{
++var e=ToObject(a);
++var f=(e.length>>>0);
++d=f-1;
++}
++return callFunction(ArrayLastIndexOf,a,c,d);
++}
++
++
++function ArrayEvery(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(arguments.length===0)
++ThrowError(227,0,'Array.prototype.every');
++if(!IsCallable(a))
++ThrowError(22,DecompileArg(0,a));
++
++
++var e=arguments.length>1?arguments[1]:void 0;
++
++
++
++for(var f=0;f<d;f++){
++
++if(f in c){
++
++if(!callFunction(a,e,c[f],f,c))
++return false;
++}
++}
++
++
++return true;
++}
++
++function ArrayStaticEvery(a,c){
++if(arguments.length<2)
++ThrowError(227,0,'Array.every');
++if(!IsCallable(c))
++ThrowError(22,DecompileArg(1,c));
++var d=arguments.length>2?arguments[2]:void 0;
++return callFunction(ArrayEvery,a,c,d);
++}
++
++
++function ArraySome(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(arguments.length===0)
++ThrowError(227,0,'Array.prototype.some');
++if(!IsCallable(a))
++ThrowError(22,DecompileArg(0,a));
++
++
++var e=arguments.length>1?arguments[1]:void 0;
++
++
++
++for(var f=0;f<d;f++){
++
++if(f in c){
++
++if(callFunction(a,e,c[f],f,c))
++return true;
++}
++}
++
++
++return false;
++}
++
++function ArrayStaticSome(a,c){
++if(arguments.length<2)
++ThrowError(227,0,'Array.some');
++if(!IsCallable(c))
++ThrowError(22,DecompileArg(1,c));
++var d=arguments.length>2?arguments[2]:void 0;
++return callFunction(ArraySome,a,c,d);
++}
++
++
++function ArrayForEach(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(arguments.length===0)
++ThrowError(227,0,'Array.prototype.forEach');
++if(!IsCallable(a))
++ThrowError(22,DecompileArg(0,a));
++
++
++var e=arguments.length>1?arguments[1]:void 0;
++
++
++
++for(var f=0;f<d;f++){
++
++if(f in c){
++
++callFunction(a,e,c[f],f,c);
++}
++}
++
++
++return void 0;
++}
++
++function ArrayStaticForEach(a,c){
++if(arguments.length<2)
++ThrowError(227,0,'Array.forEach');
++if(!IsCallable(c))
++ThrowError(22,DecompileArg(1,c));
++var d=arguments.length>2?arguments[2]:void 0;
++callFunction(ArrayForEach,a,c,d);
++}
++
++
++function ArrayReduce(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(arguments.length===0)
++ThrowError(227,0,'Array.prototype.reduce');
++if(!IsCallable(a))
++ThrowError(22,DecompileArg(0,a));
++
++
++var e=0;
++
++
++var f;
++if(arguments.length>1){
++f=arguments[1];
++}else{
++
++if(d===0)
++ThrowError(218);
++var g=false;
++for(;e<d;e++){
++if(e in c){
++f=c[e];
++g=true;
++e++;
++break;
++}
++}
++if(!g)
++ThrowError(218);
++}
++
++
++
++for(;e<d;e++){
++
++if(e in c){
++
++f=a(f,c[e],e,c);
++}
++}
++
++
++return f;
++}
++
++function ArrayStaticReduce(a,c){
++if(arguments.length<2)
++ThrowError(227,0,'Array.reduce');
++if(!IsCallable(c))
++ThrowError(22,DecompileArg(1,c));
++if(arguments.length>2)
++return callFunction(ArrayReduce,a,c,arguments[2]);
++else
++return callFunction(ArrayReduce,a,c);
++}
++
++
++function ArrayReduceRight(a){
++
++var c=ToObject(this);
++
++
++var d=(c.length>>>0);
++
++
++if(arguments.length===0)
++ThrowError(227,0,'Array.prototype.reduce');
++if(!IsCallable(a))
++ThrowError(22,DecompileArg(0,a));
++
++
++var e=d-1;
++
++
++var f;
++if(arguments.length>1){
++f=arguments[1];
++}else{
++
++if(d===0)
++ThrowError(218);
++var g=false;
++for(;e>=0;e--){
++if(e in c){
++f=c[e];
++g=true;
++e--;
++break;
++}
++}
++if(!g)
++ThrowError(218);
++}
++
++
++
++for(;e>=0;e--){
++
++if(e in c){
++
++f=a(f,c[e],e,c);
++}
++}
++
++
++return f;
++}
++
++function ArrayStaticReduceRight(a,c){
++if(arguments.length<2)
++ThrowError(227,0,'Array.reduceRight');
++if(!IsCallable(c))
++ThrowError(22,DecompileArg(1,c));
++if(arguments.length>2)
++return callFunction(ArrayReduceRight,a,c,arguments[2]);
++else
++return callFunction(ArrayReduceRight,a,c);
++}
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++function toASCIIUpperCase(a){
++assert(typeof a==="string","toASCIIUpperCase");
++
++
++
++
++var c="";
++for(var d=0;d<a.length;d++){
++var e=a[d];
++if("a"<=e&&e<="z")
++e=callFunction(std_String_toUpperCase,e);
++c+=e;
++}
++return c;
++}
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++var unicodeLocaleExtensionSequence="-u(-[a-z0-9]{2,8})+";
++var unicodeLocaleExtensionSequenceRE=new RegExp(unicodeLocaleExtensionSequence);
++var unicodeLocaleExtensionSequenceGlobalRE=new RegExp(unicodeLocaleExtensionSequence,"g");
++
++
++
++
++
++
++
++var languageTagRE=(function(){
++
++
++var c="[a-zA-Z]";
++
++
++var d="[0-9]";
++
++
++
++var e="(?:"+c+"|"+d+")";
++
++
++
++
++
++
++
++
++
++var f="(?:art-lojban|cel-gaulish|no-bok|no-nyn|zh-guoyu|zh-hakka|zh-min|zh-min-nan|zh-xiang)";
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++var h="(?:en-GB-oed|i-ami|i-bnn|i-default|i-enochian|i-hak|i-klingon|i-lux|i-mingo|i-navajo|i-pwn|i-tao|i-tay|i-tsu|sgn-BE-FR|sgn-BE-NL|sgn-CH-DE)";
++
++
++var i="(?:"+h+"|"+f+")";
++
++var j="(?:x(?:-[a-z0-9]{1,8})+)";
++
++
++
++
++
++var k="(?:"+d+"|[A-WY-Za-wy-z])";
++
++var l="(?:"+k+"(?:-"+e+"{2,8})+)";
++
++
++var m="(?:"+e+"{5,8}|(?:"+d+e+"{3}))";
++
++
++var n="(?:"+c+"{2}|"+d+"{3})";
++
++var q="(?:"+c+"{4})";
++
++
++var r="(?:"+c+"{3}(?:-"+c+"{3}){0,2})";
++
++
++
++
++
++var t="(?:"+c+"{2,3}(?:-"+r+")?|"+c+"{4}|"+c+"{5,8})";
++
++
++
++
++
++
++var w=t+"(?:-"+q+")?(?:-"+n+")?(?:-"+
++m+")*(?:-"+l+")*(?:-"+j+")?";
++
++
++
++var x="^(?:"+w+"|"+j+"|"+i+")$";
++
++
++return new RegExp(x,"i");
++}());
++
++
++var duplicateVariantRE=(function(){
++
++
++var c="[a-zA-Z]";
++
++
++var d="[0-9]";
++
++
++
++var e="(?:"+c+"|"+d+")";
++
++
++var f="(?:"+e+"{5,8}|(?:"+d+e+"{3}))";
++
++
++var h=
++
++
++
++"(?:"+e+"{2,8}-)+"+
++
++"("+f+")-"+
++
++
++"(?:"+e+"{2,8}-)*"+
++
++"\\1"+
++
++
++"(?!"+e+")";
++
++
++
++
++return new RegExp(h);
++}());
++
++
++var duplicateSingletonRE=(function(){
++
++
++var c="[a-zA-Z]";
++
++
++var d="[0-9]";
++
++
++
++var e="(?:"+c+"|"+d+")";
++
++
++
++
++
++var f="(?:"+d+"|[A-WY-Za-wy-z])";
++
++
++var h=
++
++
++"-("+f+")-"+
++
++"(?:"+e+"+-)*"+
++
++"\\1"+
++
++
++"(?!"+e+")";
++
++
++
++
++return new RegExp(h);
++}());
++
++
++
++
++
++
++
++
++function IsStructurallyValidLanguageTag(c){
++assert(typeof c==="string","IsStructurallyValidLanguageTag");
++if(!callFunction(std_RegExp_test,languageTagRE,c))
++return false;
++
++
++
++
++if(callFunction(std_String_startsWith,c,"x-"))
++return true;
++var d=callFunction(std_String_indexOf,c,"-x-");
++if(d!==-1)
++c=callFunction(std_String_substring,c,0,d);
++
++
++return!callFunction(std_RegExp_test,duplicateVariantRE,c)&&
++!callFunction(std_RegExp_test,duplicateSingletonRE,c);
++}
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++function CanonicalizeLanguageTag(c){
++assert(IsStructurallyValidLanguageTag(c),"CanonicalizeLanguageTag");
++
++
++
++
++
++
++
++
++
++
++
++c=callFunction(std_String_toLowerCase,c);
++
++
++if(callFunction(std_Object_hasOwnProperty,langTagMappings,c))
++return langTagMappings[c];
++
++var d=callFunction(std_String_split,c,"-");
++var e=0;
++
++
++
++while(e<d.length){
++var f=d[e];
++
++
++
++
++
++
++if(f.length===1&&(e>0||f==="x"))
++break;
++
++if(f.length===4){
++
++
++f=callFunction(std_String_toUpperCase,f[0])+
++callFunction(std_String_substring,f,1);
++}else if(e!==0&&f.length===2){
++
++
++f=callFunction(std_String_toUpperCase,f);
++}
++if(callFunction(std_Object_hasOwnProperty,langSubtagMappings,f)){
++
++
++
++
++
++
++
++
++f=langSubtagMappings[f];
++}else if(callFunction(std_Object_hasOwnProperty,extlangMappings,f)){
++
++
++
++
++
++f=extlangMappings[f].preferred;
++if(e===1&&extlangMappings[f].prefix===d[0]){
++callFunction(std_Array_shift,d);
++e--;
++}
++}
++d[e]=f;
++e++;
++}
++var h=callFunction(std_Array_join,callFunction(std_Array_slice,d,0,e),"-");
++
++
++
++var i=new List();
++while(e<d.length&&d[e]!=="x"){
++var j=e;
++e++;
++while(e<d.length&&d[e].length>1)
++e++;
++var k=callFunction(std_Array_join,callFunction(std_Array_slice,d,j,e),"-");
++i.push(k);
++}
++i.sort();
++
++
++var l="";
++if(e<d.length)
++l=callFunction(std_Array_join,callFunction(std_Array_slice,d,e),"-");
++
++
++var m=h;
++if(i.length>0)
++m+="-"+i.join("-");
++if(l.length>0){
++
++if(m.length>0)
++m+="-"+l;
++else
++m=l;
++}
++
++return m;
++}
++
++
++
++
++
++
++
++function IsWellFormedCurrencyCode(c){
++var d=ToString(c);
++var e=toASCIIUpperCase(d);
++if(e.length!==3)
++return false;
++return!callFunction(std_RegExp_test,/[^A-Z]/,e);
++}
++
++
++
++
++
++
++
++
++
++
++
++
++function addOldStyleLanguageTags(c){
++
++if(c["pa-Arab-PK"])
++c["pa-PK"]=true;
++if(c["zh-Hans-CN"])
++c["zh-CN"]=true;
++if(c["zh-Hans-SG"])
++c["zh-SG"]=true;
++if(c["zh-Hant-HK"])
++c["zh-HK"]=true;
++if(c["zh-Hant-TW"])
++c["zh-TW"]=true;
++return c;
++}
++
++
++
++
++
++
++
++function CanonicalizeLocaleList(c){
++if(c===undefined)
++return new List();
++var d=new List();
++if(typeof c==="string")
++c=[c];
++var e=ToObject(c);
++var f=(e.length>>>0);
++var h=0;
++while(h<f){
++
++var i=HasProperty(e,h);
++if(i){
++var j=e[h];
++if(!(typeof j==="string"||IsObject(j)))
++ThrowError(328);
++var k=ToString(j);
++if(!IsStructurallyValidLanguageTag(k))
++ThrowError(329,k);
++k=CanonicalizeLanguageTag(k);
++if(d.indexOf(k)===-1)
++d.push(k);
++}
++h++;
++}
++return d;
++}
++
++
++
++
++
++
++
++
++
++
++function BestAvailableLocale(c,d){
++assert(IsStructurallyValidLanguageTag(d),"BestAvailableLocale");
++assert(d===CanonicalizeLanguageTag(d),"BestAvailableLocale");
++assert(callFunction(std_String_indexOf,d,"-u-")===-1,"BestAvailableLocale");
++
++var e=d;
++while(true){
++if(c[e])
++return e;
++var f=callFunction(std_String_lastIndexOf,e,"-");
++if(f===-1)
++return undefined;
++if(f>=2&&e[f-2]==="-")
++f-=2;
++e=callFunction(std_String_substring,e,0,f);
++}
++}
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++function LookupMatcher(c,d){
++var e=0;
++var f=d.length;
++var h;
++var i,j;
++while(e<f&&h===undefined){
++i=d[e];
++j=callFunction(std_String_replace,i,unicodeLocaleExtensionSequenceGlobalRE,"");
++h=BestAvailableLocale(c,j);
++e++;
++}
++
++var k=new Record();
++if(h!==undefined){
++k.__locale=h;
++if(i!==j){
++var l=callFunction(std_String_match,i,unicodeLocaleExtensionSequenceRE);
++var m=l[0];
++var n=l.index;
++k.__extension=m;
++k.__extensionIndex=n;
++}
++}else{
++k.__locale=DefaultLocale();
++}
++return k;
++}
++
++
++
++
++
++
++
++
++
++
++
++function BestFitMatcher(c,d){
++
++return LookupMatcher(c,d);
++}
++
++
++
++
++
++var langTagMappings={
++"art-lojban":"jbo",
++"cel-gaulish":"cel-gaulish",
++"en-gb-oed":"en-GB-oed",
++"i-ami":"ami",
++"i-bnn":"bnn",
++"i-default":"i-default",
++"i-enochian":"i-enochian",
++"i-hak":"hak",
++"i-klingon":"tlh",
++"i-lux":"lb",
++"i-mingo":"i-mingo",
++"i-navajo":"nv",
++"i-pwn":"pwn",
++"i-tao":"tao",
++"i-tay":"tay",
++"i-tsu":"tsu",
++"ja-latn-hepburn-heploc":"ja-Latn-alalc97",
++"no-bok":"nb",
++"no-nyn":"nn",
++"sgn-be-fr":"sfb",
++"sgn-be-nl":"vgt",
++"sgn-br":"bzs",
++"sgn-ch-de":"sgg",
++"sgn-co":"csn",
++"sgn-de":"gsg",
++"sgn-dk":"dsl",
++"sgn-es":"ssp",
++"sgn-fr":"fsl",
++"sgn-gb":"bfi",
++"sgn-gr":"gss",
++"sgn-ie":"isg",
++"sgn-it":"ise",
++"sgn-jp":"jsl",
++"sgn-mx":"mfs",
++"sgn-ni":"ncs",
++"sgn-nl":"dse",
++"sgn-no":"nsl",
++"sgn-pt":"psr",
++"sgn-se":"swl",
++"sgn-us":"ase",
++"sgn-za":"sfs",
++"zh-cmn":"cmn",
++"zh-cmn-hans":"cmn-Hans",
++"zh-cmn-hant":"cmn-Hant",
++"zh-gan":"gan",
++"zh-guoyu":"cmn",
++"zh-hakka":"hak",
++"zh-min":"zh-min",
++"zh-min-nan":"nan",
++"zh-wuu":"wuu",
++"zh-xiang":"hsn",
++"zh-yue":"yue",
++};
++
++
++
++
++var langSubtagMappings={
++"BU":"MM",
++"DD":"DE",
++"FX":"FR",
++"TP":"TL",
++"YD":"YE",
++"ZR":"CD",
++"ayx":"nun",
++"bjd":"drl",
++"ccq":"rki",
++"cjr":"mom",
++"cka":"cmr",
++"cmk":"xch",
++"drh":"khk",
++"drw":"prs",
++"gav":"dev",
++"hrr":"jal",
++"ibi":"opa",
++"in":"id",
++"iw":"he",
++"ji":"yi",
++"jw":"jv",
++"kgh":"kml",
++"lcq":"ppr",
++"mo":"ro",
++"mst":"mry",
++"myt":"mry",
++"sca":"hle",
++"tie":"ras",
++"tkk":"twm",
++"tlw":"weo",
++"tnf":"prs",
++"ybd":"rki",
++"yma":"lrr",
++};
++
++
++
++
++var extlangMappings={
++"aao":{preferred:"aao",prefix:"ar"},
++"abh":{preferred:"abh",prefix:"ar"},
++"abv":{preferred:"abv",prefix:"ar"},
++"acm":{preferred:"acm",prefix:"ar"},
++"acq":{preferred:"acq",prefix:"ar"},
++"acw":{preferred:"acw",prefix:"ar"},
++"acx":{preferred:"acx",prefix:"ar"},
++"acy":{preferred:"acy",prefix:"ar"},
++"adf":{preferred:"adf",prefix:"ar"},
++"ads":{preferred:"ads",prefix:"sgn"},
++"aeb":{preferred:"aeb",prefix:"ar"},
++"aec":{preferred:"aec",prefix:"ar"},
++"aed":{preferred:"aed",prefix:"sgn"},
++"aen":{preferred:"aen",prefix:"sgn"},
++"afb":{preferred:"afb",prefix:"ar"},
++"afg":{preferred:"afg",prefix:"sgn"},
++"ajp":{preferred:"ajp",prefix:"ar"},
++"apc":{preferred:"apc",prefix:"ar"},
++"apd":{preferred:"apd",prefix:"ar"},
++"arb":{preferred:"arb",prefix:"ar"},
++"arq":{preferred:"arq",prefix:"ar"},
++"ars":{preferred:"ars",prefix:"ar"},
++"ary":{preferred:"ary",prefix:"ar"},
++"arz":{preferred:"arz",prefix:"ar"},
++"ase":{preferred:"ase",prefix:"sgn"},
++"asf":{preferred:"asf",prefix:"sgn"},
++"asp":{preferred:"asp",prefix:"sgn"},
++"asq":{preferred:"asq",prefix:"sgn"},
++"asw":{preferred:"asw",prefix:"sgn"},
++"auz":{preferred:"auz",prefix:"ar"},
++"avl":{preferred:"avl",prefix:"ar"},
++"ayh":{preferred:"ayh",prefix:"ar"},
++"ayl":{preferred:"ayl",prefix:"ar"},
++"ayn":{preferred:"ayn",prefix:"ar"},
++"ayp":{preferred:"ayp",prefix:"ar"},
++"bbz":{preferred:"bbz",prefix:"ar"},
++"bfi":{preferred:"bfi",prefix:"sgn"},
++"bfk":{preferred:"bfk",prefix:"sgn"},
++"bjn":{preferred:"bjn",prefix:"ms"},
++"bog":{preferred:"bog",prefix:"sgn"},
++"bqn":{preferred:"bqn",prefix:"sgn"},
++"bqy":{preferred:"bqy",prefix:"sgn"},
++"btj":{preferred:"btj",prefix:"ms"},
++"bve":{preferred:"bve",prefix:"ms"},
++"bvl":{preferred:"bvl",prefix:"sgn"},
++"bvu":{preferred:"bvu",prefix:"ms"},
++"bzs":{preferred:"bzs",prefix:"sgn"},
++"cdo":{preferred:"cdo",prefix:"zh"},
++"cds":{preferred:"cds",prefix:"sgn"},
++"cjy":{preferred:"cjy",prefix:"zh"},
++"cmn":{preferred:"cmn",prefix:"zh"},
++"coa":{preferred:"coa",prefix:"ms"},
++"cpx":{preferred:"cpx",prefix:"zh"},
++"csc":{preferred:"csc",prefix:"sgn"},
++"csd":{preferred:"csd",prefix:"sgn"},
++"cse":{preferred:"cse",prefix:"sgn"},
++"csf":{preferred:"csf",prefix:"sgn"},
++"csg":{preferred:"csg",prefix:"sgn"},
++"csl":{preferred:"csl",prefix:"sgn"},
++"csn":{preferred:"csn",prefix:"sgn"},
++"csq":{preferred:"csq",prefix:"sgn"},
++"csr":{preferred:"csr",prefix:"sgn"},
++"czh":{preferred:"czh",prefix:"zh"},
++"czo":{preferred:"czo",prefix:"zh"},
++"doq":{preferred:"doq",prefix:"sgn"},
++"dse":{preferred:"dse",prefix:"sgn"},
++"dsl":{preferred:"dsl",prefix:"sgn"},
++"dup":{preferred:"dup",prefix:"ms"},
++"ecs":{preferred:"ecs",prefix:"sgn"},
++"esl":{preferred:"esl",prefix:"sgn"},
++"esn":{preferred:"esn",prefix:"sgn"},
++"eso":{preferred:"eso",prefix:"sgn"},
++"eth":{preferred:"eth",prefix:"sgn"},
++"fcs":{preferred:"fcs",prefix:"sgn"},
++"fse":{preferred:"fse",prefix:"sgn"},
++"fsl":{preferred:"fsl",prefix:"sgn"},
++"fss":{preferred:"fss",prefix:"sgn"},
++"gan":{preferred:"gan",prefix:"zh"},
++"gds":{preferred:"gds",prefix:"sgn"},
++"gom":{preferred:"gom",prefix:"kok"},
++"gse":{preferred:"gse",prefix:"sgn"},
++"gsg":{preferred:"gsg",prefix:"sgn"},
++"gsm":{preferred:"gsm",prefix:"sgn"},
++"gss":{preferred:"gss",prefix:"sgn"},
++"gus":{preferred:"gus",prefix:"sgn"},
++"hab":{preferred:"hab",prefix:"sgn"},
++"haf":{preferred:"haf",prefix:"sgn"},
++"hak":{preferred:"hak",prefix:"zh"},
++"hds":{preferred:"hds",prefix:"sgn"},
++"hji":{preferred:"hji",prefix:"ms"},
++"hks":{preferred:"hks",prefix:"sgn"},
++"hos":{preferred:"hos",prefix:"sgn"},
++"hps":{preferred:"hps",prefix:"sgn"},
++"hsh":{preferred:"hsh",prefix:"sgn"},
++"hsl":{preferred:"hsl",prefix:"sgn"},
++"hsn":{preferred:"hsn",prefix:"zh"},
++"icl":{preferred:"icl",prefix:"sgn"},
++"ils":{preferred:"ils",prefix:"sgn"},
++"inl":{preferred:"inl",prefix:"sgn"},
++"ins":{preferred:"ins",prefix:"sgn"},
++"ise":{preferred:"ise",prefix:"sgn"},
++"isg":{preferred:"isg",prefix:"sgn"},
++"isr":{preferred:"isr",prefix:"sgn"},
++"jak":{preferred:"jak",prefix:"ms"},
++"jax":{preferred:"jax",prefix:"ms"},
++"jcs":{preferred:"jcs",prefix:"sgn"},
++"jhs":{preferred:"jhs",prefix:"sgn"},
++"jls":{preferred:"jls",prefix:"sgn"},
++"jos":{preferred:"jos",prefix:"sgn"},
++"jsl":{preferred:"jsl",prefix:"sgn"},
++"jus":{preferred:"jus",prefix:"sgn"},
++"kgi":{preferred:"kgi",prefix:"sgn"},
++"knn":{preferred:"knn",prefix:"kok"},
++"kvb":{preferred:"kvb",prefix:"ms"},
++"kvk":{preferred:"kvk",prefix:"sgn"},
++"kvr":{preferred:"kvr",prefix:"ms"},
++"kxd":{preferred:"kxd",prefix:"ms"},
++"lbs":{preferred:"lbs",prefix:"sgn"},
++"lce":{preferred:"lce",prefix:"ms"},
++"lcf":{preferred:"lcf",prefix:"ms"},
++"liw":{preferred:"liw",prefix:"ms"},
++"lls":{preferred:"lls",prefix:"sgn"},
++"lsg":{preferred:"lsg",prefix:"sgn"},
++"lsl":{preferred:"lsl",prefix:"sgn"},
++"lso":{preferred:"lso",prefix:"sgn"},
++"lsp":{preferred:"lsp",prefix:"sgn"},
++"lst":{preferred:"lst",prefix:"sgn"},
++"lsy":{preferred:"lsy",prefix:"sgn"},
++"ltg":{preferred:"ltg",prefix:"lv"},
++"lvs":{preferred:"lvs",prefix:"lv"},
++"lzh":{preferred:"lzh",prefix:"zh"},
++"max":{preferred:"max",prefix:"ms"},
++"mdl":{preferred:"mdl",prefix:"sgn"},
++"meo":{preferred:"meo",prefix:"ms"},
++"mfa":{preferred:"mfa",prefix:"ms"},
++"mfb":{preferred:"mfb",prefix:"ms"},
++"mfs":{preferred:"mfs",prefix:"sgn"},
++"min":{preferred:"min",prefix:"ms"},
++"mnp":{preferred:"mnp",prefix:"zh"},
++"mqg":{preferred:"mqg",prefix:"ms"},
++"mre":{preferred:"mre",prefix:"sgn"},
++"msd":{preferred:"msd",prefix:"sgn"},
++"msi":{preferred:"msi",prefix:"ms"},
++"msr":{preferred:"msr",prefix:"sgn"},
++"mui":{preferred:"mui",prefix:"ms"},
++"mzc":{preferred:"mzc",prefix:"sgn"},
++"mzg":{preferred:"mzg",prefix:"sgn"},
++"mzy":{preferred:"mzy",prefix:"sgn"},
++"nan":{preferred:"nan",prefix:"zh"},
++"nbs":{preferred:"nbs",prefix:"sgn"},
++"ncs":{preferred:"ncs",prefix:"sgn"},
++"nsi":{preferred:"nsi",prefix:"sgn"},
++"nsl":{preferred:"nsl",prefix:"sgn"},
++"nsp":{preferred:"nsp",prefix:"sgn"},
++"nsr":{preferred:"nsr",prefix:"sgn"},
++"nzs":{preferred:"nzs",prefix:"sgn"},
++"okl":{preferred:"okl",prefix:"sgn"},
++"orn":{preferred:"orn",prefix:"ms"},
++"ors":{preferred:"ors",prefix:"ms"},
++"pel":{preferred:"pel",prefix:"ms"},
++"pga":{preferred:"pga",prefix:"ar"},
++"pks":{preferred:"pks",prefix:"sgn"},
++"prl":{preferred:"prl",prefix:"sgn"},
++"prz":{preferred:"prz",prefix:"sgn"},
++"psc":{preferred:"psc",prefix:"sgn"},
++"psd":{preferred:"psd",prefix:"sgn"},
++"pse":{preferred:"pse",prefix:"ms"},
++"psg":{preferred:"psg",prefix:"sgn"},
++"psl":{preferred:"psl",prefix:"sgn"},
++"pso":{preferred:"pso",prefix:"sgn"},
++"psp":{preferred:"psp",prefix:"sgn"},
++"psr":{preferred:"psr",prefix:"sgn"},
++"pys":{preferred:"pys",prefix:"sgn"},
++"rms":{preferred:"rms",prefix:"sgn"},
++"rsi":{preferred:"rsi",prefix:"sgn"},
++"rsl":{preferred:"rsl",prefix:"sgn"},
++"sdl":{preferred:"sdl",prefix:"sgn"},
++"sfb":{preferred:"sfb",prefix:"sgn"},
++"sfs":{preferred:"sfs",prefix:"sgn"},
++"sgg":{preferred:"sgg",prefix:"sgn"},
++"sgx":{preferred:"sgx",prefix:"sgn"},
++"shu":{preferred:"shu",prefix:"ar"},
++"slf":{preferred:"slf",prefix:"sgn"},
++"sls":{preferred:"sls",prefix:"sgn"},
++"sqk":{preferred:"sqk",prefix:"sgn"},
++"sqs":{preferred:"sqs",prefix:"sgn"},
++"ssh":{preferred:"ssh",prefix:"ar"},
++"ssp":{preferred:"ssp",prefix:"sgn"},
++"ssr":{preferred:"ssr",prefix:"sgn"},
++"svk":{preferred:"svk",prefix:"sgn"},
++"swc":{preferred:"swc",prefix:"sw"},
++"swh":{preferred:"swh",prefix:"sw"},
++"swl":{preferred:"swl",prefix:"sgn"},
++"syy":{preferred:"syy",prefix:"sgn"},
++"tmw":{preferred:"tmw",prefix:"ms"},
++"tse":{preferred:"tse",prefix:"sgn"},
++"tsm":{preferred:"tsm",prefix:"sgn"},
++"tsq":{preferred:"tsq",prefix:"sgn"},
++"tss":{preferred:"tss",prefix:"sgn"},
++"tsy":{preferred:"tsy",prefix:"sgn"},
++"tza":{preferred:"tza",prefix:"sgn"},
++"ugn":{preferred:"ugn",prefix:"sgn"},
++"ugy":{preferred:"ugy",prefix:"sgn"},
++"ukl":{preferred:"ukl",prefix:"sgn"},
++"uks":{preferred:"uks",prefix:"sgn"},
++"urk":{preferred:"urk",prefix:"ms"},
++"uzn":{preferred:"uzn",prefix:"uz"},
++"uzs":{preferred:"uzs",prefix:"uz"},
++"vgt":{preferred:"vgt",prefix:"sgn"},
++"vkk":{preferred:"vkk",prefix:"ms"},
++"vkt":{preferred:"vkt",prefix:"ms"},
++"vsi":{preferred:"vsi",prefix:"sgn"},
++"vsl":{preferred:"vsl",prefix:"sgn"},
++"vsv":{preferred:"vsv",prefix:"sgn"},
++"wuu":{preferred:"wuu",prefix:"zh"},
++"xki":{preferred:"xki",prefix:"sgn"},
++"xml":{preferred:"xml",prefix:"sgn"},
++"xmm":{preferred:"xmm",prefix:"ms"},
++"xms":{preferred:"xms",prefix:"sgn"},
++"yds":{preferred:"yds",prefix:"sgn"},
++"ysl":{preferred:"ysl",prefix:"sgn"},
++"yue":{preferred:"yue",prefix:"zh"},
++"zib":{preferred:"zib",prefix:"sgn"},
++"zlm":{preferred:"zlm",prefix:"ms"},
++"zmi":{preferred:"zmi",prefix:"ms"},
++"zsl":{preferred:"zsl",prefix:"sgn"},
++"zsm":{preferred:"zsm",prefix:"ms"},
++};
++
+

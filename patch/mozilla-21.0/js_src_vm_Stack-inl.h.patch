@@ -1,0 +1,33 @@
+--- ff-orig/mozilla-21.0/js/src/vm/Stack-inl.h	2013-05-11 14:19:36.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/vm/Stack-inl.h	2015-01-19 23:04:24.518571108 -0600
+@@ -118,6 +118,9 @@
+ 
+     if (prevfp->hasPushedSPSFrame())
+         setPushedSPSFrame();
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ }
+ 
+ inline void
+@@ -150,6 +153,9 @@
+     blockChain_= NULL;
+     JS_ASSERT(!hasBlockChain());
+     JS_ASSERT(!hasHookData());
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ 
+     initVarsToUndefined();
+ }
+@@ -171,6 +177,9 @@
+     prev_ = prev;
+     ncode_ = ncode;
+     u.nactual = nactual;
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ }
+ 
+ inline bool
+

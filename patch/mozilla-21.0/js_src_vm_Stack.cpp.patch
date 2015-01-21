@@ -1,0 +1,114 @@
+--- ff-orig/mozilla-21.0/js/src/vm/Stack.cpp	2013-05-11 14:19:36.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/vm/Stack.cpp	2015-01-20 17:35:22.831894174 -0600
+@@ -100,6 +100,9 @@
+     Debug_SetValueRangeToCrashOnTouch(&rval_, 1);
+     hookData_ = (void *)0xbad;
+ #endif
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ }
+ 
+ template <StackFrame::TriggerPostBarriers doPostBarrier>
+@@ -1044,6 +1047,19 @@
+     fp->initCallFrame(cx, *fun, script, args.length(), flags);
+     fg->regs_.prepareToRun(*fp, script);
+ 
++#ifdef TxJS
++    // Save a transaction that is in the process of suspending, so that
++    // we can automatically resume it when this frame returns.
++    TxContext *tx = cx->getSuspendingTx();
++    if (tx) {
++        JS_ASSERT(!fp->suspendedTx());
++        // Advance the transaction state.
++        JS_ASSERT(tx->inState(TX_SUSPEND0 | TX_END0));
++        tx->advanceState();
++        fp->setSuspendedTx(tx);
++    }
++#endif
++
+     fg->prevRegs_ = seg_->pushRegs(fg->regs_);
+     JS_ASSERT(space().firstUnused() == fg->regs_.sp);
+     fg->setPushed(*this);
+@@ -1121,6 +1137,18 @@
+     fp->initVarsToUndefined();
+     efg->regs_.prepareToRun(*fp, script);
+ 
++#ifdef TxJS
++    // Save a transaction that is in the process of suspending, so that
++    // we can automatically resume it when this frame returns.
++    TxContext *tx = cx->getSuspendingTx();
++    if (tx) {
++        JS_ASSERT(!fp->suspendedTx());
++        JS_ASSERT(tx->inState(TX_SUSPEND0 | TX_END0));
++        tx->advanceState();
++        fp->setSuspendedTx(tx);
++    }
++#endif
++
+     /* pushRegs() below links the prev-frame; manually link the prev-call. */
+     if (evalInFrame && evalInFrameCalls)
+         seg_->pointAtCall(*evalInFrameCalls);
+@@ -1170,6 +1198,51 @@
+ 
+     Value *oldend = seg_->end();
+ 
++#ifdef TxJS
++    /*
++    if (fg.prevRegs_) {
++        StackFrame *fp = fg.prevRegs_->fp();
++        if (fp) {
++            TxContext::clearFrameLocals(cx_, fp);
++            TxContext *tx = fp->suspendedTx();
++            if (tx) {
++                JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
++                // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
++                tx->advanceState();
++                fp->setSuspendedTx(NULL);
++
++                // Perform actions prior to popping based on suspend type.
++                // %%% Necessary?
++                if (tx->inState(TX_RESUME)) {
++                    switch (tx->getSuspend()->type) {
++                      case AX_WRITE:
++                      case AX_CALL:
++                        // Push the return value of the handler frame.
++                        fp->setReturnValue(tx->getReturnValue());
++                        break;
++                      default:
++                        break;
++                    }
++                }
++
++                if (tx && tx->inState(TX_RESUME | TX_DONE)) {
++                    // An exception occurred within a transaction handler.
++                    // %%% Always true here?
++                    // If the transaction was suspended, we need to restart
++                    // it here.
++                    if (tx->inState(TX_RESUME)) {
++                        // TX_RESUME -> TX_RUNNING
++                        tx->advanceState();
++                    }
++                    // %%% Only do this for TX_RESUME case also?
++                    //tx = cx_->setTxContext(tx);
++                }
++            }
++        }
++    }
++    */
++#endif
++
+     seg_->popRegs(fg.prevRegs_);
+     if (fg.pushedSeg_)
+         popSegment();
+@@ -1301,6 +1374,9 @@
+ void
+ StackIter::popCall()
+ {
++#ifdef TxJS
++    JS_ASSERT(!data_.fp_ || !data_.fp_->suspendedTx());
++#endif
+     DebugOnly<CallArgsList*> oldCall = data_.calls_;
+     JS_ASSERT(data_.seg_->contains(oldCall));
+     data_.calls_ = data_.calls_->prev();
+

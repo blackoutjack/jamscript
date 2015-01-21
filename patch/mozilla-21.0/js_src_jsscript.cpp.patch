@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-21.0/js/src/jsscript.cpp	2013-05-11 14:19:34.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/jsscript.cpp	2015-01-19 22:17:57.002652611 -0600
+@@ -1747,6 +1747,10 @@
+     script->sourceEnd = bufEnd;
+     script->userBit = options.userBit;
+ 
++#ifdef TxJS
++    script->setIntrospector(UndefinedValue());
++#endif
++
+     return script;
+ }
+ 
+@@ -2440,6 +2444,9 @@
+     dst->hasSingletons = src->hasSingletons;
+     dst->isGenerator = src->isGenerator;
+     dst->isGeneratorExp = src->isGeneratorExp;
++#ifdef TxJS
++    dst->setIntrospector(src->getIntrospector());
++#endif
+ 
+     /*
+      * initScriptCounts updates scriptCountsMap if necessary. The other script
+

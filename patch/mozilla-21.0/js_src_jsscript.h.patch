@@ -1,0 +1,30 @@
+--- ff-orig/mozilla-21.0/js/src/jsscript.h	2013-05-11 14:19:34.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/jsscript.h	2015-01-19 22:17:57.002652611 -0600
+@@ -53,6 +53,9 @@
+     JSTRY_CATCH,
+     JSTRY_FINALLY,
+     JSTRY_ITER
++#ifdef TxJS
++    ,JSTRY_TX
++#endif
+ } JSTryNoteKind;
+ 
+ /*
+@@ -374,6 +377,16 @@
+     /* Persistent type information retained across GCs. */
+     js::types::TypeScript *types;
+ 
++#ifdef TxJS
++  private:
++    js::Value introspector_;
++  public:
++    inline const js::Value getIntrospector() { return introspector_; }
++    inline void setIntrospector(const js::Value &ispect) {
++        introspector_ = ispect;
++    }
++#endif
++
+   private:
+     js::ScriptSource *scriptSource_; /* source code */
+ #ifdef JS_METHODJIT
+

@@ -1,0 +1,245 @@
+--- ff-orig/mozilla-21.0/js/src/jsinterpinlines.h	2013-05-11 14:19:34.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/jsinterpinlines.h	2015-01-20 20:38:38.455684160 -0600
+@@ -17,6 +17,10 @@
+ #include "jsnum.h"
+ #include "jsprobes.h"
+ #include "jsstr.h"
++#ifdef TxJS
++#include "jsmath.h"
++#include "jstransaction.h"
++#endif
+ 
+ #include "methodjit/MethodJIT.h"
+ #include "vm/ForkJoin.h"
+@@ -128,6 +132,34 @@
+     return vp->isMagic(JS_OPTIMIZED_ARGUMENTS);
+ }
+ 
++#ifdef TxJS
++static inline bool
++IsSuspendingFunction(JSContext *cx, Value &calleev, JSFunction **fun) {
++    if (!calleev.isObject())
++        return false;
++    JSObject &callee = calleev.toObject();
++    if (!callee.isFunction())
++        return false;
++
++    *fun = callee.toFunction();
++
++    // We want to suspend on the unbound version.
++    if ((*fun)->isBoundFunction())
++        return false;
++
++    if ((*fun)->isNative()) {
++        // Implement whitelisting.
++        if ((*fun)->noSuspend())
++            return false;
++        if ((*fun)->native() == js_Array)
++            return false;
++        // Suspend on all (unwhitelisted) native calls.
++        return true;
++    }
++    return false;
++}
++#endif
++
+ /*
+  * One optimized consumer of MagicValue(JS_OPTIMIZED_ARGUMENTS) is f.apply.
+  * However, this speculation must be guarded before calling 'apply' in case it
+@@ -295,7 +327,6 @@
+         if (!GetPropertyHelper(cx, nobj, id, JSGET_CACHE_RESULT, vp))
+             return false;
+     }
+-
+ #if JS_HAS_NO_SUCH_METHOD
+     if (op == JSOP_CALLPROP &&
+         JS_UNLIKELY(vp.isPrimitive()) &&
+@@ -404,6 +435,20 @@
+         if (!NativeGet(cx, normalized, obj2, shape, 0, vp))
+             return false;
+     }
++
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        // Update the already-created read set node to reflect the value
++        // and the scope in which it was found.
++        //node->obj = pobj.get();
++        // Add the property to the read set, with the head of the scope
++        // chain as the object, and an undefined value.
++        // %%% Need to root?
++        tx->recordAction(cx, obj.get(), NameToId(name), vp, AX_READ);
++    }
++#endif
++
+     return true;
+ }
+ 
+@@ -452,9 +497,39 @@
+ 
+     Shape *shape = NULL;
+     JSObject *scope = NULL, *pobj = NULL;
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        // %%% Don't really need to root these.
++        RootedPropertyName rootname(cx, name);
++        RootedObject rootobj(cx, obj);
++        RootedObject rootscope(cx, scope);
++        RootedObject rootpobj(cx, pobj);
++        if (tx->lookupName(cx, rootname, rootobj, &rootscope, &rootpobj, vp)) {
++            // Return the value previously assigned to the name.
++            return true;
++        }
++    }
++#endif
+     if (LookupNameNoGC(cx, name, obj, &scope, &pobj, &shape)) {
++#ifdef TxJS
++        if (!FetchNameNoGC(pobj, shape, vp))
++            return false;
++        TxContext *tx = cx->getRunningTx();
++        if (tx) {
++            // Update the already-created read set node to reflect the value
++            // and the scope in which it was found.
++            //node->obj = pobj.get();
++            // Add the property to the read set, with the head of the scope
++            // chain as the object, and an undefined value.
++            // %%% Need to root?
++            tx->recordAction(cx, obj, NameToId(name), vp, AX_READ);
++        }
++        return true;
++#else
+         if (FetchNameNoGC(pobj, shape, vp))
+             return true;
++#endif
+     }
+ 
+     RootedObject objRoot(cx, obj), scopeRoot(cx), pobjRoot(cx);
+@@ -742,6 +817,10 @@
+ GetObjectElementOperation(JSContext *cx, JSOp op, JSObject *objArg, bool wasObject,
+                           HandleValue rref, MutableHandleValue res)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    RootedId id(cx);
++#endif
+     do {
+         // Don't call GetPcScript (needed for analysis) from inside Ion since it's expensive.
+         bool analyze = !cx->fp()->beginsIonActivation();
+@@ -757,6 +836,14 @@
+                     script->analysis()->getCode(pc).nonNativeGetElement = true;
+             }
+ 
++#ifdef TxJS begin
++            IndexToId(cx, index, &id);
++            if (tx) {
++                RootedObject robj(cx, objArg);
++                if (tx->getProperty(cx, robj, id.get(), res))
++                    break;
++            }
++#endif
+             if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
+                 break;
+ 
+@@ -795,6 +882,14 @@
+ 
+         JSAtom *name = ToAtom<NoGC>(cx, rref);
+         if (name) {
++#ifdef TxJS
++            id = AtomToId(name);
++            if (tx) {
++                RootedObject robj(cx, objArg);
++                if (tx->getProperty(cx, robj, id.get(), res))
++                    break;
++            }
++#endif
+             if (name->isIndex(&index)) {
+                 if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
+                     break;
+@@ -810,6 +905,13 @@
+         if (!name)
+             return false;
+ 
++#ifdef TxJS
++        id = AtomToId(name);
++        if (tx) {
++            if (tx->getProperty(cx, obj, id, res))
++                break;
++        }
++#endif
+         if (name->isIndex(&index)) {
+             if (!JSObject::getElement(cx, obj, obj, index, res))
+                 return false;
+@@ -821,6 +923,12 @@
+         objArg = obj;
+     } while (0);
+ 
++#ifdef TxJS
++    if (tx) {
++        RootedObject robj(cx, objArg);
++        tx->recordAction(cx, robj, id.get(), res.get(), AX_READ);
++    }
++#endif
+ #if JS_HAS_NO_SUCH_METHOD
+     if (op == JSOP_CALLELEM && JS_UNLIKELY(res.isPrimitive()) && wasObject) {
+         RootedObject obj(cx, objArg);
+@@ -854,6 +962,9 @@
+             return false;
+ 
+         lref.set(ObjectValue(frame.argsObj()));
++#ifdef TxJS
++        // %%% Record
++#endif
+     }
+ 
+     return true;
+@@ -874,6 +985,10 @@
+             if (!str)
+                 return false;
+             res.setString(str);
++            // %%% Record this
++            //jsid id;
++            //IndexToId(cx, i, &id);
++            //tx->recordAction(cx, StringObject(fullstr), id, res.get(), AX_READ);
+             return true;
+         }
+     }
+@@ -898,6 +1013,9 @@
+     RootedScript script(cx, maybeScript);
+     types::TypeScript::MonitorAssign(cx, obj, id);
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++#endif
+     if (obj->isArray() && JSID_IS_INT(id)) {
+         uint32_t length = obj->getDenseInitializedLength();
+         int32_t i = JSID_TO_INT(id);
+@@ -911,6 +1029,9 @@
+                 if (!script)
+                     types::TypeScript::GetPcScript(cx, script.address(), &pc);
+ 
++#ifdef TxJS
++                // %%% Interpose here?
++#endif
+                 if (script->hasAnalysis())
+                     script->analysis()->getCode(pc).arrayWriteHole = true;
+             }
+@@ -918,6 +1039,17 @@
+     }
+ 
+     RootedValue tmp(cx, value);
++#ifdef TxJS
++#ifdef TxJS_ITYPE
++    if (tx && (tx->itypes_ & AX_WRITE))
++#else
++    if (tx)
++#endif
++    {
++        tx->recordAction(cx, obj, id, value, AX_WRITE);
++        return true;
++    }
++#endif
+     return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
+ }
+ 
+

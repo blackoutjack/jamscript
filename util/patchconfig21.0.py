@@ -1,7 +1,7 @@
 
-ORIGDIR = "ff-orig/mozilla-20.0.1"
-DEVDIR = "ff-dev/mozilla-20.0.1"
-PATCHDIR = "patch/mozilla-20.0.1"
+ORIGDIR = "ff-orig/mozilla-21.0"
+DEVDIR = "ff-dev/mozilla-21.0"
+PATCHDIR = "patch/mozilla-21.0"
 IGNORE_BINARY = True
 EXCLUSIONS = [
   '_virtualenv',

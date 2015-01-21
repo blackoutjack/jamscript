@@ -1,0 +1,15 @@
+--- ff-orig/mozilla-21.0/js/src/jsstr.cpp	2013-05-11 14:19:34.000000000 -0500
++++ ff-dev/mozilla-21.0/js/src/jsstr.cpp	2015-01-19 22:17:57.014652610 -0600
+@@ -3438,7 +3438,11 @@
+ }
+ 
+ static JSFunctionSpec string_static_methods[] = {
++#ifdef TxJS
++    JS_FN("fromCharCode", js::str_fromCharCode, 1, JSFUN_TX_NOSUSPEND),
++#else
+     JS_FN("fromCharCode", js::str_fromCharCode, 1, 0),
++#endif
+     JS_FS_END
+ };
+ 
+
