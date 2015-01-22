@@ -1,0 +1,55 @@
+--- ff-orig/mozilla-23.0.1/js/src/ion/Ion.cpp	2013-08-14 08:49:30.000000000 -0500
++++ ff-dev/mozilla-23.0.1/js/src/ion/Ion.cpp	2015-01-21 17:43:29.773465227 -0600
+@@ -1638,6 +1638,12 @@
+         return Method_Skipped;
+ 
+     // Mark as forbidden if frame can't be handled.
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     if (!CheckFrame(fp)) {
+         ForbidCompilation(cx, script);
+         return Method_CantCompile;
+@@ -1701,6 +1707,12 @@
+     }
+ 
+     // Mark as forbidden if frame can't be handled.
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     if (!CheckFrame(fp)) {
+         ForbidCompilation(cx, script);
+         return Method_CantCompile;
+@@ -1730,6 +1742,12 @@
+     JS_ASSERT(fp.isFunctionFrame());
+ 
+     // Mark as forbidden if frame can't be handled.
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     if (!CheckFrame(fp)) {
+         ForbidCompilation(cx, script);
+         return Method_CantCompile;
+@@ -1906,6 +1924,12 @@
+ ion::CanEnterUsingFastInvoke(JSContext *cx, HandleScript script, uint32_t numActualArgs)
+ {
+     JS_ASSERT(ion::IsEnabled(cx));
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+ 
+     // Skip if the code is expected to result in a bailout.
+     if (!script->hasIonScript() || script->ionScript()->bailoutExpected())
+

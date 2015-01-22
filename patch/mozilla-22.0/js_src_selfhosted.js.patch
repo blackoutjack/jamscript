@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/selfhosted.js	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-22.0/js/src/selfhosted.js	2015-01-20 23:48:42.323350730 -0600
++++ ff-dev/mozilla-22.0/js/src/selfhosted.js	2015-01-21 09:13:57.350359113 -0600
 @@ -0,0 +1,3778 @@
 +
 +

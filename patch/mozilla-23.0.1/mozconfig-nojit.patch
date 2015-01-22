@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-23.0.1/mozconfig-nojit	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-23.0.1/mozconfig-nojit	2015-01-21 08:54:52.566392584 -0600
+@@ -0,0 +1,17 @@
++# Use pound sign for comments.
++ac_add_options --enable-application=browser
++#ac_add_options --enable-debug
++#ac_add_options --disable-optimize
++#ac_add_options --enable-optimize="-O3 -fno-omit-frame-pointer"
++#ac_add_options --enable-optimize="-O3"
++ac_add_options --disable-methodjit
++ac_add_options --disable-methodjit-spew
++ac_add_options --disable-tracejit
++ac_add_options --disable-jit
++#ac_add_options --enable-vtune
++#ac_add_options --enable-jprof
++#mk_add_options -DLDFLAGS=-lprofiler
++#mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-@CONFIG_GUESS@
++mk_add_options MOZ_OBJDIR=obj-nojit
++mk_add_options MOZ_BUILD_PROJECTS="browser"
++mk_add_options MOZ_MAKE_FLAGS="-j4"
+

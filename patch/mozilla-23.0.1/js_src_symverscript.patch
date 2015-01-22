@@ -1,0 +1,7 @@
+--- ff-orig/mozilla-23.0.1/js/src/symverscript	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-23.0.1/js/src/symverscript	2015-01-21 10:26:34.306231723 -0600
+@@ -0,0 +1,3 @@
++mozjs_23.0 {
++    global: *;
++};
+

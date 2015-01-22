@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsscript.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsscript.cpp	2015-01-20 21:57:07.103546487 -0600
++++ ff-dev/mozilla-22.0/js/src/jsscript.cpp	2015-01-21 09:13:57.274359115 -0600
 @@ -1682,6 +1682,10 @@
      script->sourceEnd = bufEnd;
      script->userBit = options.userBit;

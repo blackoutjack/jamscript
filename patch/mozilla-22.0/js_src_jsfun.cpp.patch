@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsfun.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsfun.cpp	2015-01-20 22:31:17.487486537 -0600
++++ ff-dev/mozilla-22.0/js/src/jsfun.cpp	2015-01-21 09:13:57.170359118 -0600
 @@ -682,7 +682,9 @@
          // Functions created with the constructor should not be using the
          // expression body extension.

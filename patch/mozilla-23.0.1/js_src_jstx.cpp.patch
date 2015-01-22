@@ -1,0 +1,747 @@
+--- ff-orig/mozilla-23.0.1/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-23.0.1/js/src/jstx.cpp	2015-01-21 10:21:03.666241390 -0600
+@@ -0,0 +1,743 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#include "jsversion.h"
++#ifdef TxJS
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>     /* for memcpy */
++#include "jscntxt.h"
++#include "jsfun.h"
++#include "jsscriptinlines.h"
++#include "jsinterpinlines.h"
++#include "jsjam.h"
++
++using namespace js;
++
++// TxContext methods
++
++TxContext *
++TxContext::initTx(JSContext *cx, TxContext *tx, const Value &handler)
++{
++    // Since we only maintain one stack of transactions, push onto the
++    // top, regardless of whether the current top tx is running.
++    TxContext *parent = cx->getTxContext();
++
++    // %%% Replace with constructor call.
++    //TxContext *tx = (TxContext*)cx->malloc_(sizeof(TxContext));
++    //memset(tx, 0, sizeof(TxContext));
++
++    tx->state_ = TX_INIT;
++    tx->seq_ = NULL;
++    tx->seqsize_ = 0;
++    tx->capacity_ = 0;
++#ifdef TxJS_PROFILE_ACTIONS
++    tx->writesize_ = 0;
++    tx->readsize_ = 0;
++    tx->callsize_ = 0;
++    tx->deletesize_ = 0;
++    tx->forinsize_ = 0;
++#endif
++#ifdef TxJS_HASH
++    tx->values_ = NULL;
++#endif
++
++    tx->suspend_.active = false;
++    tx->retval_ = JSVAL_VOID;
++    tx->next_ = parent;
++    tx->handler_ = handler;
++
++#ifdef TxJS_ITYPE
++    tx->itypes_ = AX_ANY;
++    JSObject *irawobj = &handler.toObject();
++    cx->compartment->wrap(cx, &irawobj);
++    RootedObject iobj(cx, irawobj);
++    RootedValue itype(cx);
++    bool hasItype = JSObject::getProperty(cx, iobj, iobj, cx->runtime->atomState.itypeAtom, &itype);
++    if (hasItype) {
++        if (itype.isString()) {
++            JSString *itypestr = itype.toString();
++            bool res;
++            EqualStrings(cx, itypestr, cx->runtime->atomState.callAtom, &res);
++            if (res) {
++                //fprintf(stderr, "SETTING AX_CALL\n");
++#ifdef TxJS_ITYPE_MOD
++                tx->itypes_ = AX_CALL; 
++#else
++                tx->itypes_ = AX_CALL | AX_MODIFY;
++#endif
++            } else {
++                EqualStrings(cx, itypestr, cx->runtime->atomState.readAtom, &res);
++                if (res) {
++                  //fprintf(stderr, "SETTING AX_READ\n");
++#ifdef TxJS_ITYPE_MOD
++                  tx->itypes_ = AX_READ; 
++#else
++                  tx->itypes_ = AX_READ | AX_MODIFY;
++#endif
++                } else {
++                    EqualStrings(cx, itypestr, cx->runtime->atomState.writeAtom, &res);
++                    if (res) {
++                      //fprintf(stderr, "SETTING AX_WRITE\n");
++                      tx->itypes_ = AX_WRITE; 
++#ifdef TxJS_ITYPE_MOD
++                      tx->itypes_ = AX_WRITE; 
++#else
++                      tx->itypes_ = AX_MODIFY;
++#endif
++                    }
++                }
++            }
++        }
++    }
++#endif
++
++    return tx;
++}
++
++void
++TxContext::setState(TxState newstate)
++{
++    JS_ASSERT_IF(newstate & (TX_ENDING | TX_SUSPENDING), state_ == TX_RUNNING);
++    state_ = newstate;
++}
++
++void
++TxContext::advanceState()
++{
++    switch (state_) {
++      case TX_INIT:
++        state_ = TX_RUNNING;
++        break;
++      case TX_SUSPENDING:
++        state_ = TX_SUSPEND0;
++        break;
++      case TX_SUSPEND0:
++        state_ = TX_SUSPEND1;
++        break;
++      case TX_SUSPEND1:
++        state_ = TX_RESUME;
++        break;
++      case TX_RESUME:
++        state_ = TX_RUNNING;
++        break;
++      case TX_ENDING:
++        state_ = TX_END0;
++        break;
++      case TX_END0:
++        state_ = TX_END1;
++        break;
++      case TX_END1:
++        state_ = TX_DONE;
++        break;
++      default:
++        // Only the states above have a logical successor.
++        JS_ASSERT(false);
++    }
++}
++
++void
++TxContext::finish(JSContext *cx) {
++    //this->clear(cx);
++
++#ifdef TxJS_HASH
++    if (values_ != NULL) {
++        values_->finish();
++        delete values_;
++    }
++#endif
++
++    if (seq_ != NULL) {
++        free(seq_);
++        seq_ = NULL;
++        seqsize_ = 0;
++        capacity_ = 0;
++#ifdef TxJS_PROFILE_ACTIONS
++        writesize_ = 0;
++        readsize_ = 0;
++        callsize_ = 0;
++        deletesize_ = 0;
++        forinsize_ = 0;
++#endif
++    }
++    suspend_.active = false;
++}
++
++// Clear accumulated data from the transaction.
++void
++TxContext::clear(JSContext *cx) {
++#ifdef TxJS_HASH
++    if (values_ != NULL) {
++        values_->clear();
++    }
++#endif
++
++    if (seq_ != NULL) {
++        free(seq_);
++        seq_ = NULL;
++        seqsize_ = 0;
++        capacity_ = 0;
++#ifdef TxJS_PROFILE_ACTIONS
++        writesize_ = 0;
++        readsize_ = 0;
++        callsize_ = 0;
++        deletesize_ = 0;
++        forinsize_ = 0;
++#endif
++    }
++    suspend_.active = false;
++}
++
++
++JSBool
++TxContext::recordSuspend(JSContext *cx, const CallArgs *args, bool construct)
++{
++    // Invariant: only the topmost running transaction can suspend.
++    JS_ASSERT(this == cx->getRunningTx());
++    //if (suspend_ != NULL) {
++    //  free(suspend_);
++    //}
++
++    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
++    init_action(cx, &suspend_, args, construct);
++
++    // Clear the return value.
++    setReturnValue(JSVAL_VOID);
++
++#ifdef TxJS_PROFILE_ACTIONS
++    ++callsize_;
++#endif
++    return JS_TRUE;
++}
++
++JSBool
++TxContext::recordAction(JSContext *cx, const CallArgs *args, bool construct)
++{
++#ifdef TxJS_ITYPE
++    if (!(itypes_ & AX_CALL)) {
++      //fprintf(stderr, "SKIPPING CALL\n");
++      return JS_FALSE;
++    }
++#endif
++    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
++    TxAction *act = expandSequence(cx);
++    init_action(cx, act, args, construct);
++    //seq_ = append_action(seq_, act);
++#ifdef TxJS_PROFILE_ACTIONS
++    ++callsize_;
++#endif
++    return JS_TRUE;
++}
++
++JSBool
++TxContext::recordSuspend(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
++{
++    // Invariant: only the topmost running transaction can suspend.
++    JS_ASSERT(this == cx->getRunningTx());
++    /*
++    if (suspend_ != NULL) {
++      free(suspend_);
++    }
++    */
++
++    // Unwrap objects from their proxy to match consistently later.
++    // The second condition is because of some weird CSS objects that
++    // are proxies without being a proxy to anything.
++    // (Test case: colorpicker.preprocessed.modular.js).
++    while (IsProxy(obj) && GetProxyPrivate(obj).isObjectOrNull()) {
++      obj = GetProxyTargetObject(obj);
++    }
++
++    // Cases other than array length/indices come straight here.
++    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
++    init_action(cx, &suspend_, obj, id, val, type);
++#ifdef TxJS_PROFILE_ACTIONS
++    switch (type) {
++      case AX_WRITE: ++writesize_; break;
++      case AX_READ: ++readsize_; break;
++      case AX_DELETE: ++deletesize_; break;
++      case AX_FORIN: ++forinsize_; break;
++      default: JS_ASSERT(false);
++    }
++#endif
++
++    // Clear the return value.
++    setReturnValue(JSVAL_VOID);
++
++    return JS_TRUE;
++}
++
++JSBool
++TxContext::recordAction(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
++{
++#ifdef TxJS_ITYPE
++    if (!(itypes_ & type)) {
++      //fprintf(stderr, "SKIPPING TYPE: %x\n", type);
++      return JS_FALSE;
++    }
++#endif
++    // Unwrap objects from their proxy to match consistently later.
++    // The second condition is because of some weird CSS objects that
++    // are proxies without being a proxy to anything.
++    // (Test case: colorpicker.preprocessed.modular.js).
++    while (IsProxy(obj) && GetProxyPrivate(obj).isObjectOrNull()) {
++        obj = GetProxyTargetObject(obj);
++    }
++
++    if ((type & AX_MODIFY) && values_ == NULL) {
++        values_ = new Values(TempAllocPolicy(cx));
++        values_->init(4);
++        if (!values_->initialized()) {
++            fprintf(stderr, "ERROR: could not initialize |values_| hash set");
++            return JS_FALSE;
++        }
++    }
++
++    if ((type & AX_WRITE) && obj && obj->isArray()) {
++        // For an assignment to an array's |length| property, we need to
++        // add nodes signifying an implicit delete of any elements < the
++        // old length but >= the new length.
++        jsid lenId = AtomToId(cx->names().length);
++        if (id == lenId) {
++            uint32_t len;
++            double d;
++            // If |ToNumber| returns false (i.e. if the value is
++            // not convertible to a number) or the subsequent checks
++            // fail, the write would have
++            // failed. See jsarray.cpp:array_length_setter.
++            if (!ToUint32(cx, val, &len))
++                return JS_FALSE;
++            if (!ToNumber(cx, val, &d))
++                return JS_FALSE;
++            if (d != len) {
++                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
++                return JS_FALSE; 
++            }
++            
++            // Get the current length.
++            uint32_t curLen = getArrayLength(cx, HandleObject::fromMarkedLocation(&obj));
++            // Gotta be careful about wrap-around here.
++            int64_t idx = ((int64_t)curLen) - 1;
++            int64_t ilen = (int64_t)len;
++            for (; idx>=ilen; idx--) {
++                // %%% Could be more efficient for degenerate cases.
++                //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
++                TxAction *addl = expandSequence(cx);
++                jsid addlid = INT_TO_JSID(idx);
++                RootedValue holeVal(cx);
++                holeVal.setMagic(JS_ELEMENTS_HOLE);
++                init_action(cx, addl, obj, addlid, holeVal, AX_DELETE);
++                //seq_ = append_action(seq_, act);
++#ifdef TxJS_PROFILE_ACTIONS
++                ++deletesize_;
++#endif
++#ifdef TxJS_HASH
++                values_->put(addl->prop, addl->value);
++#endif
++            }
++        } else {
++            // Conversely, if the array is extended by writing to an
++            // index >= to the current length, add an implicit write
++            // to the length property.
++            uint32_t idx;
++            if (js_IdIsIndex(id, &idx)) {
++                uint32_t curLen = getArrayLength(cx, HandleObject::fromMarkedLocation(&obj));
++                if (idx >= curLen) {
++                    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
++                    TxAction *addl = expandSequence(cx);
++                    init_action(cx, addl, obj, lenId, NumberValue(idx + 1), AX_WRITE);    
++                    //seq_ = append_action(seq_, act);
++#ifdef TxJS_PROFILE_ACTIONS
++                    ++writesize_;
++#endif
++#ifdef TxJS_HASH
++                    values_->put(addl->prop, addl->value);
++#endif
++                }
++            }
++        }
++    }
++
++    // Cases other than array length/indices come straight here.
++    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
++    TxAction *act = expandSequence(cx);
++    init_action(cx, act, obj, id, val, type);
++    //seq_ = append_action(seq_, act);
++#ifdef TxJS_PROFILE_ACTIONS
++    switch (type) {
++        case AX_WRITE: ++writesize_; break;
++        case AX_READ: ++readsize_; break;
++        case AX_DELETE: ++deletesize_; break;
++        case AX_FORIN: ++forinsize_; break;
++        default: JS_ASSERT(false);
++    }
++#endif
++
++#ifdef TxJS_HASH
++    if (act->type & AX_MODIFY) {
++        values_->put(act->prop, act->value);
++    }
++#endif
++    return JS_TRUE;
++}
++
++JSBool
++TxContext::lookupProperty(JSContext *cx, HandleObject obj, jsid id, MutableHandleObject pobj, MutableHandleValue vp)
++{
++    pobj.set(obj);
++    // Search starting with obj and following the prototype chain.
++    while (pobj != NULL) {
++        // |getProperty| searches the whole transaction chain.
++        if (getProperty(cx, pobj, id, vp)) {
++            return JS_TRUE;
++        }
++        // %%% Lookup the |__proto__| member in the transaction!
++        pobj.set(pobj->getProto());
++    }
++    return JS_FALSE;
++}
++
++JSBool
++TxContext::getProperty(JSContext *cx, HandleObject obj, jsid id, MutableHandleValue vp)
++{
++#ifdef TxJS_PROFILE_ACTIONS
++    uint32_t missCount = 0;
++#endif
++    TxContext *tx = this;
++    while (tx != NULL) {
++#ifdef TxJS_ITYPE
++        if (!(tx->itypes_ & AX_MODIFY)) {
++            //fprintf(stderr, "SKIPPING GETPROPERTY\n");
++            tx = tx->getNext();
++            continue;
++        }
++#endif
++#ifdef TxJS_HASH
++        JSObject *sobj = obj;
++        // See comment in |recordAction| for reasoning behind the
++        // second condition here.
++        while (IsProxy(sobj) && GetProxyPrivate(sobj).isObjectOrNull()) {
++            sobj = GetProxyTargetObject(sobj);
++        }
++        if (tx->values_ != NULL) {
++            TxProperty prop;
++            prop.type = TX_OBJECT;
++            prop.i.id = id;
++            prop.object.init(sobj);
++            Values::Ptr node = tx->values_->lookup(prop);
++            if (node) {
++#ifdef TxJS_PROFILE_ACTIONS
++                js_jam_profileActionLookup(cx, 1, AX_WRITE);
++                if (missCount) {
++                    js_jam_profileActionLookup(cx, missCount, AX_NULL);
++                    //fprintf(stderr, "MISS 1: %d ", missCount);
++                    //js_DumpId(id);
++                }
++#endif
++                vp.set(node->value);
++                return JS_TRUE;
++            }
++        }
++#ifdef TxJS_PROFILE_ACTIONS
++        ++missCount;
++#endif
++#else
++        // %%% Profiling not implemented yet.
++        TxAction *node;
++        JSObject *objp = obj.get();
++        while (IsProxy(objp) && GetProxyPrivate(objp).isObjectOrNull()) {
++          objp = GetProxyTargetObject(objp);
++        }
++        if ((node = get_action_node(cx, tx->getActionSequence(), objp, id, tx->seqsize_, AX_MODIFY)) != NULL) {
++            vp.set(get_node_val(node));
++            return JS_TRUE;
++        }
++#endif
++        tx = tx->getNext();
++    }
++#ifdef TxJS_PROFILE_ACTIONS
++    // Only misses make it here.
++    if (missCount) {
++        //fprintf(stderr, "MISS 2: %d ", missCount);
++        //js_DumpId(id);
++        js_jam_profileActionLookup(cx, missCount, AX_NULL);
++    }
++#endif
++    return JS_FALSE;
++}
++
++JSBool
++TxContext::lookupName(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, MutableHandleObject objp, MutableHandleObject pobjp, MutableHandleValue vp)
++{
++    jsid id = NameToId(name);
++    for (RootedObject scope(cx, scopeChain); scope; scope = scope->enclosingScope()) {
++        if (getProperty(cx, scope, id, vp)) {
++            objp.set(scope);
++            // No prototype chain, so this will be the same object.
++            pobjp.set(scope); 
++            return JS_TRUE;
++        }
++    }
++    return JS_FALSE;
++}
++
++//JSBool tx_FindProperty(JSContext *, jsid, JSObject **, JSObject **, JSProperty **);
++//JSBool tx_ObjectHasProperty(JSContext *, jsid, JSObject *, JSObject **, JSProperty **);
++
++// %%% Have this return bool and have length be an out-param.
++uint32_t
++TxContext::getArrayLength(JSContext *cx, HandleObject obj)
++{
++    JS_ASSERT(obj->isArray());
++
++    uint32_t len;
++    RootedValue lenVal(cx);
++    if (getProperty(cx, obj, AtomToId(cx->names().length), &lenVal)) {
++        ToUint32(cx, lenVal, &len);
++    } else {
++        // Get the original length.
++        len = obj->getArrayLength();
++    }
++
++    return len;
++}
++
++TxAction *
++TxContext::expandSequence(JSContext *cx)
++{
++    ++seqsize_;
++    if (seqsize_ > capacity_) {
++        // A minimum capacity of 8 seems to work well.
++        capacity_ = 2 * seqsize_ + 6;
++        seq_ = cx->realloc_(seq_, capacity_ * sizeof(TxAction));
++    }
++    return getActionSequence() + (seqsize_ - 1);
++}
++
++// This creates a JavaScript array of |seq_| filtered to the given
++// |TxActionType|.
++JSBool
++TxContext::loadActionSequenceIntoArray(JSContext *cx, TxActionType type, MutableHandleValue vp)
++{
++    // Create a new Array object.
++    RootedObject arr(cx, NewDenseAllocatedArray(cx, seqsize_));
++    if (!arr) {
++        return JS_FALSE;
++    }
++
++    TxAction *act = NULL;
++    uint32_t idx = 0;
++    for (uint32_t i=0; i<seqsize_; i++) {
++      act = getActionSequence() + i;
++      if (act->type & type) {
++          RootedValue value(cx);
++          if (!tx_ActionNodeToValue(cx, act, &value)) {
++              fprintf(stderr, "ERROR: Unable to retrieve TxAction\n");
++              return JS_FALSE;
++          }
++
++          if (!js_SetArrayElement(cx, arr, idx, value)) {
++              fprintf(stderr, "ERROR: Unable to push TxAction into array\n");
++              return JS_FALSE;
++          }
++          ++idx;
++      }
++    }
++
++    if (suspend_.active) {
++        if (suspend_.type & type) {
++            RootedValue value(cx);
++            if (!tx_ActionNodeToValue(cx, &suspend_, &value)) {
++                fprintf(stderr, "ERROR: Unable to retrieve TxAction\n");
++                return JS_FALSE;
++            }
++
++            if (!js_SetArrayElement(cx, arr, idx, value)) {
++                fprintf(stderr, "ERROR: Unable to push TxAction into array\n");
++                return JS_FALSE;
++            }
++            ++idx;
++        }
++    }
++
++#ifdef TxJS_PROFILE_ACTIONS
++    js_jam_profileActionRetrieval(cx, idx, type);
++#endif
++
++    // Assign the array to the out-param.
++    vp.setObject(*arr);
++
++    return SetLengthProperty(cx, arr, idx);
++}
++
++JSBool
++TxContext::commitAction(JSContext *cx, TxContext *nextTx, TxAction *act)
++{
++    // If we're in a nested transaction, just propagate this
++    // write to the parent transaction's write set. Otherwise,
++    // actually perform the write.
++    JSObject *obj = act->prop.object.get();
++    if (nextTx) {
++        nextTx->recordAction(cx, obj, act->prop.i.id, act->value, act->type);
++    } else {
++        cx->compartment->wrap(cx, &obj);
++        if ((act->type & AX_DELETE) || act->value.isMagic(JS_ELEMENTS_HOLE)) {
++            RootedValue rval(cx);
++            JSBool success;
++            if (!JSObject::deleteByValue(cx, HandleObject::fromMarkedLocation(&obj), IdToValue(act->prop.i.id), &success))
++                return JS_FALSE;
++            rval.setBoolean(success);
++        } else {
++            // %%% Does this already account for custom setters?
++            RootedValue writeVal(cx, act->value);
++            cx->compartment->wrap(cx, &writeVal);
++            RootedId rootId(cx, act->prop.i.id);
++            RootedObject robj(cx, obj);
++            if (robj->isGlobal()) {
++              // See jsinterpinlines.h:SetNameOperation.
++              return baseops::SetPropertyHelper(cx, robj, robj, rootId, DNP_UNQUALIFIED, &writeVal, false);
++            }
++            return JSObject::setGeneric(cx, robj, robj, rootId, &writeVal, false); // %%% Strict? (last parameter)
++        }
++    }
++
++    return JS_TRUE;
++}
++
++JSBool
++TxContext::commit(JSContext *cx)
++{
++    if (seq_ == NULL) {
++        return JS_TRUE;
++    }
++
++    // May need to propagate values up to an enclosing transaction.
++    TxContext *nextTx = getNext();
++    // We actually want the next running transaction. This logic comes
++    // into play when a transaction is created during the suspension
++    // of the parent (e.g. when |eval| suspends).
++    while (nextTx != NULL) {
++        if (nextTx->inState(TX_RUNNING)) {
++          break;
++        }
++        nextTx = nextTx->getNext();
++    }
++
++#ifdef TxJS_PROFILE_ACTIONS
++    unsigned deleteCnt = 0;
++    unsigned writeCnt = 0;
++#endif
++
++#ifdef TxJS_HASH
++#ifdef DEBUG
++    // %%% This takes too long.
++    //JS_ASSERT(checkConsistency(cx));
++#endif
++    // Iterate through and apply all most-recent values.
++    if (values_ != NULL) {
++        for (Values::Range r=values_->all(); !r.empty(); r.popFront())
++        {
++            TxAction act;
++            act.type = AX_WRITE;
++            act.prop = r.front().key;
++            act.value = r.front().value;
++            act.active = true;
++            if (!commitAction(cx, nextTx, &act)) {
++                return JS_FALSE;
++            }
++        }
++    }
++#else
++    // Iterate through each TxAction node.
++    TxAction *act = NULL;
++    for (uint32_t i=0; i<seqsize_; i++) {
++        act = getActionSequence() + i;
++        if (act->type & AX_MODIFY) {
++            if (!commitAction(cx, nextTx, act))
++              return JS_FALSE;
++#ifdef TxJS_PROFILE_ACTIONS
++            act->type == AX_DELETE ? ++deleteCnt : ++writeCnt;
++#endif
++        }
++    }
++#endif
++
++#ifdef TxJS_PROFILE_ACTIONS
++    if (deleteCnt)
++        js_jam_profileActionCommit(cx, deleteCnt, AX_DELETE);
++    if (writeCnt)
++        js_jam_profileActionCommit(cx, writeCnt, AX_WRITE);
++#endif
++
++    if (seqsize_ > 0) { 
++      TxAction *last = getActionSequence() + (seqsize_ - 1);
++      // %%% What about AX_CALL actions?
++      setReturnValue(last->value);
++    } else {
++      setReturnValue(JSVAL_VOID);
++    }
++
++    return JS_TRUE;
++}
++
++#ifdef DEBUG
++#ifdef TxJS_HASH
++/*
++JSBool
++TxContext::checkConsistency(JSContext *cx)
++{
++    // %%% Comment
++    for (Values::Range r = values_->all(); !r.empty(); r.popFront())
++    {
++        uint32_t idx = r.front();
++        TxAction *actHash = getActionSequence() + idx * sizeof(TxAction);
++        TxAction *actSeq;
++        if (actHash->prop.object) {
++            actSeq = get_action_node(cx, (TxAction*)seq_, actHash->prop.object, actHash->prop.i.id, seqsize_, AX_MODIFY);
++            JS_ASSERT(actHash == actSeq);
++        } else {
++            uint32_t i;
++            JS_ASSERT(js_IdIsIndex(actHash->id, &i));
++            actSeq = get_action_node(cx, (TxAction*)seq_, actHash->fp, i, seqsize_, AX_MODIFY);
++            if (actSeq == NULL) {
++                JS_ASSERT(!actHash->active);
++            } else {
++                JS_ASSERT(actHash == actSeq);
++            }
++        }
++    }
++
++    return JS_TRUE;
++}
++*/
++#endif
++#endif
++
++void
++TxContext::trace(JSTracer *trc)
++{
++    // Generate a unique id (based on stack level) for this tx.
++    uint32_t txidx = depth();
++
++    JS_SET_TRACING_INDEX(trc, "tx_handler", txidx);
++    gc::MarkValueUnbarriered(trc, &handler_, "tx_handler");
++    JS_SET_TRACING_INDEX(trc, "tx_retval", txidx);
++    gc::MarkValueUnbarriered(trc, &retval_, "tx_retval");
++
++    tx_actionsequence_trace(trc, getActionSequence(), seqsize_);
++
++    if (suspend_.active) {
++      tx_actionsequence_trace(trc, &suspend_, 1);
++    }
++
++    // Recursively trace the tx stack.
++    TxContext *next = getNext();
++    if (next) {
++      next->trace(trc);
++    }
++}
++
++#endif
+

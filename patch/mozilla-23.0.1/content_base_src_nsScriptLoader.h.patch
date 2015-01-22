@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-23.0.1/content/base/src/nsScriptLoader.h	2013-08-14 08:49:19.000000000 -0500
++++ ff-dev/mozilla-23.0.1/content/base/src/nsScriptLoader.h	2015-01-21 08:54:51.534392614 -0600
+@@ -17,6 +17,9 @@
+ #include "nsAutoPtr.h"
+ #include "nsIDocument.h"
+ #include "nsIStreamLoader.h"
++// TxJS begin
++#include "jsapi.h"
++// TxJS end
+ 
+ class nsScriptLoadRequest;
+ class nsIURI;
+@@ -207,6 +210,9 @@
+                           const nsAString &aCrossOrigin,
+                           bool aScriptFromHead);
+ 
++#ifdef TxJS
++  JS::Value mIntrospector;
++#endif
+ private:
+   /**
+    * Unblocks the creator parser of the parser-blocking scripts.
+

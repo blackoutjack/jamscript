@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/Makefile.in	2013-06-18 06:01:23.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/Makefile.in	2015-01-20 21:57:07.151546486 -0600
++++ ff-dev/mozilla-22.0/js/src/Makefile.in	2015-01-21 09:13:57.310359114 -0600
 @@ -69,6 +69,7 @@
  		jsinfer.cpp \
  		jsinterp.cpp \

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsinterpinlines.h	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsinterpinlines.h	2015-01-20 22:35:13.531479636 -0600
++++ ff-dev/mozilla-22.0/js/src/jsinterpinlines.h	2015-01-21 09:13:57.210359117 -0600
 @@ -17,6 +17,10 @@
  #include "jsnum.h"
  #include "jsprobes.h"

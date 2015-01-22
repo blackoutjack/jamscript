@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/frontend/Parser.h	2013-06-18 06:01:24.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/frontend/Parser.h	2015-01-20 22:23:33.539500102 -0600
++++ ff-dev/mozilla-22.0/js/src/frontend/Parser.h	2015-01-21 09:13:57.042359122 -0600
 @@ -17,6 +17,9 @@
  #include "jsatom.h"
  #include "jsscript.h"

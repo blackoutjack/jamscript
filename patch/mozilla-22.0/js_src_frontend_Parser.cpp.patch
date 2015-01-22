@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/frontend/Parser.cpp	2013-06-18 06:01:24.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/frontend/Parser.cpp	2015-01-20 23:36:59.803371271 -0600
++++ ff-dev/mozilla-22.0/js/src/frontend/Parser.cpp	2015-01-21 09:13:57.038359122 -0600
 @@ -632,6 +632,11 @@
              return ENDS_IN_OTHER;
          return HasFinalReturn(pn->last());

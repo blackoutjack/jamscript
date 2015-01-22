@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsinterp.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsinterp.cpp	2015-01-20 22:38:40.975473571 -0600
++++ ff-dev/mozilla-22.0/js/src/jsinterp.cpp	2015-01-21 09:13:57.194359117 -0600
 @@ -38,6 +38,10 @@
  #include "jspropertycache.h"
  #include "jsscript.h"

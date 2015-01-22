@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/vm/Stack-inl.h	2013-06-18 06:01:27.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/vm/Stack-inl.h	2015-01-20 21:57:07.475546476 -0600
++++ ff-dev/mozilla-22.0/js/src/vm/Stack-inl.h	2015-01-21 09:13:57.402359111 -0600
 @@ -117,6 +117,9 @@
  
      if (prevfp->hasPushedSPSFrame())

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsopcode.tbl	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsopcode.tbl	2015-01-20 22:13:37.515517529 -0600
++++ ff-dev/mozilla-22.0/js/src/jsopcode.tbl	2015-01-21 09:13:57.254359115 -0600
 @@ -541,3 +541,10 @@
  
  /* Notes the point at which a value is pushed as an argument. */

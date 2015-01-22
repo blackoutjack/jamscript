@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jstransaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-22.0/js/src/jstransaction.cpp	2015-01-20 21:57:07.135546486 -0600
++++ ff-dev/mozilla-22.0/js/src/jstransaction.cpp	2015-01-21 09:13:57.290359114 -0600
 @@ -0,0 +1,339 @@
 +#include "jsversion.h"
 +#ifdef TxJS

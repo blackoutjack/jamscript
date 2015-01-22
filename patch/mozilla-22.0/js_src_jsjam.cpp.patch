@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-22.0/js/src/jsjam.cpp	2015-01-20 21:57:07.031546489 -0600
++++ ff-dev/mozilla-22.0/js/src/jsjam.cpp	2015-01-21 09:13:57.210359117 -0600
 @@ -0,0 +1,1144 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *

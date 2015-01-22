@@ -1,0 +1,42 @@
+--- ff-orig/mozilla-23.0.1/dom/base/nsJSEnvironment.cpp	2013-08-14 08:49:21.000000000 -0500
++++ ff-dev/mozilla-23.0.1/dom/base/nsJSEnvironment.cpp	2015-01-21 09:16:32.918354564 -0600
+@@ -1251,7 +1251,7 @@
+ 
+   return refcnt;
+ }
+-
++#ifdef TxJS
+ nsresult
+ nsJSContext::EvaluateString(const nsAString& aScript,
+                             JS::Handle<JSObject*> aScopeObject,
+@@ -1259,6 +1259,19 @@
+                             bool aCoerceToString,
+                             JS::Value* aRetValue)
+ {
++  return EvaluateString(aScript, aScopeObject, aOptions,
++      aCoerceToString, aRetValue, JS::UndefinedValue());
++}
++
++nsresult
++nsJSContext::EvaluateString(const nsAString& aScript,
++                            JSObject& aScopeObject,
++                            JS::CompileOptions& aOptions,
++                            bool aCoerceToString,
++                            JS::Value* aRetValue,
++                            const JS::Value &ispect)
++{
++#endif
+   PROFILER_LABEL("JS", "EvaluateString");
+   MOZ_ASSERT_IF(aOptions.versionSet, aOptions.version != JSVERSION_UNKNOWN);
+   MOZ_ASSERT_IF(aCoerceToString, aRetValue);
+@@ -1300,6 +1313,9 @@
+     ++mExecuteDepth;
+ 
+     JS::RootedObject rootedScope(mContext, aScopeObject);
++#ifdef TxJS
++    aOptions.introspector = ispect;
++#endif
+     ok = JS::Evaluate(mContext, rootedScope, aOptions,
+                       PromiseFlatString(aScript).get(),
+                       aScript.Length(), aRetValue);
+

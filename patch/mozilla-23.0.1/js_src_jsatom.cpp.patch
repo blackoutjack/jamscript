@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-23.0.1/js/src/jsatom.cpp	2013-08-14 08:49:31.000000000 -0500
++++ ff-dev/mozilla-23.0.1/js/src/jsatom.cpp	2015-01-21 08:54:52.146392596 -0600
+@@ -104,6 +104,9 @@
+ const char js_close_str[]           = "close";
+ const char js_send_str[]            = "send";
+ #endif
++#ifdef TxJS
++const char js_introspect_str[]      = "introspect";
++#endif
+ 
+ /*
+  * For a browser build from 2007-08-09 after the browser starts up there are
+

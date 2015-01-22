@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/content/base/src/nsScriptLoader.cpp	2013-06-18 06:01:13.000000000 -0500
-+++ ff-dev/mozilla-22.0/content/base/src/nsScriptLoader.cpp	2015-01-20 21:57:06.483546505 -0600
++++ ff-dev/mozilla-22.0/content/base/src/nsScriptLoader.cpp	2015-01-21 09:13:56.754359130 -0600
 @@ -48,6 +48,9 @@
  
  #include "mozilla/CORSMode.h"

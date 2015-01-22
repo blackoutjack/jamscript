@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-23.0.1/parser/html/nsHtml5StreamParser.cpp	2013-08-14 08:49:44.000000000 -0500
++++ ff-dev/mozilla-23.0.1/parser/html/nsHtml5StreamParser.cpp	2015-01-21 08:54:52.610392583 -0600
+@@ -164,6 +164,9 @@
+   , mLoadFlusher(new nsHtml5LoadFlusher(aExecutor))
+   , mFlushTimer(do_CreateInstance("@mozilla.org/timer;1"))
+   , mMode(aMode)
++#ifdef TxJS
++  , mIntrospector(JS::UndefinedValue())
++#endif
+ {
+   NS_ASSERTION(NS_IsMainThread(), "Wrong thread!");
+   mFlushTimer->SetTarget(mThread);
+@@ -876,6 +879,9 @@
+   mTreeBuilder->SetPreventScriptExecution(!((mMode == NORMAL) &&
+                                             scriptingEnabled));
+   mTokenizer->start();
++#ifdef TxJS
++  mExecutor->mIntrospector = mIntrospector;
++#endif
+   mExecutor->Start();
+   mExecutor->StartReadingFromStage();
+ 
+

@@ -1,0 +1,35 @@
+--- ff-orig/mozilla-23.0.1/js/src/methodjit/Compiler.cpp	2013-08-14 08:49:31.000000000 -0500
++++ ff-dev/mozilla-23.0.1/js/src/methodjit/Compiler.cpp	2015-01-21 15:48:44.041666554 -0600
+@@ -995,6 +995,10 @@
+   checkOutput:
+     if (!cx->methodJitEnabled)
+         return Compile_Abort;
++#ifdef TxJS
++    if (cx->getRunningTx())
++        return Compile_Abort;
++#endif
+ 
+     if (!cx->jaegerCompilationAllowed())
+         return Compile_Abort;
+@@ -3305,6 +3309,20 @@
+           }
+           END_CASE(JSOP_DEBUGGER)
+ 
++#ifdef TxJS
++          BEGIN_CASE(JSOP_BEGIN_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_BEGIN_TX\n");
++          }
++          END_CASE(JSOP_BEGIN_TX)
++
++          BEGIN_CASE(JSOP_END_TX)
++          {
++            fprintf(stderr, "JIT entering JSOP_END_TX\n");
++          }
++          END_CASE(JSOP_END_TX)
++#endif
++
+           default:
+             JS_NOT_REACHED("Opcode not implemented");
+         }
+

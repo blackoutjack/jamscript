@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/shell/js.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/shell/js.cpp	2015-01-20 21:57:07.239546483 -0600
++++ ff-dev/mozilla-22.0/js/src/shell/js.cpp	2015-01-21 09:13:57.378359112 -0600
 @@ -43,6 +43,10 @@
  #include "jswrapper.h"
  #include "jsperf.h"

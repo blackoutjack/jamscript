@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsinfer.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsinfer.cpp	2015-01-20 21:57:07.003546490 -0600
++++ ff-dev/mozilla-22.0/js/src/jsinfer.cpp	2015-01-21 09:13:57.194359117 -0600
 @@ -4124,6 +4124,10 @@
        case JSOP_TABLESWITCH:
        case JSOP_TRY:

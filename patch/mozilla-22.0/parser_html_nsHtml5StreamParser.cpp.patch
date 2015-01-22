@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/parser/html/nsHtml5StreamParser.cpp	2013-06-18 06:01:38.000000000 -0500
-+++ ff-dev/mozilla-22.0/parser/html/nsHtml5StreamParser.cpp	2015-01-20 21:57:07.559546474 -0600
++++ ff-dev/mozilla-22.0/parser/html/nsHtml5StreamParser.cpp	2015-01-21 09:13:57.446359110 -0600
 @@ -164,6 +164,9 @@
    , mLoadFlusher(new nsHtml5LoadFlusher(aExecutor))
    , mFlushTimer(do_CreateInstance("@mozilla.org/timer;1"))

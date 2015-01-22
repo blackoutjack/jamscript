@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-23.0.1/js/src/jsscript.cpp	2013-08-14 08:49:31.000000000 -0500
++++ ff-dev/mozilla-23.0.1/js/src/jsscript.cpp	2015-01-21 08:54:52.358392590 -0600
+@@ -1681,6 +1681,10 @@
+     script->sourceEnd = bufEnd;
+     script->userBit = options.userBit;
+ 
++#ifdef TxJS
++    script->setIntrospector(UndefinedValue());
++#endif
++
+     return script;
+ }
+ 
+@@ -2357,6 +2361,9 @@
+     dst->hasSingletons = src->hasSingletons;
+     dst->isGenerator = src->isGenerator;
+     dst->isGeneratorExp = src->isGeneratorExp;
++#ifdef TxJS
++    dst->setIntrospector(src->getIntrospector());
++#endif
+ 
+     /* Copy over hints. */
+     dst->shouldCloneAtCallsite = src->shouldCloneAtCallsite;
+

@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-23.0.1/js/src/jsinfer.cpp	2013-08-14 08:49:31.000000000 -0500
++++ ff-dev/mozilla-23.0.1/js/src/jsinfer.cpp	2015-01-21 08:54:52.226392594 -0600
+@@ -4221,6 +4221,10 @@
+       case JSOP_TABLESWITCH:
+       case JSOP_TRY:
+       case JSOP_LABEL:
++#ifdef TxJS
++      case JSOP_BEGIN_TX:
++      case JSOP_END_TX:
++#endif
+         break;
+ 
+         /* Bytecodes pushing values of known type. */
+

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsarray.h	2013-06-18 06:01:25.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsarray.h	2015-01-20 21:57:06.891546493 -0600
++++ ff-dev/mozilla-22.0/js/src/jsarray.h	2015-01-21 09:13:57.106359120 -0600
 @@ -14,6 +14,9 @@
  #include "jspubtd.h"
  #include "jsatom.h"

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-22.0/js/src/jsobj.cpp	2013-06-18 06:01:26.000000000 -0500
-+++ ff-dev/mozilla-22.0/js/src/jsobj.cpp	2015-01-20 21:57:07.071546488 -0600
++++ ff-dev/mozilla-22.0/js/src/jsobj.cpp	2015-01-21 09:13:57.250359116 -0600
 @@ -29,6 +29,10 @@
  #include "jsiter.h"
  #include "jslock.h"
