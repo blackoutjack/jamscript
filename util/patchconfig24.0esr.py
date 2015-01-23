@@ -1,7 +1,7 @@
 
-ORIGDIR = "ff-orig/mozilla-23.0.1"
-DEVDIR = "ff-dev/mozilla-23.0.1"
-PATCHDIR = "patch/mozilla-23.0.1"
+ORIGDIR = "ff-orig/mozilla-24.0esr"
+DEVDIR = "ff-dev/mozilla-24.0esr"
+PATCHDIR = "patch/mozilla-24.0esr"
 IGNORE_BINARY = True
 EXCLUSIONS = [
   '_virtualenv',
@@ -54,6 +54,8 @@ EXCLUSIONS = [
   'unallmakefiles',
   '*gdb.py',
   'intl',
+  'symverscript',
   'selfhosted.js',
+  'backend.RecursiveMakeBackend.built.pp',
 ]
 

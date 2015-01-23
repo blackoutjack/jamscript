@@ -1,0 +1,340 @@
+--- ff-orig/mozilla-24.0esr/js/src/jstransaction.cpp	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-24.0esr/js/src/jstransaction.cpp	2015-01-23 11:07:14.576696623 -0600
+@@ -0,0 +1,336 @@
++#include "jsversion.h"
++#ifdef TxJS
++#include <string.h>
++#include "jstypes.h"
++#include "jsapi.h"
++#include "jsarray.h"
++#include "jscntxt.h"
++#include "jstransaction.h"
++#include "jsproxy.h"
++
++#define JSVAL_HOLE_FLAG jsval(4 << JSVAL_TAGBITS)
++#define JSVAL_HOLE (JSVAL_VOID | JSVAL_HOLE_FLAG)
++
++using namespace js;
++
++JSObject *getThisTxObj(JSContext *cx, CallArgs &args) {
++    JS_ASSERT(args.thisv().isObject());
++    JSObject *txObj = &args.thisv().toObject();
++    if (IsProxy(txObj)) {
++        return GetProxyTargetObject(txObj);
++    }
++    return txObj;
++}
++
++TxContext *getThisTx(JSContext *cx, CallArgs &args) {
++    JSObject *txObj = getThisTxObj(cx, args);
++    return (TxContext*)txObj->getPrivate(); 
++}
++
++static JSBool
++tx_getActionSequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_ANY, args.rval());
++}
++
++static JSBool
++tx_getModifySequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_MODIFY, args.rval());
++}
++
++static JSBool
++tx_getReadSequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_READ, args.rval());
++}
++
++static JSBool
++tx_getWriteSequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_WRITE, args.rval());
++}
++
++static JSBool
++tx_getDeleteSequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_DELETE, args.rval());
++}
++
++static JSBool
++tx_getCallSequence(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    return tx->loadActionSequenceIntoArray(cx, AX_INVOKE, args.rval());
++}
++
++JSBool
++tx_commit(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    if (!tx->commit(cx))
++      return JS_FALSE;
++
++    args.rval().set(JSVAL_TRUE);
++    return JS_TRUE;
++}
++
++JSBool
++tx_suppress(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    // Suppress the read/write sets and DOM copy.
++    tx->clear(cx);
++
++    // Set the transaction object as the return value to allow chaining.
++    args.rval().setObject(args.thisv().toObject());
++    return JS_TRUE;
++}
++
++JSBool
++tx_isSuspended(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++    args.rval().set(JSVAL_FALSE);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    if (!tx->inState(TX_SUSPEND1)) {
++        // |vp| already stores JS_FALSE.
++        return JS_TRUE;
++    }
++
++    args.rval().set(JSVAL_TRUE);
++    return JS_TRUE;
++}
++
++JSBool
++tx_getSuspendInfo(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    if (!tx->inState(TX_SUSPEND1)) {
++        args.rval().set(JSVAL_NULL);
++        return JS_TRUE;
++    }
++
++    tx_ActionNodeToValue(cx, tx->getSuspend(), args.rval());
++    return JS_TRUE;
++}
++
++JSBool
++tx_getHandler(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    RootedValue handler(cx, tx->getHandler());
++    cx->compartment()->wrap(cx, &handler);
++    args.rval().set(handler); 
++    return JS_TRUE;
++}
++
++JSBool
++tx_setRetval(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    TxContext *tx = getThisTx(cx, args);
++
++    if (tx == NULL) {
++        return JS_FALSE;
++    }
++
++    if (!tx->inState(TX_SUSPEND1)) {
++        args.rval().set(JSVAL_FALSE);
++        return JS_TRUE;
++    }
++
++    tx->setReturnValue(args[0]);
++
++    args.rval().set(JSVAL_TRUE);
++    return JS_TRUE;
++}
++
++// %%% Reinstate this
++static JSBool
++tx_commitAndFlush(JSContext *cx, unsigned argc, Value *vp)
++{
++    tx_commit(cx, argc, vp);
++    tx_suppress(cx, argc, vp);
++
++    JS::CallArgs args = CallArgsFromVp(argc, vp);
++    // %%% Should check that both operations were successful.
++    args.rval().set(JSVAL_TRUE);
++    return JS_TRUE;
++}
++
++int js_Tx(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    args.rval().set(JSVAL_TRUE);
++    return JS_TRUE;
++}
++
++/** Description of this class: */
++Class TxClass =
++{
++    js_Tx_str,
++    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_CACHED_PROTO(JSProto_Tx),
++    JS_PropertyStub,             /* addProperty stub */
++    JS_DeletePropertyStub,       /* deleteProperty stub */
++    JS_PropertyStub,             /* getProperty stub */
++    JS_StrictPropertyStub,       /* setProperty stub */
++    JS_EnumerateStub,            /* enumerateProperty stub */
++    JS_ResolveStub,              /* resolveProperty stub */
++    JS_ConvertStub,              /* convertProperty stub */
++    NULL,                        /* finalizer */
++
++    /* Optional members below instead of JSCLASS_NO_OPTIONAL_MEMBERS */
++    //NULL,//tx_getObjectOps,//NULL,                        /**< getObjectOps */
++    NULL,                        /* checkAccess */
++    NULL,                        /* call */
++    NULL,                        /* hasInstance */
++    NULL,                        /* construct */
++    NULL,                        /* GC Trace */
++};
++
++static JSFunctionSpec tx_methods[] =
++{
++    JS_FN("getActionSequence", tx_getActionSequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getModifySequence", tx_getModifySequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getReadSequence", tx_getReadSequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getWriteSequence", tx_getWriteSequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getCallSequence", tx_getCallSequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getDeleteSequence", tx_getDeleteSequence, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("commit", tx_commit, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND | JSFUN_TX_NOSUSPEND),
++    JS_FN("suppress", tx_suppress, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("isSuspended", tx_isSuspended, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getSuspendInfo", tx_getSuspendInfo, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("getHandler", tx_getHandler, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("setRetval", tx_setRetval, 1, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FN("commitAndFlush", tx_commitAndFlush, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
++    JS_FS_END
++};
++
++JSObject *
++js_InitTxClass(JSContext *cx, HandleObject obj)
++{
++    JS_ASSERT(obj->isNative());
++
++    Rooted<GlobalObject*> global(cx, &obj->as<GlobalObject>());
++
++    RootedObject txProto(cx, global->createBlankPrototype(cx, &TxClass));
++    if (!txProto)
++        return NULL;
++
++    /* Now create the Tx function. */
++    RootedFunction ctor(cx);
++    ctor = global->createConstructor(cx, js_Tx, cx->names().Tx, 0);
++    if (!ctor)
++        return NULL;
++
++    if (!LinkConstructorAndPrototype(cx, ctor, txProto))
++        return NULL;
++
++    if (!DefinePropertiesAndBrand(cx, txProto, NULL, tx_methods))
++        return NULL;
++
++    if (!DefineConstructorAndPrototype(cx, global, JSProto_Tx, ctor, txProto))
++        return NULL;
++
++    return txProto;
++}
++
++JSObject *
++js_NewTxObject(JSContext *cx, TxContext *tx) {
++
++    if (!tx)
++        return NULL;
++
++    JSObject *obj = NewBuiltinClassInstance(cx, &TxClass);
++    if (!obj)
++        return NULL;
++
++    obj->setPrivate(tx);
++
++    return obj;
++}
++#endif
+

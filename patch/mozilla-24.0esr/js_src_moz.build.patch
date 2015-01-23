@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-24.0esr/js/src/moz.build	2013-09-10 22:22:33.000000000 -0500
++++ ff-dev/mozilla-24.0esr/js/src/moz.build	2015-01-23 17:16:49.046970020 -0600
+@@ -155,6 +155,7 @@
+     'jsgc.cpp',
+     'jsinfer.cpp',
+     'jsiter.cpp',
++    'jsjam.cpp',
+     'jsmath.cpp',
+     'jsmemorymetrics.cpp',
+     'jsnativestack.cpp',
+@@ -170,6 +171,9 @@
+     'jsreflect.cpp',
+     'jsscript.cpp',
+     'jsstr.cpp',
++    'jstransaction.cpp',
++    'jstx.cpp',
++    'jstxaction.cpp',
+     'jstypedarray.cpp',
+     'jsutil.cpp',
+     'jswatchpoint.cpp',
+

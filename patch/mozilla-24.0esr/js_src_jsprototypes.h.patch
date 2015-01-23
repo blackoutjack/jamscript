@@ -1,0 +1,11 @@
+--- ff-orig/mozilla-24.0esr/js/src/jsprototypes.h	2013-09-10 22:22:33.000000000 -0500
++++ ff-dev/mozilla-24.0esr/js/src/jsprototypes.h	2015-01-21 18:32:09.213379867 -0600
+@@ -56,5 +56,7 @@
+     macro(DataView,              35,     js_InitTypedArrayClasses) \
+     macro(ParallelArray,         36,     js_InitParallelArrayClass) \
+     macro(Intl,                  37,     js_InitIntlClass) \
++    macro(Tx,                    38,     js_InitTxClass) \
++    macro(JAM,                   39,     js_InitJAMClass) \
+ 
+ #endif /* jsprototypes_h */
+

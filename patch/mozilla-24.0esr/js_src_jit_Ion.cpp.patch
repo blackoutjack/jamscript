@@ -1,0 +1,68 @@
+--- ff-orig/mozilla-24.0esr/js/src/jit/Ion.cpp	2013-09-10 22:22:33.000000000 -0500
++++ ff-dev/mozilla-24.0esr/js/src/jit/Ion.cpp	2015-01-21 19:21:49.957292716 -0600
+@@ -1600,6 +1600,12 @@
+     JS_ASSERT(jit::IsIonEnabled(cx));
+     JS_ASSERT((JSOp)*pc == JSOP_LOOPENTRY);
+ 
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     // Skip if the script has been disabled.
+     if (!script->canIonCompile())
+         return Method_Skipped;
+@@ -1653,6 +1659,12 @@
+ {
+     JS_ASSERT(jit::IsIonEnabled(cx));
+ 
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     JSScript *script = state.script();
+ 
+     // Skip if the script has been disabled.
+@@ -1725,6 +1737,12 @@
+     JS_ASSERT(!frame->fun()->nonLazyScript()->hasIonScript());
+     JS_ASSERT(frame->isFunctionFrame());
+ 
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     // Mark as forbidden if frame can't be handled.
+     if (!CheckFrame(frame)) {
+         ForbidCompilation(cx, script);
+@@ -1745,6 +1763,12 @@
+ MethodStatus
+ jit::CanEnterInParallel(JSContext *cx, HandleScript script)
+ {
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     // Skip if the script has been disabled.
+     //
+     // Note: We return Method_Skipped in this case because the other
+@@ -1790,6 +1814,12 @@
+ {
+     JS_ASSERT(jit::IsIonEnabled(cx));
+ 
++#if 0//def TxJS
++    if (cx->getRunningTx()) {
++        ForbidCompilation(cx, script);
++        return Method_CantCompile;
++    }
++#endif
+     // Skip if the code is expected to result in a bailout.
+     if (!script->hasIonScript() || script->ionScript()->bailoutExpected())
+         return Method_Skipped;
+

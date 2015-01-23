@@ -1,0 +1,54 @@
+--- ff-orig/mozilla-24.0esr/js/src/vm/Stack.h	2013-09-10 22:22:35.000000000 -0500
++++ ff-dev/mozilla-24.0esr/js/src/vm/Stack.h	2015-01-23 14:32:39.425349978 -0600
+@@ -10,6 +10,9 @@
+ #include "jsautooplen.h"
+ #include "jsfun.h"
+ #include "jsscript.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ #include "jit/IonFrameIterator.h"
+ 
+ struct JSContext;
+@@ -270,6 +273,9 @@
+ 
+         /* Miscellaneous state. */
+         USE_NEW_TYPE       =    0x20000   /* Use new type for constructed |this| object. */
++#ifdef TxJS
++       ,HAS_SUSPENDED_TX   =    0x40000
++#endif
+     };
+ 
+   private:
+@@ -296,6 +302,13 @@
+     Value               *prevsp_;
+ 
+     void                *hookData_;     /* if HAS_HOOK_DATA, closure returned by call hook */
++#ifdef TxJS
++    // When the handler is called on suspend or at the end of a
++    // transaction, the transaction object is saved here. When this
++    // frame returns, we know to resume or terminate the transaction
++    // (depending on the transaction state).
++    TxContext           *suspendedTx_;
++#endif
+     AbstractFramePtr    evalInFramePrev_; /* for an eval/debugger frame, the prev frame */
+     Value               *argv_;         /* If hasArgs(), points to frame's arguments. */
+     LifoAlloc::Mark     mark_;          /* Used to release memory for this frame. */
+@@ -696,6 +709,16 @@
+ 
+     inline JSCompartment *compartment() const;
+ 
++#ifdef TxJS
++    inline TxContext *suspendedTx() const {
++        return (flags_ & HAS_SUSPENDED_TX) ? suspendedTx_ : NULL;
++    }
++    inline void setSuspendedTx(TxContext *tx) {
++        flags_ |= HAS_SUSPENDED_TX;
++        suspendedTx_ = tx;
++    }
++#endif
++
+     /* Debugger hook data */
+ 
+     bool hasHookData() const {
+

@@ -1,0 +1,78 @@
+--- ff-orig/mozilla-24.0esr/js/src/jsapi.cpp	2013-09-10 22:22:33.000000000 -0500
++++ ff-dev/mozilla-24.0esr/js/src/jsapi.cpp	2015-01-21 19:05:24.277321535 -0600
+@@ -47,6 +47,10 @@
+ #include "jsweakmap.h"
+ #include "jswrapper.h"
+ #include "jstypedarray.h"
++#ifdef TxJS
++#include "jsjam.h"
++#include "jstransaction.h"
++#endif
+ #ifdef JS_THREADSAFE
+ #include "jsworkers.h"
+ #endif
+@@ -1775,6 +1779,12 @@
+ #if ENABLE_INTL_API
+     {js_InitIntlClass,                  EAGER_ATOM_AND_CLASP(Intl)},
+ #endif
++#ifdef TxJS
++    /* %%% What does the EAGER_ATOM_AND_CLASP mean? 
++       %%% Convert to &js::Tx::class_ following pattern. */
++    {js_InitTxClass,                    EAGER_CLASS_ATOM(Tx), &TxClass},
++    {js_InitJAMClass,                   EAGER_CLASS_ATOM(JAM), &JAMClass},
++#endif
+     {NULL,                              0, NULL}
+ };
+ 
+@@ -3416,6 +3426,14 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx)
++{
++  return cx->getIntrospector();
++}
++#endif
++
+ static JSBool
+ LookupPropertyById(JSContext *cx, HandleObject obj, HandleId id, unsigned flags,
+                    MutableHandleObject objp, MutableHandleShape propp)
+@@ -3706,7 +3724,6 @@
+                                              zeroFlags, global, atom);
+             if (!setobj)
+                 return false;
+-
+             if (set.info)
+                 setobj->setJitInfo(set.info);
+ 
+@@ -4904,7 +4921,6 @@
+                 if (!ctor)
+                     return JS_FALSE;
+             }
+-
+             flags &= ~JSFUN_GENERIC_NATIVE;
+             JSFunction *fun = DefineFunction(cx, ctor, id,
+                                              js_generic_native_method_dispatcher,
+@@ -5137,6 +5153,9 @@
+       forEval(false),
+       noScriptRval(cx->hasOption(JSOPTION_NO_SCRIPT_RVAL)),
+       selfHostingMode(false),
++#ifdef TxJS
++      introspector(JS::UndefinedValue()),
++#endif
+       canLazilyParse(true),
+       sourcePolicy(SAVE_SOURCE)
+ {
+@@ -5497,6 +5516,9 @@
+                                                     chars, length, NULL, 0, &sct));
+     if (!script)
+         return false;
++#ifdef TxJS
++    script->setIntrospector(options.introspector);
++#endif
+ 
+     JS_ASSERT(script->getVersion() == options.version);
+ 
+
