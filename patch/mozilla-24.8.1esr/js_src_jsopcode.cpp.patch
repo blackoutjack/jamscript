@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/jsopcode.cpp	2014-09-23 21:53:36.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/jsopcode.cpp	2015-01-23 17:27:18.682951610 -0600
+@@ -154,8 +154,17 @@
+         return NumBlockSlots(script, pc) + 1;
+       default:
+         /* stack: fun, this, [argc arguments] */
++#ifdef TxJS
++        JS_ASSERT(op == JSOP_NEW || op == JSOP_CALL || op == JSOP_EVAL ||
++                  op == JSOP_BEGIN_TX || op == JSOP_FUNCALL || op == JSOP_FUNAPPLY);
++        // There's no fun or this for transaction entry.
++        if (op == JSOP_BEGIN_TX)
++            return GET_ARGC(pc);
++        else
++#else
+         JS_ASSERT(op == JSOP_NEW || op == JSOP_CALL || op == JSOP_EVAL ||
+                   op == JSOP_FUNCALL || op == JSOP_FUNAPPLY);
++#endif
+         return 2 + GET_ARGC(pc);
+     }
+ }
+

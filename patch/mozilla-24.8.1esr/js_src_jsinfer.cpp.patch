@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/jsinfer.cpp	2014-09-23 21:53:36.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/jsinfer.cpp	2015-01-23 17:27:18.658951611 -0600
+@@ -4028,6 +4028,10 @@
+       case JSOP_TABLESWITCH:
+       case JSOP_TRY:
+       case JSOP_LABEL:
++#ifdef TxJS
++      case JSOP_BEGIN_TX:
++      case JSOP_END_TX:
++#endif
+       case JSOP_RUNONCE:
+         break;
+ 
+

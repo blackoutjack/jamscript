@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/frontend/TokenStream.h	2014-09-23 21:53:35.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/frontend/TokenStream.h	2015-01-23 17:27:18.430951617 -0600
+@@ -22,6 +22,9 @@
+ #include "jsopcode.h"
+ #include "jsprvtd.h"
+ #include "jspubtd.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ #include "js/Vector.h"
+ 
+@@ -150,7 +153,9 @@
+     TOK_DIVASSIGN,
+     TOK_MODASSIGN,
+     TOK_ASSIGNMENT_LAST = TOK_MODASSIGN,
+-
++#ifdef TxJS
++    TOK_TX,
++#endif
+     TOK_LIMIT                      /* domain size */
+ };
+ 
+

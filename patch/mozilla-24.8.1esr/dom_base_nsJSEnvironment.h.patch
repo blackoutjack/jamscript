@@ -1,0 +1,22 @@
+--- ff-orig/mozilla-24.8.1esr/dom/base/nsJSEnvironment.h	2014-09-23 21:53:29.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/dom/base/nsJSEnvironment.h	2015-01-23 17:27:18.170951625 -0600
+@@ -44,6 +44,18 @@
+   NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_AMBIGUOUS(nsJSContext,
+                                                          nsIScriptContext)
+ 
++#ifdef TxJS
++  virtual nsresult EvaluateString(const nsAString& aScript,
++                                  JSObject* aScopeObject,
++                                  nsIPrincipal *principal,
++                                  nsIPrincipal *originPrincipal,
++                                  const char *aURL,
++                                  uint32_t aLineNo,
++                                  JSVersion aVersion,
++                                  nsAString *aRetValue,
++                                  bool* aIsUndefined,
++                                  const JS::Value &ispect);
++#endif
+   virtual nsresult EvaluateString(const nsAString& aScript,
+                                   JS::Handle<JSObject*> aScopeObject,
+                                   JS::CompileOptions &aOptions,
+

@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/vm/Stack-inl.h	2014-09-23 21:53:38.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/vm/Stack-inl.h	2015-01-23 17:27:18.786951607 -0600
+@@ -91,6 +91,9 @@
+     blockChain_= NULL;
+     JS_ASSERT(!hasBlockChain());
+     JS_ASSERT(!hasHookData());
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ 
+     initVarsToUndefined();
+ }
+

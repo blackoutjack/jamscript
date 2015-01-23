@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-24.8.1esr/dom/base/nsIScriptContext.h	2014-09-23 21:53:29.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/dom/base/nsIScriptContext.h	2015-01-23 17:27:18.158951625 -0600
+@@ -58,11 +58,20 @@
+    *                  don't care about the result.  Note that asking for a
+    *                  result will deoptimize your script somewhat in many cases.
+    */
++#ifdef TxJS
++  virtual nsresult EvaluateString(const nsAString& aScript,
++                                  JS::Handle<JSObject*> aScopeObject,
++                                  JS::CompileOptions& aOptions,
++                                  bool aCoerceToString,
++                                  JS::Value* aRetValue,
++                                  const JS::Value &ispect) = 0;
++#else
+   virtual nsresult EvaluateString(const nsAString& aScript,
+                                   JS::Handle<JSObject*> aScopeObject,
+                                   JS::CompileOptions& aOptions,
+                                   bool aCoerceToString,
+                                   JS::Value* aRetValue) = 0;
++#endif
+ 
+   /**
+    * Compile a script.
+

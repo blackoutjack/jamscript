@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/vm/Keywords.h	2014-09-23 21:53:38.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/vm/Keywords.h	2015-01-23 17:27:18.782951607 -0600
+@@ -71,6 +71,9 @@
+     macro(extends, extends, TOK_RESERVED, JSOP_NOP, JSVERSION_DEFAULT) \
+     macro(import, import, TOK_RESERVED, JSOP_NOP, JSVERSION_DEFAULT) \
+     macro(super, super, TOK_RESERVED, JSOP_NOP, JSVERSION_DEFAULT) \
++    /* TxJS begin */ \
++    macro(introspect, introspect_, TOK_TX, JSOP_BEGIN_TX, JSVERSION_DEFAULT) \
++    /* TxJS end */ \
+     /* ES5 future reserved keywords in strict mode. */ \
+     macro(implements, implements, TOK_STRICT_RESERVED, JSOP_NOP, JSVERSION_DEFAULT) \
+     macro(interface, interface, TOK_STRICT_RESERVED, JSOP_NOP, JSVERSION_DEFAULT) \
+

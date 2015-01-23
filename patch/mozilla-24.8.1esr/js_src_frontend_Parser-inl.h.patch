@@ -1,0 +1,15 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/frontend/Parser-inl.h	2014-09-23 21:53:35.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/frontend/Parser-inl.h	2015-01-23 17:27:18.402951618 -0600
+@@ -50,6 +50,11 @@
+     blockidGen(bodyid),  // used to set |bodyid| and subsequently incremented in init()
+     topStmt(NULL),
+     topScopeStmt(NULL),
++#ifdef TxJS_HOIST
++    txTop(NULL),
++    hasTxTop(false),
++    hasFunctionStmt(false),
++#endif
+     blockChain(prs->context),
+     staticLevel(staticLevel),
+     parenDepth(0),
+

@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-24.8.1esr/js/src/jit/Ion.h	2014-09-23 21:53:36.000000000 -0500
++++ ff-dev/mozilla-24.8.1esr/js/src/jit/Ion.h	2015-01-23 17:27:18.506951615 -0600
+@@ -339,6 +339,10 @@
+ static inline bool
+ IsIonEnabled(JSContext *cx)
+ {
++#ifdef TxJS
++    if (cx->getRunningTx())
++        return false;
++#endif
+     return cx->hasOption(JSOPTION_ION) &&
+         cx->hasOption(JSOPTION_BASELINE) &&
+         cx->typeInferenceEnabled();
+
