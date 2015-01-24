@@ -1,0 +1,29 @@
+--- ff-orig/mozilla-26.0/parser/html/nsHtml5TreeOpExecutor.cpp	2013-12-05 10:07:53.000000000 -0600
++++ ff-dev/mozilla-26.0/parser/html/nsHtml5TreeOpExecutor.cpp	2015-01-24 14:47:28.337662331 -0600
+@@ -69,6 +69,9 @@
+ nsHtml5TreeOpExecutor::nsHtml5TreeOpExecutor(bool aRunsToCompletion)
+   : mPreloadedURLs(23)  // Mean # of preloadable resources per page on dmoz
+ {
++#ifdef TxJS
++  mIntrospector = JS::UndefinedValue();
++#endif
+   mRunsToCompletion = aRunsToCompletion;
+   // zeroing operator new for everything else
+ }
+@@ -729,6 +732,15 @@
+ 
+   NS_ASSERTION(aScriptElement, "No script to run");
+   nsCOMPtr<nsIScriptElement> sele = do_QueryInterface(aScriptElement);
++#ifdef TxJS
++  if (!mIntrospector.isUndefined()) {
++    nsCOMPtr<nsIContent> cont =
++      do_QueryInterface((nsIScriptElement*) sele);
++    nsIDocument* ownerDoc = cont->OwnerDoc();
++    nsRefPtr<nsScriptLoader> loader = ownerDoc->ScriptLoader();
++    loader->mIntrospector = mIntrospector;
++  }
++#endif
+   
+   if (!mParser) {
+     NS_ASSERTION(sele->IsMalformed(), "Script wasn't marked as malformed.");
+

@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-26.0/js/src/jsarray.h	2013-12-05 10:07:37.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/jsarray.h	2015-01-24 15:35:56.961577288 -0600
+@@ -11,6 +11,9 @@
+ 
+ #include "jsobj.h"
+ #include "jspubtd.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ namespace js {
+ /* 2^32-2, inclusive */
+@@ -150,4 +153,11 @@
+ bool
+ js_Array(JSContext *cx, unsigned argc, js::Value *vp);
+ 
++#ifdef TxJS
++extern bool 
++js_SetArrayElement(JSContext *cx, js::HandleObject obj, double index, js::HandleValue vp);
++
++extern bool 
++js_GetArrayElement(JSContext *cx, js::HandleObject obj, double index, bool *hole, js::MutableHandleValue vp);
++#endif
+ #endif /* jsarray_h */
+

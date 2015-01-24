@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-26.0/js/src/jsinfer.cpp	2013-12-05 10:07:37.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/jsinfer.cpp	2015-01-24 15:18:24.013608074 -0600
+@@ -3268,6 +3268,10 @@
+       case JSOP_GETLOCAL:
+         return JSOp(pc[JSOP_GETLOCAL_LENGTH]) == JSOP_POP;
+ 
++#ifdef TxJS
++      case JSOP_END_TX:
++        return true;
++#endif
+       default:
+         return false;
+     }
+

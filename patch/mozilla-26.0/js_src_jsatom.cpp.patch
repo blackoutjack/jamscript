@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-26.0/js/src/jsatom.cpp	2013-12-05 10:07:37.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/jsatom.cpp	2015-01-24 14:47:28.037662340 -0600
+@@ -86,6 +86,9 @@
+ const char js_in_str[]              = "in";
+ const char js_instanceof_str[]      = "instanceof";
+ const char js_interface_str[]       = "interface";
++#ifdef TxJS
++const char js_introspect_str[]      = "introspect";
++#endif
+ const char js_let_str[]             = "let";
+ const char js_new_str[]             = "new";
+ const char js_package_str[]         = "package";
+

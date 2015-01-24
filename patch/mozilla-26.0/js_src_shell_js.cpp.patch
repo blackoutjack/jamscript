@@ -1,0 +1,35 @@
+--- ff-orig/mozilla-26.0/js/src/shell/js.cpp	2013-12-05 10:07:37.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/shell/js.cpp	2015-01-24 14:47:28.233662334 -0600
+@@ -51,6 +51,10 @@
+ #include "TraceLogging.h"
+ #endif
+ 
++// TxJS begin
++#include "jsversion.h"
++// TxJS end
++
+ #include "builtin/TestingFunctions.h"
+ #include "frontend/Parser.h"
+ #include "jit/Ion.h"
+@@ -1832,7 +1836,12 @@
+ JS_STATIC_ASSERT(JSTRY_FINALLY == 1);
+ JS_STATIC_ASSERT(JSTRY_ITER == 2);
+ 
++#ifdef TxJS
++JS_STATIC_ASSERT(JSTRY_TX == 3);
++static const char* const TryNoteNames[] = { "catch", "finally", "iter", "tx", "loop" };
++#else
+ static const char* const TryNoteNames[] = { "catch", "finally", "iter", "loop" };
++#endif
+ 
+ static bool
+ TryNotes(JSContext *cx, HandleScript script, Sprinter *sp)
+@@ -3730,7 +3739,6 @@
+     JS_FN_HELP("readline", ReadLine, 0, 0,
+ "readline()",
+ "  Read a single line from stdin."),
+-
+     JS_FN_HELP("print", Print, 0, 0,
+ "print([exp ...])",
+ "  Evaluate and print expressions to stdout."),
+

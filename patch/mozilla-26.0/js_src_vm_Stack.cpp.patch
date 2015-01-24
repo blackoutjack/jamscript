@@ -1,0 +1,50 @@
+--- ff-orig/mozilla-26.0/js/src/vm/Stack.cpp	2013-12-05 10:07:40.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/vm/Stack.cpp	2015-01-24 14:47:28.289662333 -0600
+@@ -89,6 +89,9 @@
+     Debug_SetValueRangeToCrashOnTouch(&rval_, 1);
+     hookData_ = (void *)0xbad;
+ #endif
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ }
+ 
+ template <StackFrame::TriggerPostBarriers doPostBarrier>
+@@ -483,6 +486,18 @@
+ 
+     fp->mark_ = mark;
+     fp->initCallFrame(cx, NULL, NULL, NULL, *fun, script, argv, args.length(), flags);
++#ifdef TxJS
++    // Save a transaction that is in the process of suspending, so that
++    // we can automatically resume it when this frame returns.
++    TxContext *tx = cx->getSuspendingTx();
++    if (tx) {
++        JS_ASSERT(!fp->suspendedTx());
++        // Advance the transaction state.
++        JS_ASSERT(tx->inState(TX_SUSPEND0 | TX_END0));
++        tx->advanceState();
++        fp->setSuspendedTx(tx);
++    }
++#endif
+     fg->setPushed(*this, fp);
+     return fp;
+ }
+@@ -504,6 +519,17 @@
+     fp->initExecuteFrame(cx, script, evalInFrame, thisv, *scopeChain, type);
+     fp->initVarsToUndefined();
+ 
++#ifdef TxJS
++    // Save a transaction that is in the process of suspending, so that
++    // we can automatically resume it when this frame returns.
++    TxContext *tx = cx->getSuspendingTx();
++    if (tx) {
++        JS_ASSERT(!fp->suspendedTx());
++        JS_ASSERT(tx->inState(TX_SUSPEND0 | TX_END0));
++        tx->advanceState();
++        fp->setSuspendedTx(tx);
++    }
++#endif
+     fg->setPushed(*this, fp);
+     return fp;
+ }
+

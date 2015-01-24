@@ -1,0 +1,11 @@
+--- ff-orig/mozilla-26.0/js/src/jsprototypes.h	2013-12-05 10:07:37.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/jsprototypes.h	2015-01-24 15:24:53.045596700 -0600
+@@ -69,5 +69,7 @@
+     macro(StructType,            50,     js_InitTypedObjectClasses) \
+     macro(ArrayTypeObject,       51,     js_InitTypedObjectClasses) \
+     macro(GeneratorFunction,     52,     js_InitIteratorClasses) \
++    macro(Tx,                    53,     js_InitTxClass) \
++    macro(JAM,                   54,     js_InitJAMClass) \
+ 
+ #endif /* jsprototypes_h */
+

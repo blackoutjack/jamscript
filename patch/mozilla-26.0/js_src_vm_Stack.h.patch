@@ -1,0 +1,54 @@
+--- ff-orig/mozilla-26.0/js/src/vm/Stack.h	2013-12-05 10:07:40.000000000 -0600
++++ ff-dev/mozilla-26.0/js/src/vm/Stack.h	2015-01-24 15:13:18.981616993 -0600
+@@ -11,6 +11,9 @@
+ 
+ #include "jsfun.h"
+ #include "jsscript.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ 
+ #include "jit/IonFrameIterator.h"
+ #ifdef CHECK_OSIPOINT_REGISTERS
+@@ -291,6 +294,9 @@
+ 
+         /* Miscellaneous state. */
+         USE_NEW_TYPE       =    0x20000   /* Use new type for constructed |this| object. */
++#ifdef TxJS
++       ,HAS_SUSPENDED_TX   =    0x40000
++#endif
+     };
+ 
+   private:
+@@ -317,6 +323,13 @@
+     Value               *prevsp_;
+ 
+     void                *hookData_;     /* if HAS_HOOK_DATA, closure returned by call hook */
++#ifdef TxJS
++    // When the handler is called on suspend or at the end of a
++    // transaction, the transaction object is saved here. When this
++    // frame returns, we know to resume or terminate the transaction
++    // (depending on the transaction state).
++    TxContext           *suspendedTx_;
++#endif
+ 
+     /*
+      * For an eval-in-frame DEBUGGER frame, the frame in whose scope we're
+@@ -723,6 +736,16 @@
+ 
+     inline JSCompartment *compartment() const;
+ 
++#ifdef TxJS
++    inline TxContext *suspendedTx() const {
++        return (flags_ & HAS_SUSPENDED_TX) ? suspendedTx_ : NULL;
++    }
++    inline void setSuspendedTx(TxContext *tx) {
++        flags_ |= HAS_SUSPENDED_TX;
++        suspendedTx_ = tx;
++    }
++#endif
++
+     /* Debugger hook data */
+ 
+     bool hasHookData() const {
+

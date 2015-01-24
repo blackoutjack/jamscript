@@ -1,0 +1,12 @@
+--- ff-orig/mozilla-26.0/dom/base/nsIScriptChannel.idl	2013-12-05 10:07:27.000000000 -0600
++++ ff-dev/mozilla-26.0/dom/base/nsIScriptChannel.idl	2015-01-24 14:47:27.737662349 -0600
+@@ -66,4 +66,8 @@
+    * channel has no effect.
+    */
+   attribute boolean executeAsync;   
++
++  // TxJS begin
++  attribute jsval introspector;
++  // TxJS end
+ };
+
