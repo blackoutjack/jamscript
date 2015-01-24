@@ -1,0 +1,48 @@
+--- ff-orig/mozilla-25.0/js/src/frontend/Parser.h	2013-10-25 17:27:22.000000000 -0500
++++ ff-dev/mozilla-25.0/js/src/frontend/Parser.h	2015-01-24 13:22:22.933811605 -0600
+@@ -99,6 +99,11 @@
+ 
+     StmtInfoPC      *topStmt;       /* top of statement info stack */
+     StmtInfoPC      *topScopeStmt;  /* top lexical scope statement */
++#ifdef TxJS_HOIST
++    StmtInfoPC      *txTop;         /* top statement to use for tx */
++    bool             hasTxTop;
++    bool             hasFunctionStmt;
++#endif
+     Rooted<StaticBlockObject *> blockChain;
+                                     /* compile time block scope chain */
+     Node            maybeFunction;  /* sc->isFunctionBox, the pn where pn->pn_funbox == sc */
+@@ -243,6 +248,11 @@
+         blockidGen(bodyid),  // used to set |bodyid| and subsequently incremented in init()
+         topStmt(NULL),
+         topScopeStmt(NULL),
++#ifdef TxJS_HOIST
++        txTop(NULL),
++        hasTxTop(false),
++        hasFunctionStmt(false),
++#endif
+         blockChain(prs->context),
+         maybeFunction(maybeFunction),
+         staticLevel(staticLevel),
+@@ -513,6 +523,10 @@
+     Node expr();
+     Node assignExpr();
+     Node assignExprWithoutYield(unsigned err);
++#ifdef TxJS
++    Node txStmt();
++    Node txExpr();
++#endif
+     Node condExpr1();
+     Node orExpr1();
+     Node unaryExpr();
+@@ -527,6 +541,9 @@
+ 
+     Node functionDef(HandlePropertyName name, const TokenStream::Position &start,
+                      FunctionType type, FunctionSyntaxKind kind);
++#ifdef TxJS
++    bool txArguments(Node txpn);
++#endif
+     bool functionArgsAndBody(Node pn, HandleFunction fun,
+                              FunctionType type, FunctionSyntaxKind kind,
+                              Directives inheritedDirectives, Directives *newDirectives);
+

@@ -1,0 +1,11 @@
+--- ff-orig/mozilla-25.0/js/src/jsprototypes.h	2013-10-25 17:27:23.000000000 -0500
++++ ff-dev/mozilla-25.0/js/src/jsprototypes.h	2015-01-24 13:27:52.341801973 -0600
+@@ -71,5 +71,7 @@
+     macro(ArrayType,             50,     js_InitBinaryDataClasses) \
+     macro(StructType,            51,     js_InitBinaryDataClasses) \
+     macro(ArrayTypeObject,       52,     js_InitBinaryDataClasses) \
++    macro(Tx,                    53,     js_InitTxClass) \
++    macro(JAM,                   54,     js_InitJAMClass) \
+ 
+ #endif /* jsprototypes_h */
+

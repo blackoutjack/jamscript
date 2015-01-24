@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-25.0/content/base/src/nsFrameLoader.cpp	2013-10-25 17:27:10.000000000 -0500
++++ ff-dev/mozilla-25.0/content/base/src/nsFrameLoader.cpp	2015-01-24 13:00:49.741849415 -0600
+@@ -290,6 +290,9 @@
+   , mRemoteBrowser(nullptr)
+   , mRenderMode(RENDER_MODE_DEFAULT)
+   , mEventMode(EVENT_MODE_NORMAL_DISPATCH)
++#ifdef TxJS
++  , mIntrospector(JS::UndefinedValue())
++#endif
+ {
+   ResetPermissionManagerStatus();
+ }
+@@ -521,6 +524,9 @@
+   // Kick off the load...
+   bool tmpState = mNeedsAsyncDestroy;
+   mNeedsAsyncDestroy = true;
++#ifdef TxJS
++  mDocShell->SetIntrospector(mIntrospector);
++#endif
+   nsCOMPtr<nsIURI> uriToLoad = mURIToLoad;
+   rv = mDocShell->LoadURI(uriToLoad, loadInfo, flags, false);
+   mNeedsAsyncDestroy = tmpState;
+

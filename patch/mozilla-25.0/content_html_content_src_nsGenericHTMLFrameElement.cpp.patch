@@ -1,0 +1,30 @@
+--- ff-orig/mozilla-25.0/content/html/content/src/nsGenericHTMLFrameElement.cpp	2013-10-25 17:27:11.000000000 -0500
++++ ff-dev/mozilla-25.0/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-01-24 13:00:49.885849411 -0600
+@@ -14,6 +14,9 @@
+ #include "nsServiceManagerUtils.h"
+ #include "nsIDOMApplicationRegistry.h"
+ #include "nsIPermissionManager.h"
++#ifdef TxJS
++#include "nsIScriptContext.h"
++#endif
+ #include "GeckoProfiler.h"
+ 
+ using namespace mozilla;
+@@ -168,6 +171,16 @@
+     return NS_OK;
+   }
+ 
++#ifdef TxJS
++  nsIScriptContext* sctx = GetContextForEventHandlers(&rv);
++  if (sctx) {
++    JSContext* cx = sctx->GetNativeContext();
++    JS::Value ispect = JS_GetIntrospector(cx);
++    if (!ispect.isUndefined()) {
++      mFrameLoader->mIntrospector = ispect;
++    }
++  }
++#endif
+   nsresult rv = mFrameLoader->LoadFrame();
+ #ifdef DEBUG
+   if (NS_FAILED(rv)) {
+

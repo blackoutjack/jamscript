@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-25.0/js/src/jsopcode.tbl	2013-10-25 17:27:23.000000000 -0500
++++ ff-dev/mozilla-25.0/js/src/jsopcode.tbl	2015-01-24 13:05:15.289841651 -0600
+@@ -518,3 +518,10 @@
+ 
+ /* Notes the point at which a value is pushed as an argument. */
+ OPDEF(JSOP_NOTEARG,       228, "notearg",      NULL,  1,  0,  0,  JOF_BYTE)
++
++// TxJS begin
++// %%% Guarding with a preprocessor directive causes
++// %%% inconsistencies.
++OPDEF(JSOP_BEGIN_TX,      229, "begin_tx",     NULL,  3,  1,  0,  JOF_UINT16)
++OPDEF(JSOP_END_TX,        230, "end_tx",       NULL,  1,  0,  1,  JOF_BYTE|JOF_INVOKE|JOF_TMPSLOT3)
++// TxJS end
+

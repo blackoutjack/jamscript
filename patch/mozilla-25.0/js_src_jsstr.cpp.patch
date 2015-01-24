@@ -1,0 +1,15 @@
+--- ff-orig/mozilla-25.0/js/src/jsstr.cpp	2013-10-25 17:27:23.000000000 -0500
++++ ff-dev/mozilla-25.0/js/src/jsstr.cpp	2015-01-24 13:05:15.309841651 -0600
+@@ -3562,7 +3562,11 @@
+ }
+ 
+ static const JSFunctionSpec string_static_methods[] = {
++#ifdef TxJS
++    JS_FN("fromCharCode", js::str_fromCharCode, 1, JSFUN_TX_NOSUSPEND),
++#else
+     JS_FN("fromCharCode", js::str_fromCharCode, 1, 0),
++#endif
+ 
+     // This must be at the end because of bug 853075: functions listed after
+     // self-hosted methods aren't available in self-hosted code.
+
