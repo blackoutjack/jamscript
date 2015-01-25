@@ -1,0 +1,34 @@
+--- ff-orig/mozilla-29.0.1/js/src/frontend/FullParseHandler.h	2014-05-06 17:55:42.000000000 -0500
++++ ff-dev/mozilla-29.0.1/js/src/frontend/FullParseHandler.h	2015-01-25 16:09:23.698992425 -0600
+@@ -274,8 +274,18 @@
+     void addStatementToList(ParseNode *list, ParseNode *stmt, PC *pc) {
+         JS_ASSERT(list->isKind(PNK_STATEMENTLIST));
+ 
++#ifdef TxJS_HOIST
++        if (stmt->isKind(PNK_TX) && stmt->pn_xflags & PNX_FUNCDEFS) {
++          stmt->pn_xflags &= ~PNX_FUNCDEFS;
++          list->pn_xflags |= PNX_FUNCDEFS;
++        }
++#endif
+         if (stmt->isKind(PNK_FUNCTION)) {
++#ifdef TxJS_HOIST
++            if (pc->atBodyLevel() || pc->hasTxTop) {
++#else
+             if (pc->atBodyLevel()) {
++#endif
+                 // PNX_FUNCDEFS notifies the emitter that the block contains
+                 // body-level function definitions that should be processed
+                 // before the rest of nodes.
+@@ -284,6 +294,11 @@
+                 // General deoptimization was done in Parser::functionDef.
+                 JS_ASSERT_IF(pc->sc->isFunctionBox(),
+                              pc->sc->asFunctionBox()->hasExtensibleScope());
++#ifdef TxJS
++                // Communicate to |txStmt| that there is a function
++                // definition within.
++                pc->hasFunctionStmt = true;
++#endif
+             }
+         }
+ 
+

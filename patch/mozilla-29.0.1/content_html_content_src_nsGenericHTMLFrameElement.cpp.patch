@@ -1,0 +1,30 @@
+--- ff-orig/mozilla-29.0.1/content/html/content/src/nsGenericHTMLFrameElement.cpp	2014-05-06 17:55:18.000000000 -0500
++++ ff-dev/mozilla-29.0.1/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-01-25 16:13:05.850985930 -0600
+@@ -21,6 +21,9 @@
+ #include "nsIPermissionManager.h"
+ #include "nsIPresShell.h"
+ #include "nsIScrollable.h"
++#ifdef TxJS
++#include "nsIScriptContext.h"
++#endif
+ #include "nsPresContext.h"
+ #include "nsServiceManagerUtils.h"
+ 
+@@ -178,6 +181,16 @@
+     return NS_OK;
+   }
+ 
++#ifdef TxJS
++  nsIScriptContext* sctx = GetContextForEventHandlers(&rv);
++  if (sctx) {
++    JSContext* cx = sctx->GetNativeContext();
++    JS::Value ispect = JS_GetIntrospector(cx);
++    if (!ispect.isUndefined()) {
++      mFrameLoader->mIntrospector = ispect;
++    }
++  }
++#endif
+   nsresult rv = mFrameLoader->LoadFrame();
+ #ifdef DEBUG
+   if (NS_FAILED(rv)) {
+

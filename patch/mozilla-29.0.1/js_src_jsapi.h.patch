@@ -1,0 +1,48 @@
+--- ff-orig/mozilla-29.0.1/js/src/jsapi.h	2014-05-06 17:55:45.000000000 -0500
++++ ff-dev/mozilla-29.0.1/js/src/jsapi.h	2015-01-25 16:09:23.878992420 -0600
+@@ -977,7 +977,14 @@
+  */
+ #define JSFUN_GENERIC_NATIVE   0x800
+ 
++#ifdef TxJS
++#define JSFUN_TX_NOSUSPEND     0x1000   /* indicates that a call to this
++                                           function should not suspend
++                                           an active transaction */
++#define JSFUN_FLAGS_MASK       0x1e00   /* | of all the JSFUN_* flags */
++#else
+ #define JSFUN_FLAGS_MASK       0xe00    /* | of all the JSFUN_* flags */
++#endif
+ 
+ /*
+  * The first call to JS_CallOnce by any thread in a process will call 'func'.
+@@ -1010,6 +1017,11 @@
+ extern JS_PUBLIC_API(JSString *)
+ JS_GetEmptyString(JSRuntime *rt);
+ 
++#ifdef TxJS
++extern JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx);
++#endif
++
+ /*
+  * Format is a string of the following characters (spaces are insignificant),
+  * specifying the tabulated type conversions:
+@@ -3240,6 +3252,7 @@
+  * Security protocol.
+  */
+ struct JSPrincipals {
++
+     /* Don't call "destroy"; use reference counting macros below. */
+ #ifdef JS_THREADSAFE
+     mozilla::Atomic<int32_t> refcount;
+@@ -3549,6 +3562,9 @@
+     bool forEval;
+     bool noScriptRval;
+     bool selfHostingMode;
++#ifdef TxJS
++    Value introspector;
++#endif
+     bool canLazilyParse;
+     bool strictOption;
+     bool extraWarningsOption;
+

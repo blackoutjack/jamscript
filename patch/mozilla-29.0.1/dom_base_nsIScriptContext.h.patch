@@ -1,0 +1,26 @@
+--- ff-orig/mozilla-29.0.1/dom/base/nsIScriptContext.h	2014-05-06 17:55:22.000000000 -0500
++++ ff-dev/mozilla-29.0.1/dom/base/nsIScriptContext.h	2015-01-25 16:09:23.486992432 -0600
+@@ -61,12 +61,22 @@
+    * @param aOffThreadToken if specified, the result of compiling the script
+    *                        on another thread.
+    */
++#ifdef TxJS
+   virtual nsresult EvaluateString(const nsAString& aScript,
+                                   JS::Handle<JSObject*> aScopeObject,
+                                   JS::CompileOptions& aOptions,
+                                   bool aCoerceToString,
+                                   JS::Value* aRetValue,
++                                  const JS::Value &ispect,
+                                   void **aOffThreadToken = nullptr) = 0;
++#else
++  virtual nsresult EvaluateString(const nsAString& aScript,
++                                  JS::Handle<JSObject*> aScopeObject,
++                                  JS::CompileOptions& aOptions,
++                                  bool aCoerceToString,
++                                  JS::Value* aRetValue,
++                                  void **aOffThreadToken = nullptr) = 0;
++#endif
+ 
+   /**
+    * Bind an already-compiled event handler function to the given
+

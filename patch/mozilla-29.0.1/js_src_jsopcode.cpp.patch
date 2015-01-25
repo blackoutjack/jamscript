@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-29.0.1/js/src/jsopcode.cpp	2014-05-06 17:55:46.000000000 -0500
++++ ff-dev/mozilla-29.0.1/js/src/jsopcode.cpp	2015-01-25 16:09:24.074992414 -0600
+@@ -121,8 +121,17 @@
+         return GET_UINT16(pc) + 1;
+       default:
+         /* stack: fun, this, [argc arguments] */
++#ifdef TxJS
++        JS_ASSERT(op == JSOP_NEW || op == JSOP_CALL || op == JSOP_EVAL ||
++                  op == JSOP_BEGIN_TX || op == JSOP_FUNCALL || op == JSOP_FUNAPPLY);
++        // There's no fun or this for transaction entry.
++        if (op == JSOP_BEGIN_TX)
++            return GET_ARGC(pc);
++        else
++#else
+         JS_ASSERT(op == JSOP_NEW || op == JSOP_CALL || op == JSOP_EVAL ||
+                   op == JSOP_FUNCALL || op == JSOP_FUNAPPLY);
++#endif
+         return 2 + GET_ARGC(pc);
+     }
+ }
+

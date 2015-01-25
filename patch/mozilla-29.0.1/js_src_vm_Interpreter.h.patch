@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-29.0.1/js/src/vm/Interpreter.h	2014-05-06 17:55:51.000000000 -0500
++++ ff-dev/mozilla-29.0.1/js/src/vm/Interpreter.h	2015-01-25 16:10:43.874990081 -0600
+@@ -322,6 +322,20 @@
+ extern void
+ UnwindScope(JSContext *cx, ScopeIter &si, uint32_t stackDepth);
+ 
++#ifdef TxJS
++extern bool 
++BeginTx(JSContext *cx, const js::Value &tx_handler);
++
++extern bool 
++IntrospectTx(JSContext *cx, TxContext *tx, InterpreterActivation *activation, bool isEnd, HandleScript script, int *path, bool *newType);
++
++extern bool
++TxSubsumed(JSContext *cx, const js::Value &ispect);
++
++extern bool
++SuspendCall(JSContext *cx, TxContext *tx, CallArgs &args, bool *construct);
++#endif
++
+ /*
+  * Unwind for an uncatchable exception. This means not running finalizers, etc;
+  * just preserving the basic engine stack invariants.
+
