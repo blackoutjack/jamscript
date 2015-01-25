@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-28.0/js/src/vm/Keywords.h	2014-03-15 00:19:23.000000000 -0500
++++ ff-dev/mozilla-28.0/js/src/vm/Keywords.h	2015-01-25 12:18:49.943396901 -0600
+@@ -48,6 +48,9 @@
+     macro(enum, enum_, TOK_RESERVED, JSVERSION_DEFAULT) \
+     macro(extends, extends, TOK_RESERVED, JSVERSION_DEFAULT) \
+     macro(super, super, TOK_RESERVED, JSVERSION_DEFAULT) \
++    /* TxJS begin */ \
++    macro(introspect, introspect_, TOK_TX, JSVERSION_DEFAULT) \
++    /* TxJS end */ \
+     /* Future reserved keywords, but only in strict mode. */ \
+     macro(implements, implements, TOK_STRICT_RESERVED, JSVERSION_DEFAULT) \
+     macro(interface, interface, TOK_STRICT_RESERVED, JSVERSION_DEFAULT) \
+

@@ -1,0 +1,48 @@
+--- ff-orig/mozilla-28.0/js/src/frontend/Parser.h	2014-03-15 00:19:19.000000000 -0500
++++ ff-dev/mozilla-28.0/js/src/frontend/Parser.h	2015-01-25 12:15:21.303403001 -0600
+@@ -98,6 +98,11 @@
+ 
+     StmtInfoPC      *topStmt;       /* top of statement info stack */
+     StmtInfoPC      *topScopeStmt;  /* top lexical scope statement */
++#ifdef TxJS_HOIST
++    StmtInfoPC      *txTop;         /* top statement to use for tx */
++    bool             hasTxTop;
++    bool             hasFunctionStmt;
++#endif
+     Rooted<StaticBlockObject *> blockChain;
+                                     /* compile time block scope chain */
+     Node            maybeFunction;  /* sc->isFunctionBox, the pn where pn->pn_funbox == sc */
+@@ -249,6 +254,11 @@
+         blockidGen(bodyid),  // used to set |bodyid| and subsequently incremented in init()
+         topStmt(nullptr),
+         topScopeStmt(nullptr),
++#ifdef TxJS_HOIST
++        txTop(NULL),
++        hasTxTop(false),
++        hasFunctionStmt(false),
++#endif
+         blockChain(prs->context),
+         maybeFunction(maybeFunction),
+         staticLevel(staticLevel),
+@@ -523,6 +533,10 @@
+     Node assignExpr();
+     Node assignExprWithoutYield(unsigned err);
+     Node yieldExpression();
++#ifdef TxJS
++    Node txStmt();
++    Node txExpr();
++#endif
+     Node condExpr1();
+     Node orExpr1();
+     Node unaryExpr();
+@@ -537,6 +551,9 @@
+ 
+     Node functionDef(HandlePropertyName name, const TokenStream::Position &start,
+                      FunctionType type, FunctionSyntaxKind kind, GeneratorKind generatorKind);
++#ifdef TxJS
++    bool txArguments(Node txpn);
++#endif
+     bool functionArgsAndBody(Node pn, HandleFunction fun,
+                              FunctionType type, FunctionSyntaxKind kind,
+                              GeneratorKind generatorKind,
+

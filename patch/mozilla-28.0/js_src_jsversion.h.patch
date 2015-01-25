@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-28.0/js/src/jsversion.h	2014-03-15 00:19:20.000000000 -0500
++++ ff-dev/mozilla-28.0/js/src/jsversion.h	2015-01-25 12:15:21.611402992 -0600
+@@ -26,6 +26,9 @@
+ #define JS_HAS_GENERATOR_EXPRS  1       /* has (expr for (lhs in iterable)) */
+ #define JS_HAS_EXPR_CLOSURES    1       /* has function (formals) listexpr */
+ 
++/* Enable transactions */
++#define TxJS 1
++
+ /* Support for JS_NewGlobalObject. */
+ #define JS_HAS_NEW_GLOBAL_OBJECT        1
+ 
+

@@ -1,0 +1,384 @@
+--- ff-orig/mozilla-28.0/js/src/jstxaction.cpp	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-28.0/js/src/jstxaction.cpp	2015-01-25 12:15:21.611402992 -0600
+@@ -0,0 +1,380 @@
++#include "jsversion.h"
++#ifdef TxJS
++
++#include <stdlib.h>
++#include <stdio.h>
++
++#include "jstx.h"
++#include "jstxaction.h"
++#include "jscntxt.h"
++#include "jsatom.h"
++#include "jsbool.h"
++#include "jsobjinlines.h"
++
++using namespace js;
++
++namespace js {
++    HashNumber
++    DefaultHasher<TxProperty>::hash(const Lookup &l) {
++        // random numbers from rand.org
++        long z[3] = {0x2058cc50L, 0xcb19137eL, 0x2cb6b6fdL}; 
++        long zz = 0xbea0107e5067d19dL;
++
++        // convert (unsigned) hashcodes to long
++        long h0, h1;
++#ifdef TxJS_LOCAL
++        if (l.type == TX_OBJECT) {
++#endif
++            h0 = HashId(l.i.id) & ((1L<<32)-1);
++            h1 = PointerHasher<JSObject*,0>::hash(l.object.get()) & ((1L<<32)-1);
++#ifdef TxJS_LOCAL
++        } else {
++            h0 = detail::ScrambleHashCode(l.i.index) & ((1L<<32)-1);
++            h1 = PointerHasher<StackFrame*,0>::hash(l.frame) & ((1L<<32)-1);
++        }
++#endif
++        return (HashNumber)(((z[0]*h0 + z[2]*h1)*zz) >> 32);
++    }
++
++    bool
++    DefaultHasher<TxProperty>::match(const TxProperty &k, const Lookup &l) {
++        return k.type == l.type && (
++#ifdef TxJS_LOCAL
++          k.type == TX_FRAME ?
++          k.i.index == l.i.index && k.frame == l.frame :
++#endif
++          k.i.id == l.i.id && k.object == l.object
++        );
++    }
++} // namespace js
++
++static bool
++wrap(JSContext *cx, JSObject **objp)
++{
++  JSCompartment *comp = cx->compartment();
++  if ((*objp)->compartment() == comp) {
++    return true;
++  } else {
++    RootedObject obj(cx, *objp);
++    return comp->wrap(cx, &obj);
++  }
++}
++
++static bool
++wrap(JSContext *cx, Value *vp)
++{
++  JSCompartment *comp = cx->compartment();
++  if (vp->isObject() && vp->toObject().compartment() == comp) {
++    return true;
++  } else {
++    RootedValue v(cx, *vp);
++    return comp->wrap(cx, &v);
++  }
++}
++
++bool
++tx_ActionNodeToValue(JSContext *cx, TxAction *node, MutableHandleValue vp)
++{
++    Value val;
++
++    // Create the object that will be returned. It will have the
++    // following structure.
++    //
++    // [Object]:object
++    //   type:string  read/write/call/delete
++    //   value:any  Value that was read/written
++    //   obj:object  Scope/receiver of the access
++    //   id:string|int|object  Member/local identifier
++    //
++    JSObject *obj = NewObjectWithClassProto(cx, &JSObject::class_, NULL, NULL);
++    if (!obj) {
++        return false;
++    }
++    RootedObject rootObj(cx, obj);
++
++    // Set the "type" property.
++    switch (node->type) {
++      case AX_READ:
++        val = StringValue(cx->names().read);
++        break;
++      case AX_WRITE:
++        val = StringValue(cx->names().write);
++        break;
++      case AX_CALL:
++        val = StringValue(cx->names().call);
++        break;
++      case AX_NEW:
++        val = StringValue(Atomize(cx, "new", 3));
++        break;
++      case AX_DELETE:
++        val = StringValue(cx->names().delete_);
++        break;
++      case AX_FORIN:
++        val = StringValue(cx->names().forin);
++        break;
++      default:
++        JS_ASSERT(false);
++        break;
++    }
++    //JS_SetProperty(cx, obj, "type", &val);
++    RootedValue rootVal0(cx, val);
++    RootedId rootId0(cx, AtomToId(cx->names().type));
++    JSObject::setGeneric(cx, rootObj, rootObj, rootId0, &rootVal0, false);
++
++    // Set the "value" property.
++    wrap(cx, &node->value);
++    RootedValue rootVal1(cx, node->value);
++    RootedId rootId1(cx, AtomToId(cx->names().value));
++    JSObject::setGeneric(cx, rootObj, rootObj, rootId1, &rootVal1, false);
++
++    if (node->prop.type == TX_OBJECT) {
++        // Add the "obj" property.
++        JSObject *objp = node->prop.object.get();
++        wrap(cx, &objp);
++        RootedValue rootVal2(cx, ObjectValue(*objp));
++        RootedId rootId2(cx, AtomToId(cx->names().obj));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId2, &rootVal2, false);
++
++        // Add the "id" property.
++        RootedValue rootVal3(cx, IdToValue(node->prop.i.id));
++        RootedId rootId3(cx, AtomToId(cx->names().id));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId3, &rootVal3, false);
++    } else {
++        // Add a null "obj" property.
++        RootedValue rootVal2(cx, JSVAL_NULL);
++        RootedId rootId2(cx, AtomToId(cx->names().obj));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId2, &rootVal2, false);
++
++        // Add the "id" property to the index.
++        RootedValue rootVal3(cx, INT_TO_JSVAL(node->prop.i.index));
++        RootedId rootId3(cx, AtomToId(cx->names().id));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId3, &rootVal3, false);
++    }
++
++    // Add the arguments information.
++    if (node->type & AX_INVOKE) {
++        RootedValue rootVal4(cx, NumberValue(node->argc));
++        RootedId rootId4(cx, AtomToId(cx->names().argc));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId4, &rootVal4, false);
++
++        JSObject *args = NULL;
++        if (node->argc == 0) {
++            args = NewDenseEmptyArray(cx);
++        } else {
++            args = NewDenseCopiedArray(cx, node->argc, node->argv);
++        }
++        if (!args) {
++            return false;
++        }
++
++        RootedValue rootVal6(cx, ObjectValue(*args));
++        RootedId rootId6(cx, AtomToId(cx->names().args));
++        JSObject::setGeneric(cx, rootObj, rootObj, rootId6, &rootVal6, false);
++    }
++
++    // Set the return value.
++    vp.setObject(*obj);
++
++    return true;
++}
++
++#ifndef TxJS_HASH
++Value
++get_node_val(TxAction *node)
++{
++    if (node && !(node->type & AX_DELETE))
++        return node->value;
++    return JSVAL_VOID;
++}
++#endif
++
++#ifdef TxJS_LOCAL
++bool
++init_action(JSContext *cx, TxAction *act, StackFrame *fp, uint32_t i, Value val, TxActionType type, bool active)
++{
++    JS_ASSERT(fp != NULL && act != NULL);
++
++    act->type = type;
++    act->prop.type = TX_FRAME;
++    act->prop.object.init(NULL);
++    act->prop.frame = fp;
++    act->prop.i.index = i;
++    act->active = active;
++    act->value = val;
++    act->argv = NULL;
++    act->argc = 0;
++
++    return true;
++}
++#endif
++
++bool
++init_action(JSContext *cx, TxAction *act, JSObject *obj, jsid id, Value val, TxActionType type)
++{
++    JS_ASSERT(obj != NULL && act != NULL);
++
++    act->type = type;
++    act->prop.type = TX_OBJECT;
++    act->prop.object.init(obj);
++    act->prop.i.id = id;
++    act->active = true;
++    act->value = val;
++    act->argv = NULL;
++    act->argc = 0;
++    //act->prev = NULL;
++    //act->next = NULL;
++
++    return true;
++}
++
++bool
++init_action(JSContext *cx, TxAction *act, const CallArgs *args, bool construct)
++{
++    JS_ASSERT(args != NULL && act != NULL);
++
++    // Record a call action.
++    RootedValue recv(cx, args->thisv());
++    JSObject *r = NULL;
++    if (recv.isObject()) {
++        r = &recv.toObject();
++    } else {
++        if (recv.isNullOrUndefined()) {
++          // Global is the receiver if it is undefined.
++          r = cx->global();
++        } else if ((r = PrimitiveToObject(cx, recv)) != NULL) {
++          // |r| gets a pointer to the JSObject.
++        } else {
++          // Else use the global.
++          // %%% Is this correct? Somehow throw an exception?
++          // %%% How is the case triggered?
++          r = cx->global();
++        }
++    }
++
++    RootedObject rec(cx, r);
++
++    HandleValue fnval = args->calleev();
++    jsid fnid;
++    JSFunction *fnfun;
++    if (fnval.isObject() && IsFunctionObject(fnval, &fnfun)) {
++      JSAtom *fnatom = fnfun->atom();
++      if (fnatom != NULL) {
++        fnid = AtomToId(fnatom); 
++      } else {
++        // %%% Something better to do here?
++        fnid = INT_TO_JSID(0);
++      }
++    } else {
++      // %%% Something better to do here?
++      fnid = INT_TO_JSID(0);
++    }
++
++    act->type = construct ? AX_NEW : AX_CALL;
++    act->prop.type = TX_OBJECT;
++    act->prop.object.init(rec);
++    act->prop.i.id = fnid;
++    act->active = true;
++    act->value = fnval.get();
++    act->argc = args->length();
++    if (act->argc > 0) {
++        act->argv = (Value*)cx->malloc_(act->argc * sizeof(Value));
++        for (uint32_t i=0; i<act->argc; i++) {
++            act->argv[i] = args->array()[i];
++        }
++    } else {
++      act->argv = NULL;
++    }
++
++    return true;
++}
++
++#ifndef TxJS_HASH
++#ifdef TxJS_LOCAL
++TxAction *
++get_action_node(JSContext *cx, TxAction *seq, StackFrame *fp, uint32_t i, uint32_t size, TxActionType type)
++{
++    if (seq == NULL || fp == NULL)
++        return NULL;
++
++    TxAction *act = NULL;
++    for (uint32_t j=size; j>0; j--) {
++        act = seq + (j - 1);
++        // Get any type of node, since it will contain the latest value.
++        // However, don't get non-|active| nodes, because it may be the
++        // case that a new frame has been created with the same address
++        // as one that has returned.
++        if ((act->type & type) && act->prop.type == TX_FRAME && 
++          act->active && act->prop.frame == fp &&
++          i == act->prop.i.index)
++        {
++            return act;
++        }
++    }
++
++    return NULL;
++}
++#endif
++
++static bool
++idsAreEqual(jsid id1, jsid id2) {
++    if (id1 == id2) {
++        return true;
++    }
++    uint32_t i, j;
++    if (js_IdIsIndex(id1, &i) && js_IdIsIndex(id2, &j)) {
++        return i == j;
++    }
++    return false;
++}
++
++TxAction *
++get_action_node(JSContext *cx, TxAction *seq, JSObject *obj, jsid id, uint32_t size, TxActionType type)
++{
++    if (seq == NULL || obj == NULL)
++        return NULL;
++
++    TxAction *act = NULL;
++    for (uint32_t i=size; i>0; i--) {
++        act = seq + (i - 1);
++        if ((act->type & type) && act->prop.type == TX_OBJECT &&
++          act->prop.object.get() == obj && idsAreEqual(id, act->prop.i.id))
++        {
++            return act;
++        }
++    }
++
++    return NULL;
++}
++#endif
++
++static void
++tx_action_trace(JSTracer *trc, TxAction *act)
++{
++#ifdef TxJS_LOCAL
++    // We rely on existing stack manipulations to know when to dispose
++    // of StackFrame objects.
++    if (act->prop.type == TX_OBJECT)
++#endif
++        gc::MarkObject(trc, &act->prop.object, "tx_action_obj");
++
++    gc::MarkValueUnbarriered(trc, &act->value, "tx_action_value");
++
++    for (uint32_t i=0; i<act->argc; i++) {
++        JS_SET_TRACING_INDEX(trc, "tx_action_argv", i);
++        gc::MarkValueUnbarriered(trc, &act->argv[i], "tx_action_argv");
++    }
++
++    // %%% Others?
++}
++
++void
++tx_actionsequence_trace(JSTracer *trc, TxAction *seq, uint32_t size)
++{
++    TxAction *act = NULL;
++    for (uint32_t i=0; i<size; i++) {
++        act = seq + i;
++        tx_action_trace(trc, act);
++    }
++}
++
++#endif
+

@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-28.0/js/src/jit/BaselineJIT.h	2014-03-15 00:19:20.000000000 -0500
++++ ff-dev/mozilla-28.0/js/src/jit/BaselineJIT.h	2015-01-25 13:59:33.071220210 -0600
+@@ -307,6 +307,10 @@
+ inline bool
+ IsBaselineEnabled(JSContext *cx)
+ {
++#ifdef TxJS
++    if (cx->getRunningTx())
++        return false;
++#endif
+     return cx->compartment()->options().baseline(cx);
+ }
+ 
+

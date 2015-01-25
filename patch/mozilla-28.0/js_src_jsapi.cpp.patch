@@ -1,0 +1,65 @@
+--- ff-orig/mozilla-28.0/js/src/jsapi.cpp	2014-03-15 00:19:20.000000000 -0500
++++ ff-dev/mozilla-28.0/js/src/jsapi.cpp	2015-01-25 14:22:03.447180727 -0600
+@@ -44,6 +44,10 @@
+ #include "jsworkers.h"
+ #endif
+ #include "jswrapper.h"
++#ifdef TxJS
++#include "jsjam.h"
++#include "jstransaction.h"
++#endif
+ #include "prmjtime.h"
+ 
+ #if ENABLE_YARR_JIT
+@@ -2682,6 +2686,14 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx)
++{
++  return cx->getIntrospector();
++}
++#endif
++
+ static bool
+ LookupPropertyById(JSContext *cx, HandleObject obj, HandleId id, unsigned flags,
+                    MutableHandleObject objp, MutableHandleShape propp)
+@@ -2974,7 +2986,6 @@
+                                              zeroFlags, global, atom);
+             if (!setobj)
+                 return false;
+-
+             if (set.info)
+                 setobj->setJitInfo(set.info);
+ 
+@@ -4121,7 +4132,6 @@
+                 if (!ctor)
+                     return false;
+             }
+-
+             flags &= ~JSFUN_GENERIC_NATIVE;
+             JSFunction *fun = DefineFunction(cx, ctor, id,
+                                              js_generic_native_method_dispatcher,
+@@ -4435,6 +4445,9 @@
+     extraWarningsOption = cx->options().extraWarnings();
+     werrorOption = cx->options().werror();
+     asmJSOption = cx->options().asmJS();
++#ifdef TxJS
++    introspector = JS::UndefinedValue();
++#endif
+ }
+ 
+ JSScript *
+@@ -4787,6 +4800,9 @@
+                                                     chars, length, nullptr, 0, &sct));
+     if (!script)
+         return false;
++#ifdef TxJS
++    script->setIntrospector(options.introspector);
++#endif
+ 
+     JS_ASSERT(script->getVersion() == options.version);
+ 
+
