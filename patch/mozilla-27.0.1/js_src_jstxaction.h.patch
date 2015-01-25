@@ -1,0 +1,131 @@
+--- ff-orig/mozilla-27.0.1/js/src/jstxaction.h	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-27.0.1/js/src/jstxaction.h	2015-01-24 17:44:40.945351452 -0600
+@@ -0,0 +1,127 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef jstxaction_h___
++#define jstxaction_h___
++
++#ifdef TxJS
++
++/*
++ * JS Read/Write Set interface
++ */
++#include "jsapi.h"
++#include "jsobj.h"
++
++
++typedef enum TxActionType {
++    AX_NULL = 0x0,
++    // Base types
++    AX_READ = 0x1,
++    AX_WRITE = 0x2,
++    AX_CALL = 0x4,
++    AX_DELETE = 0x8,
++    AX_FORIN = 0x10,
++    AX_NEW = 0x20,
++    // Grouped types
++    AX_MODIFY = 0xA,  // AX_WRITE | AX_DELETE
++    AX_INVOKE = 0x24,  // AX_CALL | AX_NEW
++    AX_ANY = 0x1F  // all base types
++} TxActionType;
++
++typedef enum PropertyType {
++    TX_OBJECT = 0x1,
++    TX_FRAME = 0x2
++} PropertyType;
++
++typedef struct {
++    // Indicates which of the property members to access
++    PropertyType type;
++    // Object whose property was accessed
++    js::HeapPtr<JSObject> object;
++#ifdef TxJS_LOCAL
++    // Stackframe for locals
++    js::StackFrame *frame; 
++#endif
++    union {
++        // Id of the property that was accessed 
++        jsid id;
++        // Stack frame index of a local variable
++        uint32_t index;
++    } i;
++} TxProperty;
++
++class TxAction {
++  public:
++    // Type of action, see TxActionType above
++    TxActionType type; 
++
++    // Object/id pair to identify a slot
++    TxProperty prop;
++
++    // If |type == AX_CALL| or |AX_NEW|, arguments to the call
++    js::Value *argv;
++
++    // Number of arguments
++    uint32_t argc;
++
++    // |false| iff |prop.type == TX_FRAME| and the frame has returned 
++    bool active;
++
++    // Value that was read/written/called. 
++    // If |type == AX_READ|, the read value
++    // If |type == AX_WRITE|, the new value
++    // If |type == AX_CALL|, the function being called
++    // If |type == AX_NEW|, the constructor being called
++    js::Value value;
++};
++
++namespace js {
++    /*
++    template<> struct DefaultHasher<TxAction*>
++    {
++        typedef TxAction* Lookup;
++        static HashNumber hash(const Lookup &l);
++        static bool match(const TxAction *k, const Lookup &l);
++    };
++    typedef struct TxActionHasher : DefaultHasher< pair<TxContext*,int> >
++    {
++        typedef TxAction* Lookup;
++        static HashNumber hash(const Lookup &l);
++        static bool match(const pair<TxContext*,int> &k, const Lookup &l);
++    } TxActionHasher;
++    */
++    template<> struct DefaultHasher<TxProperty>
++    {
++        typedef TxProperty Lookup;
++        static HashNumber hash(const Lookup &l);
++        static bool match(const TxProperty &k, const Lookup &l);
++    };
++    typedef HashMap<TxProperty, js::Value> Values;
++
++#ifdef TxJS_LOCAL
++    typedef HashMap<StackFrame*,HashSet<int>*> FrameActions;
++#endif
++}
++
++bool tx_ActionNodeToValue(JSContext *, TxAction *, js::MutableHandleValue);
++void tx_actionsequence_trace(JSTracer *, TxAction *, uint32_t);
++
++bool init_action(JSContext *, TxAction *, const js::CallArgs *, bool construct);
++bool init_action(JSContext *, TxAction *, JSObject *, jsid, js::Value, TxActionType);
++#ifdef TxJS_LOCAL
++bool init_action(JSContext *, TxAction *, js::StackFrame *, uint32_t, js::Value, TxActionType, bool = true); 
++#endif
++#ifndef TxJS_HASH
++js::Value get_node_val(TxAction *);
++TxAction *get_action_node(JSContext *, TxAction *, JSObject *, jsid, uint32_t, TxActionType = AX_ANY);
++#ifdef TxJS_LOCAL
++TxAction *get_action_node(JSContext *, TxAction *, js::StackFrame *, uint32_t, uint32_t, TxActionType = AX_ANY);
++#endif
++#endif
++
++#endif
++
++#endif
+

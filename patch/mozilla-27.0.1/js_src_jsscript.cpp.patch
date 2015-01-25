@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-27.0.1/js/src/jsscript.cpp	2014-02-12 15:29:04.000000000 -0600
++++ ff-dev/mozilla-27.0.1/js/src/jsscript.cpp	2015-01-24 17:44:40.937351452 -0600
+@@ -1720,6 +1720,10 @@
+     script->sourceStart = bufStart;
+     script->sourceEnd = bufEnd;
+ 
++#ifdef TxJS
++    script->setIntrospector(UndefinedValue());
++#endif
++
+     return script;
+ }
+ 
+@@ -2407,6 +2411,9 @@
+     dst->hasSingletons = src->hasSingletons;
+     dst->treatAsRunOnce = src->treatAsRunOnce;
+     dst->isGeneratorExp = src->isGeneratorExp;
++#ifdef TxJS
++    dst->setIntrospector(src->getIntrospector());
++#endif
+     dst->setGeneratorKind(src->generatorKind());
+ 
+     /* Copy over hints. */
+

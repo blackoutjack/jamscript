@@ -1,0 +1,78 @@
+--- ff-orig/mozilla-27.0.1/js/src/jsapi.cpp	2014-02-12 15:29:04.000000000 -0600
++++ ff-dev/mozilla-27.0.1/js/src/jsapi.cpp	2015-01-25 11:01:34.567532431 -0600
+@@ -44,6 +44,10 @@
+ #include "jsworkers.h"
+ #endif
+ #include "jswrapper.h"
++#ifdef TxJS
++#include "jsjam.h"
++#include "jstransaction.h"
++#endif
+ #include "prmjtime.h"
+ 
+ #if ENABLE_YARR_JIT
+@@ -1291,6 +1295,12 @@
+ #ifdef ENABLE_BINARYDATA
+     {js_InitTypedObjectClass,           EAGER_ATOM_AND_CLASP(TypedObject)},
+ #endif
++#ifdef TxJS
++    /* %%% What does the EAGER_ATOM_AND_CLASP mean? 
++       %%% Convert to &js::Tx::class_ following pattern. */
++    {js_InitTxClass,                    EAGER_ATOM_AND_CLASP(Tx)},
++    {js_InitJAMClass,                   EAGER_ATOM_AND_CLASP(JAM)},
++#endif
+     {nullptr,                           0, nullptr}
+ };
+ 
+@@ -2771,6 +2781,14 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSContext *cx)
++{
++  return cx->getIntrospector();
++}
++#endif
++
+ static bool
+ LookupPropertyById(JSContext *cx, HandleObject obj, HandleId id, unsigned flags,
+                    MutableHandleObject objp, MutableHandleShape propp)
+@@ -3063,7 +3081,6 @@
+                                              zeroFlags, global, atom);
+             if (!setobj)
+                 return false;
+-
+             if (set.info)
+                 setobj->setJitInfo(set.info);
+ 
+@@ -4133,7 +4150,6 @@
+                 if (!ctor)
+                     return false;
+             }
+-
+             flags &= ~JSFUN_GENERIC_NATIVE;
+             JSFunction *fun = DefineFunction(cx, ctor, id,
+                                              js_generic_native_method_dispatcher,
+@@ -4356,6 +4372,9 @@
+       forEval(false),
+       noScriptRval(cx->options().noScriptRval()),
+       selfHostingMode(false),
++#ifdef TxJS
++      introspector(JS::UndefinedValue()),
++#endif
+       canLazilyParse(true),
+       strictOption(cx->options().strictMode()),
+       extraWarningsOption(cx->options().extraWarnings()),
+@@ -4799,6 +4818,9 @@
+                                                     chars, length, nullptr, 0, &sct));
+     if (!script)
+         return false;
++#ifdef TxJS
++    script->setIntrospector(options.introspector);
++#endif
+ 
+     JS_ASSERT(script->getVersion() == options.version);
+ 
+

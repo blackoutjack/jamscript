@@ -1,0 +1,64 @@
+--- ff-orig/mozilla-27.0.1/docshell/base/nsDocShell.cpp	2014-02-12 15:28:55.000000000 -0600
++++ ff-dev/mozilla-27.0.1/docshell/base/nsDocShell.cpp	2015-01-24 17:44:40.361351469 -0600
+@@ -770,6 +770,9 @@
+     mDefaultLoadFlags(nsIRequest::LOAD_NORMAL),
+     mFrameType(eFrameTypeRegular),
+     mOwnOrContainingAppId(nsIScriptSecurityManager::UNKNOWN_APP_ID),
++#ifdef TxJS
++    mIntrospector(JS::UndefinedValue()),
++#endif
+     mParentCharsetSource(0)
+ {
+     mHistoryID = ++gDocshellIDCounter;
+@@ -1708,6 +1711,20 @@
+         originIsFile && targetIsFile;
+ }
+ 
++#ifdef TxJS
++NS_IMETHODIMP
++nsDocShell::GetIntrospector(JS::Value *aIntrospector) {
++    *aIntrospector = mIntrospector;
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsDocShell::SetIntrospector(const JS::Value & aIntrospector) {
++    mIntrospector = aIntrospector;
++    return NS_OK;
++}
++#endif
++
+ NS_IMETHODIMP
+ nsDocShell::GetEldestPresContext(nsPresContext** aPresContext)
+ {
+@@ -9510,6 +9527,10 @@
+ 
+     uriLoader = do_GetService(NS_URI_LOADER_CONTRACTID, &rv);
+     if (NS_FAILED(rv)) return rv;
++#ifdef TxJS
++    JS::Value ispect;
++    GetIntrospector(&ispect);
++#endif
+ 
+     nsLoadFlags loadFlags = mDefaultLoadFlags;
+     if (aFirstParty) {
+@@ -9767,6 +9788,9 @@
+         // Allow execution against our context if the principals match
+         scriptChannel->
+             SetExecutionPolicy(nsIScriptChannel::EXECUTE_NORMAL);
++#ifdef TxJS
++        scriptChannel->SetIntrospector(ispect);
++#endif
+     }
+ 
+     if (aIsNewWindowTarget) {
+@@ -9782,7 +9806,7 @@
+     if (timedChannel) {
+         timedChannel->SetTimingEnabled(true);
+     }
+-
++    static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = ispect;
+     rv = DoChannelLoad(channel, uriLoader, aBypassClassifier);
+ 
+     //
+
