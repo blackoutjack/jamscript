@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-27.0.1/js/src/vm/Interpreter.cpp	2014-02-12 15:29:06.000000000 -0600
-+++ ff-dev/mozilla-27.0.1/js/src/vm/Interpreter.cpp	2015-01-25 11:40:23.455464339 -0600
++++ ff-dev/mozilla-27.0.1/js/src/vm/Interpreter.cpp	2015-01-25 12:39:49.603360071 -0600
 @@ -30,6 +30,11 @@
  #include "jsprf.h"
  #include "jsscript.h"
@@ -1033,9 +1033,9 @@
  
      bool succeeded;
      if (!JSObject::deleteProperty(cx, obj, name, &succeeded))
-@@ -2202,6 +3132,44 @@
-         goto error;
-     }
+@@ -2188,6 +3118,44 @@
+     RootedValue &propval = rootValue0;
+     propval = regs.sp[-1];
  
 +#ifdef TxJS
 +    // %%% Test this.
@@ -1075,9 +1075,9 @@
 +        END_CASE(JSOP_DELELEM)
 +    }
 +#endif
-     MutableHandleValue res = regs.stackHandleAt(-2);
-     res.setBoolean(succeeded);
-     regs.sp--;
+     bool succeeded;
+     if (!JSObject::deleteByValue(cx, obj, propval, &succeeded))
+         goto error;
 @@ -2249,6 +3217,118 @@
  {
  
@@ -1509,20 +1509,7 @@
  
      if (newType)
          regs.fp()->setUseNewType();
-@@ -2771,8 +4107,10 @@
-     unsigned i = GET_ARGNO(regs.pc);
-     if (script->argsObjAliasesFormals())
-         PUSH_COPY(regs.fp()->argsObj().arg(i));
--    else
--        PUSH_COPY(regs.fp()->unaliasedFormal(i));
-+    else {
-+        Value &val = regs.fp()->unaliasedFormal(i);
-+        PUSH_COPY(val);
-+    }
- }
- END_CASE(JSOP_GETARG)
- 
-@@ -2798,8 +4136,10 @@
+@@ -2798,8 +4134,10 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1533,7 +1520,7 @@
  }
  END_CASE(JSOP_GETLOCAL)
  
-@@ -2827,6 +4167,21 @@
+@@ -2827,6 +4165,21 @@
      RootedPropertyName &name = rootName0;
      name = script->getName(regs.pc);
  
@@ -1555,7 +1542,7 @@
      if (!DefVarOrConstOperation(cx, obj, name, attrs))
          goto error;
  }
-@@ -2913,6 +4268,9 @@
+@@ -2913,6 +4266,9 @@
  {
      uint8_t i = GET_UINT8(regs.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1565,7 +1552,7 @@
  
      RootedObject &obj = rootObject0;
      NewObjectKind newKind;
-@@ -2994,6 +4352,17 @@
+@@ -2994,6 +4350,17 @@
                                  JSPROP_ENUMERATE, 0, 0, 0)) {
          goto error;
      }
@@ -1583,7 +1570,7 @@
  
      regs.sp--;
  }
-@@ -3008,6 +4377,23 @@
+@@ -3008,6 +4375,23 @@
      RootedObject &obj = rootObject0;
      obj = &regs.sp[-3].toObject();
  
@@ -1607,7 +1594,7 @@
      if (!InitElemOperation(cx, obj, id, val))
          goto error;
  
-@@ -3280,6 +4666,96 @@
+@@ -3280,6 +4664,96 @@
  }
  END_CASE(JSOP_ARRAYPUSH)
  
@@ -1704,7 +1691,7 @@
  default:
  {
      char numBuf[12];
-@@ -3357,6 +4833,18 @@
+@@ -3357,6 +4831,18 @@
                  len = 0;
                  goto advanceAndDoOp;
  
@@ -1723,7 +1710,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -3398,6 +4886,38 @@
+@@ -3398,6 +4884,38 @@
          goto inline_return;
  
    exit:
@@ -1762,7 +1749,7 @@
      if (cx->compartment()->debugMode())
          interpReturnOK = ScriptDebugEpilogue(cx, regs.fp(), interpReturnOK);
      if (!regs.fp()->isYielding())
-@@ -3785,6 +5305,46 @@
+@@ -3785,6 +5303,46 @@
  {
      RootedObject scope(cx), pobj(cx);
      RootedShape shape(cx);
