@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-31.0/js/src/vm/Stack-inl.h	2014-07-16 20:45:22.000000000 -0500
++++ ff-dev/mozilla-31.0/js/src/vm/Stack-inl.h	2015-01-25 19:38:33.294625497 -0600
+@@ -88,6 +88,9 @@
+     prevpc_ = prevpc;
+     prevsp_ = prevsp;
+     JS_ASSERT(!hasHookData());
++#ifdef TxJS
++    suspendedTx_ = NULL;
++#endif
+ 
+     initVarsToUndefined();
+ }
+

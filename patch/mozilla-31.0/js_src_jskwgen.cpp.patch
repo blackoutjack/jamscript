@@ -1,0 +1,42 @@
+--- ff-orig/mozilla-31.0/js/src/jskwgen.cpp	2014-07-16 20:45:20.000000000 -0500
++++ ff-dev/mozilla-31.0/js/src/jskwgen.cpp	2015-01-25 19:38:33.002625505 -0600
+@@ -109,7 +109,14 @@
+     min_nchar_index = min_span_index = 0;
+     do {
+         column_to_compare = columns[i];
++#ifdef __FreeBSD__
++        // Due to an apparent bug or ambiguity in the implementation of
++        // qsort on FreeBSD, we have to use mergesort instead to
++        // differentiate the instanceof and introspect keywords.
++        mergesort(indexes, nelem, sizeof(indexes[0]), column_comparator);
++#else
+         qsort(indexes, nelem, sizeof(indexes[0]), column_comparator);
++#endif
+         find_char_span_and_count(indexes, nelem, column_to_compare,
+                                  &span, &nchar);
+         assert(span != 0);
+@@ -143,7 +150,11 @@
+      */
+     if (i != unprocessed_columns - 1) {
+         column_to_compare = columns[i];
++#ifdef __FreeBSD__
++        mergesort(indexes, nelem, sizeof(indexes[0]), column_comparator);
++#else
+         qsort(indexes, nelem, sizeof(indexes[0]), column_comparator);
++#endif
+     }
+ 
+     return i;
+@@ -356,7 +367,11 @@
+     }
+     for (i = 0; i != nelem; ++i)
+         indexes[i] = i;
++#ifdef __FreeBSD__
++    mergesort(indexes, nelem, sizeof(indexes[i]), length_comparator);
++#else
+     qsort(indexes, nelem, sizeof(indexes[i]), length_comparator);
++#endif
+     nlength = count_different_lengths(indexes, nelem);
+ 
+     use_if = (nlength <= opt->use_if_threshold);
+

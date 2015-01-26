@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.0/js/src/frontend/SharedContext.h	2014-07-16 20:45:18.000000000 -0500
++++ ff-dev/mozilla-31.0/js/src/frontend/SharedContext.h	2015-01-25 19:38:32.630625516 -0600
+@@ -10,6 +10,9 @@
+ #include "jsatom.h"
+ #include "jsopcode.h"
+ #include "jspubtd.h"
++#ifdef TxJS
++#include "jstx.h"
++#endif
+ #include "jsscript.h"
+ #include "jstypes.h"
+ 
+@@ -347,6 +350,9 @@
+     STMT_IF,                    /* if (then) statement */
+     STMT_ELSE,                  /* else clause of if statement */
+     STMT_SEQ,                   /* synthetic sequence of statements */
++#ifdef TxJS
++    STMT_TX,                    /* transaction block */
++#endif
+     STMT_BLOCK,                 /* compound statement: { s1[;... sN] } */
+     STMT_SWITCH,                /* switch statement */
+     STMT_WITH,                  /* with statement */
+

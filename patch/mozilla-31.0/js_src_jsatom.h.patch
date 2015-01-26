@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-31.0/js/src/jsatom.h	2014-07-16 20:45:20.000000000 -0500
++++ ff-dev/mozilla-31.0/js/src/jsatom.h	2015-01-25 19:38:32.930625507 -0600
+@@ -146,6 +146,9 @@
+ extern const char js_in_str[];
+ extern const char js_instanceof_str[];
+ extern const char js_interface_str[];
++#ifdef TxJS
++extern const char js_introspect_str[];
++#endif
+ extern const char js_new_str[];
+ extern const char js_package_str[];
+ extern const char js_private_str[];
+

@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-31.0/parser/html/nsHtml5TreeOpExecutor.h	2014-07-16 20:45:36.000000000 -0500
++++ ff-dev/mozilla-31.0/parser/html/nsHtml5TreeOpExecutor.h	2015-01-25 19:38:33.434625492 -0600
+@@ -23,6 +23,10 @@
+ #include "nsTHashtable.h"
+ #include "nsHashKeys.h"
+ #include "mozilla/LinkedList.h"
++// TxJS begin
++// %%% Needed?
++#include "jsapi.h"
++// TxJS end
+ #include "nsHtml5DocumentBuilder.h"
+ 
+ class nsHtml5Parser;
+@@ -41,6 +45,10 @@
+     NS_DECL_AND_IMPL_ZEROING_OPERATOR_NEW
+     NS_DECL_ISUPPORTS_INHERITED
+ 
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
++
+   private:
+     static bool        sExternalViewSource;
+ #ifdef DEBUG_NS_HTML5_TREE_OP_EXECUTOR_FLUSH
+

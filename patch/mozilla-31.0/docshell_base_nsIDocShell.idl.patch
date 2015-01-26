@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.0/docshell/base/nsIDocShell.idl	2014-07-16 20:45:10.000000000 -0500
++++ ff-dev/mozilla-31.0/docshell/base/nsIDocShell.idl	2015-01-25 19:38:32.282625526 -0600
+@@ -189,6 +189,10 @@
+    */ 
+   void setCurrentURI(in nsIURI aURI);
+ 
++  // TxJS begin
++  attribute jsval introspector;
++  // TxJS end
++
+   /**
+    * Notify the associated content viewer and all child docshells that they are
+    * about to be hidden.  If |isUnload| is true, then the document is being
+
