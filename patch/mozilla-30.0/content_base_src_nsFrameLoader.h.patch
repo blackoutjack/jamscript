@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-30.0/content/base/src/nsFrameLoader.h	2014-06-05 20:15:19.000000000 -0500
++++ ff-dev/mozilla-30.0/content/base/src/nsFrameLoader.h	2015-01-25 17:34:26.098843240 -0600
+@@ -461,6 +461,10 @@
+ 
+   // Indicate if we have sent 'remote-browser-pending'.
+   bool mPendingFrameSent;
++#ifdef TxJS
++public:
++  JS::Value mIntrospector;
++#endif
+ };
+ 
+ #endif
+

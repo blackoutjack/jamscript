@@ -1,0 +1,245 @@
+--- ff-orig/mozilla-30.0/js/src/frontend/Parser.cpp	2014-06-05 20:15:27.000000000 -0500
++++ ff-dev/mozilla-30.0/js/src/frontend/Parser.cpp	2015-01-25 17:34:27.794843190 -0600
+@@ -660,6 +660,11 @@
+             return ENDS_IN_OTHER;
+         return HasFinalReturn(pn->last());
+ 
++#ifdef TxJS
++      case PNK_TX:
++        return ENDS_IN_OTHER;
++#endif
++
+       case PNK_IF:
+         if (!pn->pn_kid3)
+             return ENDS_IN_OTHER;
+@@ -1715,7 +1720,11 @@
+     *pbodyProcessed = false;
+ 
+     /* Function statements add a binding to the enclosing scope. */
++#ifdef TxJS_HOIST
++    bool bodyLevel = pc->atBodyLevel() || pc->hasTxTop;
++#else
+     bool bodyLevel = pc->atBodyLevel();
++#endif
+ 
+     if (kind == Statement) {
+         /*
+@@ -2357,6 +2366,60 @@
+     return true;
+ }
+ 
++#ifdef TxJS
++template <>
++bool
++Parser<FullParseHandler>::txArguments(Node txpn)
++{
++    if (tokenStream.getToken() != TOK_LP) {
++        report(ParseError, false, null(), JSMSG_PAREN_BEFORE_FORMAL);
++        return false;
++    }
++    
++    ParseNode *arg = expr();
++    if (!arg) {
++        // %%% Report error.
++        return false;
++    }
++    txpn->pn_left = arg;
++
++    /*
++    ParseNode *argsbody = ListNode::create(PNK_ARGSBODY, this);
++    if (!argsbody)
++        return false;
++
++    argsbody->setOp(JSOP_NOP);
++    argsbody->makeEmpty();
++
++    txpn->pn_left = argsbody;
++
++    if (!tokenStream.matchToken(TOK_RP)) {
++        do {
++            ParseNode *arg = expr();
++            if (!arg)
++                return false;
++            argsbody->append(arg);
++        } while (tokenStream.matchToken(TOK_COMMA));
++    }
++    */
++
++    if (tokenStream.getToken() != TOK_RP) {
++        report(ParseError, false, null(), JSMSG_PAREN_AFTER_FORMAL);
++        return false;
++    }
++
++    return true;
++}
++
++template <>
++bool
++Parser<SyntaxParseHandler>::txArguments(Node txpn)
++{
++    JS_ALWAYS_FALSE(abortIfSyntaxParser());
++    return SyntaxParseHandler::NodeFailure;
++}
++#endif
++
+ template <typename ParseHandler>
+ typename ParseHandler::Node
+ Parser<ParseHandler>::functionStmt()
+@@ -5230,6 +5293,11 @@
+         return tryStatement();
+       case TOK_FUNCTION:
+         return functionStmt();
++#ifdef TxJS
++      case TOK_TX:
++        return txStmt();
++#endif
++
+       case TOK_DEBUGGER:
+         return debuggerStatement();
+ 
+@@ -5451,6 +5519,129 @@
+     return pn;
+ }
+ 
++#ifdef TxJS
++template <>
++ParseNode *
++Parser<FullParseHandler>::txStmt()
++{
++    JS_ASSERT(tokenStream.currentToken().type == TOK_TX);
++
++    ParseNode *pn, *pn1;
++
++    StmtInfoPC stmtInfo(context);
++#ifdef TxJS_HOIST
++    StmtInfoPC *txTop = pc->topStmt;
++    bool hasTxTop = pc->atBodyLevel();
++#endif
++    PushStatementPC(pc, &stmtInfo, STMT_TX);
++
++    // Transaction statements may optionally be named.
++    // %%% The name doesn't currently serve any purpose.
++    RootedPropertyName name(context);
++    if (tokenStream.getToken(TokenStream::KeywordIsName) == TOK_NAME)
++        name = tokenStream.currentToken().name();
++    else
++        tokenStream.ungetToken();
++
++    /*
++     * This code models transactions as inline blocks.
++     */
++
++    pn = BinaryNode::create(PNK_TX, &handler);
++    if (!pn)
++      return NULL;
++    pn->setOp(JSOP_BEGIN_TX);
++
++    /* Parse the "argument list" to get the policy function. */
++    if (!txArguments(pn))
++        return NULL;
++
++#ifdef TxJS_HOIST
++    if (tokenStream.peekToken(TokenStream::Operand) == TOK_LC) {
++        tokenStream.getToken(TokenStream::Operand);
++        JS_CHECK_RECURSION(context, return NULL);
++
++        StmtInfoPC stmtInfo1(context);
++        if (!PushBlocklikeStatement(tokenStream, &stmtInfo1, STMT_BLOCK, pc))
++            return NULL;
++        if (hasTxTop) {
++            pc->txTop = txTop;
++            pc->hasTxTop = true;
++        }
++        pn1 = statements();
++        if (pc->hasFunctionStmt) {
++          pn1->pn_xflags &= ~PNX_FUNCDEFS;
++          pn->pn_xflags |= PNX_FUNCDEFS;
++        }
++        if (pn1) {
++            MUST_MATCH_TOKEN(TOK_RC, JSMSG_CURLY_IN_COMPOUND);
++            PopStatementPC(tokenStream, pc);
++        }
++    } else
++#endif
++        pn1 = statement();
++
++    if (!pn1)
++        return NULL;
++    pn->pn_right = pn1;
++
++    // Pop the value if the transaction is not an expression.
++    pn->pn_xflags |= PNX_POPVAR;
++
++    PopStatementPC(tokenStream, pc);
++
++    return pn;
++}
++
++template <>
++SyntaxParseHandler::Node
++Parser<SyntaxParseHandler>::txStmt()
++{
++    JS_ALWAYS_FALSE(abortIfSyntaxParser());
++    return SyntaxParseHandler::NodeFailure;
++}
++
++template <>
++ParseNode *
++Parser<FullParseHandler>::txExpr()
++{
++    if (!tokenStream.matchToken(TOK_TX))
++        return NULL;
++
++    // This code models transactions as inline blocks.
++    ParseNode *pn, *pn1;
++
++    pn = BinaryNode::create(PNK_TX, &handler);
++    if (!pn)
++      return NULL;
++    pn->setOp(JSOP_BEGIN_TX);
++
++    /* Parse the "argument list" to get the policy function. */
++    if (!txArguments(pn))
++        return NULL;
++
++    pn1 = statement();
++    if (!pn1)
++        return NULL;
++    pn->pn_right = pn1;
++
++    //PopStatementPC(tokenStream, pc);
++
++    // This code models transactions as function invocations.
++    //ParseNode *pn = txDef();
++
++    return pn;
++}
++
++template <>
++SyntaxParseHandler::Node
++Parser<SyntaxParseHandler>::txExpr()
++{
++    JS_ALWAYS_FALSE(abortIfSyntaxParser());
++    return SyntaxParseHandler::NodeFailure;
++}
++#endif
++
+ template <typename ParseHandler>
+ MOZ_ALWAYS_INLINE typename ParseHandler::Node
+ Parser<ParseHandler>::condExpr1()
+@@ -5581,6 +5772,14 @@
+     TokenStream::Position start(keepAtoms);
+     tokenStream.tell(&start);
+ 
++#ifdef TxJS
++    // If the right-hand side of the assignment is a transaction,
++    // parse it as such.
++    Node pn = txExpr();
++    if (pn)
++        return pn;
++#endif
++
+     Node lhs = condExpr1();
+     if (!lhs)
+         return null();
+

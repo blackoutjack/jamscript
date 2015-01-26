@@ -1,0 +1,25 @@
+--- ff-orig/mozilla-30.0/js/src/moz.build	2014-06-05 20:15:29.000000000 -0500
++++ ff-dev/mozilla-30.0/js/src/moz.build	2015-01-25 17:34:30.542843110 -0600
+@@ -138,6 +138,9 @@
+     'jsgc.cpp',
+     'jsinfer.cpp',
+     'jsiter.cpp',
++    # TxJS begin
++    'jsjam.cpp',
++    # TxJS end
+     'jsnativestack.cpp',
+     'jsnum.cpp',
+     'jsobj.cpp',
+@@ -150,6 +153,11 @@
+     'jsreflect.cpp',
+     'jsscript.cpp',
+     'jsstr.cpp',
++    # TxJS begin
++    'jstransaction.cpp',
++    'jstx.cpp',
++    'jstxaction.cpp',
++    # TxJS end
+     'jswatchpoint.cpp',
+     'jsweakmap.cpp',
+     'jsworkers.cpp',
+

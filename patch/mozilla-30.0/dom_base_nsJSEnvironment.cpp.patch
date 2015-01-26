@@ -1,0 +1,40 @@
+--- ff-orig/mozilla-30.0/dom/base/nsJSEnvironment.cpp	2014-06-05 20:15:21.000000000 -0500
++++ ff-dev/mozilla-30.0/dom/base/nsJSEnvironment.cpp	2015-01-25 17:34:27.094843211 -0600
+@@ -894,6 +894,18 @@
+ 
+   return refcnt;
+ }
++nsresult
++nsJSContext::EvaluateString(const nsAString& aScript,
++                            JS::Handle<JSObject*> aScopeObject,
++                            JS::CompileOptions& aCompileOptions,
++                            bool aCoerceToString,
++                            JS::Value* aRetValue,
++                            void **aOffThreadToken)
++{
++#ifdef TxJS
++  return EvaluateString(aScript, aScopeObject, aCompileOptions,
++      aCoerceToString, aRetValue, JS::UndefinedValue());
++}
+ 
+ nsresult
+ nsJSContext::EvaluateString(const nsAString& aScript,
+@@ -901,12 +913,17 @@
+                             JS::CompileOptions& aCompileOptions,
+                             bool aCoerceToString,
+                             JS::Value* aRetValue,
++                            const JS::Value &ispect,
+                             void **aOffThreadToken)
+ {
++#endif
+   NS_ENSURE_TRUE(mIsInitialized, NS_ERROR_NOT_INITIALIZED);
+   AutoCxPusher pusher(mContext);
+   nsJSUtils::EvaluateOptions evalOptions;
+   evalOptions.setCoerceToString(aCoerceToString);
++#ifdef TxJS
++  aCompileOptions.introspector = ispect;
++#endif
+   return nsJSUtils::EvaluateString(mContext, aScript, aScopeObject,
+                                    aCompileOptions, evalOptions, aRetValue,
+                                    aOffThreadToken);
+

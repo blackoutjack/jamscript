@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-30.0/js/src/jsobj.cpp	2014-06-05 20:15:28.000000000 -0500
++++ ff-dev/mozilla-30.0/js/src/jsobj.cpp	2015-01-25 17:34:29.798843132 -0600
+@@ -1577,6 +1577,17 @@
+ js::CreateThisForFunction(JSContext *cx, HandleObject callee, NewObjectKind newKind)
+ {
+     RootedValue protov(cx);
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        jsid protoId = AtomToId(cx->names().prototype);
++        if (tx->getProperty(cx, callee, protoId, &protov)) {
++        } else {
++            if (!JSObject::getProperty(cx, callee, callee, cx->names().prototype, &protov))
++                return nullptr;
++        }
++    } else
++#endif
+     if (!JSObject::getProperty(cx, callee, callee, cx->names().prototype, &protov))
+         return nullptr;
+     JSObject *proto;
+

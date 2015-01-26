@@ -1,0 +1,68 @@
+--- ff-orig/mozilla-30.0/js/src/jstransaction.h	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-30.0/js/src/jstransaction.h	2015-01-25 17:34:30.470843112 -0600
+@@ -0,0 +1,64 @@
++/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++
++#ifndef jstransaction_h___
++#define jstransaction_h___
++
++#ifdef TxJS
++/*
++ * JS Transaction interface.
++ */
++#include "jspubtd.h"
++#include "jsobj.h"
++#include "jscntxt.h"
++#include "jsgcinlines.h"
++#include "jsobjinlines.h"
++
++extern "C" {
++
++// %%% Use js or js::tx namespace?
++
++extern js::Class TxClass;
++
++extern JSObject *
++js_InitTxClass(JSContext *cx, js::HandleObject obj);
++
++extern JSObject *
++js_NewTxObject(JSContext *cx, TxContext *tx);
++
++extern bool
++js_Tx(JSContext *cx, unsigned argc, js::Value *rval);
++
++static MOZ_ALWAYS_INLINE bool
++JSVAL_IS_TXOBJ(js::Value v)
++{
++    JS_ASSERT(v.isObject());
++    return v.toObject().hasClass(&TxClass);
++}
++
++extern bool
++tx_commit(JSContext *cx, unsigned argc, js::Value *vp);
++
++extern bool
++tx_suppress(JSContext *cx, unsigned argc, js::Value *vp);
++
++extern bool
++tx_isSuspended(JSContext *cx, unsigned argc, js::Value *vp);
++
++extern bool
++tx_getSuspendInfo(JSContext *cx, unsigned argc, js::Value *vp);
++
++extern bool
++tx_getHandler(JSContext *cx, unsigned argc, js::Value *vp);
++
++extern bool
++tx_setRetval(JSContext *cx, unsigned argc, js::Value *vp);
++
++}
++
++#endif
++
++#endif /* jstransaction_h___ */
+

@@ -1,0 +1,150 @@
+--- ff-orig/mozilla-30.0/js/src/vm/Interpreter-inl.h	2014-06-05 20:15:30.000000000 -0500
++++ ff-dev/mozilla-30.0/js/src/vm/Interpreter-inl.h	2015-01-25 17:34:31.346843086 -0600
+@@ -13,6 +13,10 @@
+ #include "jsinfer.h"
+ #include "jsnum.h"
+ #include "jsstr.h"
++#ifdef TxJS
++#include "jsmath.h"
++#include "jstransaction.h"
++#endif
+ 
+ #include "jit/Ion.h"
+ #include "vm/ArgumentsObject.h"
+@@ -75,6 +79,29 @@
+     return vp->isMagic(JS_OPTIMIZED_ARGUMENTS);
+ }
+ 
++#ifdef TxJS
++static inline bool
++IsSuspendingFunction(JSContext *cx, Value &calleev, JSFunction **fun) {
++    if (!IsFunctionObject(calleev, fun))
++        return false;
++
++    // We want to suspend on the unbound version.
++    if ((*fun)->isBoundFunction())
++        return false;
++
++    if ((*fun)->isNative()) {
++        // Implement whitelisting.
++        if ((*fun)->noSuspend())
++            return false;
++        if ((*fun)->native() == js_Array)
++            return false;
++        // Suspend on all (unwhitelisted) native calls.
++        return true;
++    }
++    return false;
++}
++#endif
++
+ /*
+  * One optimized consumer of MagicValue(JS_OPTIMIZED_ARGUMENTS) is f.apply.
+  * However, this speculation must be guarded before calling 'apply' in case it
+@@ -188,6 +215,20 @@
+             return false;
+         }
+     }
++
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    if (tx) {
++        // Update the already-created read set node to reflect the value
++        // and the scope in which it was found.
++        //node->obj = pobj.get();
++        // Add the property to the read set, with the head of the scope
++        // chain as the object, and an undefined value.
++        // %%% Need to root?
++        tx->recordAction(cx, obj.get(), NameToId(name), vp, AX_READ);
++    }
++#endif
++
+     return true;
+ }
+ 
+@@ -332,9 +373,21 @@
+ {
+     JS_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
+ 
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++    RootedId id(cx);
++#endif
+     do {
+         uint32_t index;
+         if (IsDefinitelyIndex(rref, &index)) {
++#ifdef TxJS
++            IndexToId(cx, index, &id);
++            if (tx) {
++                RootedObject robj(cx, objArg);
++                if (tx->getProperty(cx, robj, id.get(), res))
++                    break;
++            }
++#endif
+             if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
+                 break;
+ 
+@@ -347,6 +400,14 @@
+ 
+         JSAtom *name = ToAtom<NoGC>(cx, rref);
+         if (name) {
++#ifdef TxJS
++            id = AtomToId(name);
++            if (tx) {
++                RootedObject robj(cx, objArg);
++                if (tx->getProperty(cx, robj, id.get(), res))
++                    break;
++            }
++#endif
+             if (name->isIndex(&index)) {
+                 if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
+                     break;
+@@ -362,6 +423,13 @@
+         if (!name)
+             return false;
+ 
++#ifdef TxJS
++        id = AtomToId(name);
++        if (tx) {
++            if (tx->getProperty(cx, obj, id.get(), res))
++                break;
++        }
++#endif
+         if (name->isIndex(&index)) {
+             if (!JSObject::getElement(cx, obj, obj, index, res))
+                 return false;
+@@ -373,6 +441,12 @@
+         objArg = obj;
+     } while (0);
+ 
++#ifdef TxJS
++    if (tx) {
++        RootedObject robj(cx, objArg);
++        tx->recordAction(cx, robj, id.get(), res.get(), AX_READ);
++    }
++#endif
+ #if JS_HAS_NO_SUCH_METHOD
+     if (op == JSOP_CALLELEM && MOZ_UNLIKELY(res.isUndefined()) && wasObject) {
+         RootedObject obj(cx, objArg);
+@@ -406,6 +480,9 @@
+             return false;
+ 
+         lref.set(ObjectValue(frame.argsObj()));
++#ifdef TxJS
++        // %%% Record
++#endif
+     }
+ 
+     return true;
+@@ -425,6 +502,10 @@
+             if (!str)
+                 return false;
+             res.setString(str);
++            // %%% Record this
++            //RootedId id(cx);
++            //IndexToId(cx, i, &id);
++            //tx->recordAction(cx, StringObject(fullstr), id.get(), res.get(), AX_READ);
+             return true;
+         }
+     }
+

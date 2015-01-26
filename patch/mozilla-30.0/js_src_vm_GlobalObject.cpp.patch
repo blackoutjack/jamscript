@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-30.0/js/src/vm/GlobalObject.cpp	2014-06-05 20:15:30.000000000 -0500
++++ ff-dev/mozilla-30.0/js/src/vm/GlobalObject.cpp	2015-01-25 17:34:31.266843089 -0600
+@@ -14,6 +14,10 @@
+ #include "json.h"
+ #include "jsprototypes.h"
+ #include "jsweakmap.h"
++#ifdef TxJS
++#include "jstransaction.h"
++#include "jsjam.h"
++#endif
+ 
+ #include "builtin/Eval.h"
+ #if EXPOSE_INTL_API
+

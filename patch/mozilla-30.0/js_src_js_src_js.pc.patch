@@ -1,0 +1,15 @@
+--- ff-orig/mozilla-30.0/js/src/js/src/js.pc	1969-12-31 18:00:00.000000000 -0600
++++ ff-dev/mozilla-30.0/js/src/js/src/js.pc	2015-01-25 17:44:01.446826418 -0600
+@@ -0,0 +1,11 @@
++prefix=/usr/local
++exec_prefix=${prefix}
++libdir=${exec_prefix}/lib
++includedir=${prefix}/include
++
++Name: SpiderMonkey 30.0
++Description: The Mozilla library for JavaScript
++Version: 30.0
++Requires.private: nspr
++Libs: -L${libdir} -lmozjs-30
++Cflags: -include ${includedir}/mozjs-30/js/RequiredDefines.h -I${includedir}/mozjs-30
+
