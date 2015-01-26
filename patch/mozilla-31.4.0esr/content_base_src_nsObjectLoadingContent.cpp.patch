@@ -1,0 +1,298 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-01-25 21:28:29.642432631 -0600
+@@ -76,6 +76,9 @@
+ 
+ #include "nsWidgetsCID.h"
+ #include "nsContentCID.h"
++#ifdef TxJS
++#include "nsURILoader.h"
++#endif
+ #include "mozilla/BasicEvents.h"
+ #include "mozilla/dom/BindingUtils.h"
+ #include "mozilla/dom/Element.h"
+@@ -126,6 +129,248 @@
+ /// Runnables and helper classes
+ ///
+ 
++#if 0//def TxJS
++class nsIntrospectListener :
++    public nsIURIContentListener,
++    public nsSupportsWeakReference
++{
++public:
++  NS_DECL_ISUPPORTS
++  NS_DECL_NSIURICONTENTLISTENER
++
++  nsIntrospectListener(JS::Value &ispect)
++  : mIntrospector(ispect) {}
++
++  ~nsIntrospectListener() {}
++
++private:
++  JS::Value mIntrospector;
++};
++//*****************************************************************************
++// nsIntrospectListener::nsISupports
++//*****************************************************************************   
++
++NS_IMPL_THREADSAFE_ADDREF(nsIntrospectListener)
++NS_IMPL_THREADSAFE_RELEASE(nsIntrospectListener)
++
++NS_INTERFACE_MAP_BEGIN(nsIntrospectListener)
++    NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIURIContentListener)
++    NS_INTERFACE_MAP_ENTRY(nsIURIContentListener)
++    NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
++NS_INTERFACE_MAP_END
++
++//*****************************************************************************
++// nsIntrospectListener::nsIURIContentListener
++//*****************************************************************************   
++
++NS_IMETHODIMP
++nsIntrospectListener::OnStartURIOpen(nsIURI* aURI, bool* aAbortOpen)
++{
++  /*
++    // If mDocShell is null here, that means someone's starting a load
++    // in our docshell after it's already been destroyed.  Don't let
++    // that happen.
++    if (!mDocShell) {
++        *aAbortOpen = true;
++        return NS_OK;
++    }
++    
++    nsCOMPtr<nsIURIContentListener> parentListener;
++    GetParentContentListener(getter_AddRefs(parentListener));
++    if (parentListener)
++        return parentListener->OnStartURIOpen(aURI, aAbortOpen);
++
++  */
++    return NS_OK;
++}
++
++NS_IMETHODIMP 
++nsIntrospectListener::DoContent(const char* aContentType, 
++                                  bool aIsContentPreferred,
++                                  nsIRequest* request,
++                                  nsIStreamListener** aContentHandler,
++                                  bool* aAbortProcess)
++{
++  /*
++    nsresult rv;
++    NS_ENSURE_ARG_POINTER(aContentHandler);
++    NS_ENSURE_TRUE(mDocShell, NS_ERROR_FAILURE);
++
++    // Check whether X-Frame-Options permits us to load this content in an
++    // iframe and abort the load (unless we've disabled x-frame-options
++    // checking).
++    if (!CheckFrameOptions(request)) {
++        *aAbortProcess = true;
++        return NS_OK;
++    }
++
++    *aAbortProcess = false;
++
++    // determine if the channel has just been retargeted to us...
++    nsLoadFlags loadFlags = 0;
++    nsCOMPtr<nsIChannel> aOpenedChannel = do_QueryInterface(request);
++
++    if (aOpenedChannel)
++      aOpenedChannel->GetLoadFlags(&loadFlags);
++
++    if(loadFlags & nsIChannel::LOAD_RETARGETED_DOCUMENT_URI)
++    {
++        // XXX: Why does this not stop the content too?
++        mDocShell->Stop(nsIWebNavigation::STOP_NETWORK);
++
++        mDocShell->SetLoadType(aIsContentPreferred ? LOAD_LINK : LOAD_NORMAL);
++    }
++
++    rv = mDocShell->CreateContentViewer(aContentType, request, aContentHandler);
++
++    if (rv == NS_ERROR_REMOTE_XUL) {
++      request->Cancel(rv);
++      return NS_OK;
++    }
++
++    if (NS_FAILED(rv)) {
++       // it's okay if we don't know how to handle the content   
++        return NS_OK;
++    }
++
++    if (loadFlags & nsIChannel::LOAD_RETARGETED_DOCUMENT_URI) {
++        nsCOMPtr<nsIDOMWindow> domWindow = do_GetInterface(static_cast<nsIDocShell*>(mDocShell));
++        NS_ENSURE_TRUE(domWindow, NS_ERROR_FAILURE);
++        domWindow->Focus();
++    }
++  */
++
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsIntrospectListener::IsPreferred(const char* aContentType,
++                                    char ** aDesiredContentType,
++                                    bool* aCanHandle)
++{
++    NS_ENSURE_ARG_POINTER(aCanHandle);
++    NS_ENSURE_ARG_POINTER(aDesiredContentType);
++
++    // the docshell has no idea if it is the preferred content provider or not.
++    // It needs to ask its parent if it is the preferred content handler or not...
++
++    nsCOMPtr<nsIURIContentListener> parentListener;
++    GetParentContentListener(getter_AddRefs(parentListener));
++    if (parentListener) {
++        return parentListener->IsPreferred(aContentType,
++                                                   aDesiredContentType,
++                                                   aCanHandle);
++    }
++    // we used to return false here if we didn't have a parent properly
++    // registered at the top of the docshell hierarchy to dictate what
++    // content types this docshell should be a preferred handler for.  But
++    // this really makes it hard for developers using iframe or browser tags
++    // because then they need to make sure they implement
++    // nsIURIContentListener otherwise all link clicks would get sent to
++    // another window because we said we weren't the preferred handler type.
++    // I'm going to change the default now...if we can handle the content,
++    // and someone didn't EXPLICITLY set a nsIURIContentListener at the top
++    // of our docshell chain, then we'll now always attempt to process the
++    // content ourselves...
++    return CanHandleContent(aContentType,
++                            true,
++                            aDesiredContentType,
++                            aCanHandle);
++}
++
++NS_IMETHODIMP
++nsIntrospectListener::CanHandleContent(const char* aContentType,
++                                         bool aIsContentPreferred,
++                                         char ** aDesiredContentType,
++                                         bool* aCanHandleContent)
++{
++    NS_PRECONDITION(aCanHandleContent, "Null out param?");
++    NS_ENSURE_ARG_POINTER(aDesiredContentType);
++
++    *aCanHandleContent = false;
++    *aDesiredContentType = nullptr;
++
++    nsresult rv = NS_OK;
++    /*
++    if (aContentType) {
++        uint32_t canHandle = nsIWebNavigationInfo::UNSUPPORTED;
++        rv = mNavInfo->IsTypeSupported(nsDependentCString(aContentType),
++                                       mDocShell,
++                                       &canHandle);
++        *aCanHandleContent = (canHandle != nsIWebNavigationInfo::UNSUPPORTED);
++    }
++    */
++
++    return rv;
++}
++
++NS_IMETHODIMP
++nsIntrospectListener::GetLoadCookie(nsISupports ** aLoadCookie)
++{
++    //NS_IF_ADDREF(*aLoadCookie = nsDocShell::GetAsSupports(mDocShell));
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsIntrospectListener::SetLoadCookie(nsISupports * aLoadCookie)
++{
++    /*
++#ifdef DEBUG
++    nsRefPtr<nsDocLoader> cookieAsDocLoader =
++        nsDocLoader::GetAsDocLoader(aLoadCookie);
++    NS_ASSERTION(cookieAsDocLoader && cookieAsDocLoader == mDocShell,
++                 "Invalid load cookie being set!");
++#endif
++    */
++    return NS_OK;
++}
++
++NS_IMETHODIMP 
++nsIntrospectListener::GetParentContentListener(nsIURIContentListener**
++                                                 aParentListener)
++{
++    /*
++    if (mWeakParentContentListener)
++    {
++        nsCOMPtr<nsIURIContentListener> tempListener =
++            do_QueryReferent(mWeakParentContentListener);
++        *aParentListener = tempListener;
++        NS_IF_ADDREF(*aParentListener);
++    }
++    else {
++        *aParentListener = mParentContentListener;
++        NS_IF_ADDREF(*aParentListener);
++    }
++    */
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsIntrospectListener::SetParentContentListener(nsIURIContentListener* 
++                                                 aParentListener)
++{
++    /*
++    if (aParentListener)
++    {
++        // Store the parent listener as a weak ref. Parents not supporting
++        // nsISupportsWeakReference assert but may still be used.
++        mParentContentListener = nullptr;
++        mWeakParentContentListener = do_GetWeakReference(aParentListener);
++        if (!mWeakParentContentListener)
++        {
++            mParentContentListener = aParentListener;
++        }
++    }
++    else
++    {
++        mWeakParentContentListener = nullptr;
++        mParentContentListener = nullptr;
++    }
++    */
++    return NS_OK;
++}
++#endif
++
+ class nsAsyncInstantiateEvent : public nsRunnable {
+ public:
+   nsAsyncInstantiateEvent(nsObjectLoadingContent *aContent)
+@@ -2185,6 +2430,18 @@
+         mType = eType_Null;
+         break;
+       }
++#if 0//def TxJS
++      // Here's how to dispatch a synchronous DOM event.
++      nsCOMPtr<nsINode> thisNode = do_QueryInterface(static_cast<nsIImageLoadingContent*>(this));
++      nsCOMPtr<nsIDOMEvent> event;
++      nsEventDispatcher::CreateEvent(nullptr, nullptr, NS_LITERAL_STRING("Events"), getter_AddRefs(event));
++      event->InitEvent(NS_LITERAL_STRING("loadstart"), false, true);
++      event->SetTrusted(true);
++      nsEventDispatcher::DispatchDOMEvent(thisNode, nullptr, event, nullptr, nullptr);
++#endif
++#ifdef TxJS
++      static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = mIntrospector;
++#endif
+       rv = uriLoader->OpenChannel(mChannel, nsIURILoader::DONT_RETARGET, req,
+                                   getter_AddRefs(finalListener));
+       // finalListener will receive OnStartRequest below
+@@ -2383,6 +2640,16 @@
+   NS_ENSURE_SUCCESS(rv, rv);
+   LOG(("OBJLC [%p]: Channel opened", this));
+   mChannel = chan;
++#ifdef TxJS
++  nsIScriptContext* sctx = thisContent->AsElement()->GetContextForEventHandlers(&rv);
++  if (sctx) {
++    JSContext* cx = sctx->GetNativeContext();
++    JS::Value ispect = JS_GetIntrospector(cx);
++    if (!ispect.isUndefined()) {
++      mIntrospector = ispect;
++    }
++  }
++#endif
+   return NS_OK;
+ }
+ 
+

@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/vm/CommonPropertyNames.h	2015-01-05 23:08:07.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/CommonPropertyNames.h	2015-01-25 21:28:30.706432599 -0600
+@@ -209,6 +209,17 @@
+     macro(string, string, "string") \
+     macro(number, number, "number") \
+     macro(boolean, boolean, "boolean") \
++    /* TxJS begin */ \
++    macro(subsumedBy, subsumedBy, "subsumedBy") \
++    macro(read, read, "read") \
++    macro(write, write, "write") \
++    macro(forin, forin, "forin") \
++    macro(type, type, "type") \
++    macro(obj, obj, "obj") \
++    macro(id, id, "id") \
++    macro(argc, argc, "argc") \
++    macro(args, args, "args") \
++    /* TxJS end */ \
+     macro(null, null, "null")
+ 
+ #endif /* vm_CommonPropertyNames_h */
+

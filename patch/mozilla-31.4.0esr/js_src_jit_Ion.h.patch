@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/jit/Ion.h	2015-01-05 23:08:02.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jit/Ion.h	2015-01-25 21:28:30.374432609 -0600
+@@ -159,6 +159,10 @@
+ static inline bool
+ IsIonEnabled(JSContext *cx)
+ {
++#ifdef TxJS
++    if (cx->getRunningTx())
++        return false;
++#endif
+     return cx->runtime()->options().ion() &&
+            cx->runtime()->options().baseline() &&
+            cx->runtime()->jitSupportsFloatingPoint;
+

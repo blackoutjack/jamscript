@@ -1,1 +1,1 @@
-tests/js/throw5.js:5:0 ReferenceError: ws is not defined
+tests/js/throw5.js:5:6 ReferenceError: ws is not defined

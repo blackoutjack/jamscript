@@ -1,0 +1,29 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/vm/Opcodes.h	2015-01-05 23:08:07.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Opcodes.h	2015-01-25 21:28:30.730432599 -0600
+@@ -1412,15 +1412,24 @@
+      * able to OSR at this point, which is true unless there is non-loop state
+      * on the stack.
+      */ \
+-    macro(JSOP_LOOPENTRY,     227, "loopentry",    NULL,  2,  0,  0,  JOF_UINT8)
++    macro(JSOP_LOOPENTRY,     227, "loopentry",    NULL,  2,  0,  0,  JOF_UINT8) \
++    /* TxJS begin \
++     * %%% Guarding with a preprocessor directive causes
++     * %%% inconsistencies.
++     */ \
++    macro(JSOP_BEGIN_TX,      228, "begin_tx",     NULL,  3,  1,  0,  JOF_UINT16) \
++    macro(JSOP_END_TX,        229, "end_tx",       NULL,  1,  0,  1,  JOF_BYTE|JOF_INVOKE|JOF_TMPSLOT3) \
++    /* TxJS end */
+ 
+ /*
+  * In certain circumstances it may be useful to "pad out" the opcode space to
+  * a power of two.  Use this macro to do so.
+  */
+ #define FOR_EACH_TRAILING_UNUSED_OPCODE(macro) \
++    /* TxJS begin \
+     macro(228) \
+     macro(229) \
++       TxJS end */ \
+     macro(230) \
+     macro(231) \
+     macro(232) \
+

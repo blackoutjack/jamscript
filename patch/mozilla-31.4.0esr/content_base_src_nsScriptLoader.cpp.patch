@@ -1,0 +1,93 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-25 21:28:29.670432630 -0600
+@@ -47,6 +47,9 @@
+ #include "nsCRT.h"
+ #include "nsContentCreatorFunctions.h"
+ #include "nsCrossSiteListenerProxy.h"
++#ifdef TxJS
++#include "nsDocLoader.h"
++#endif
+ #include "nsSandboxFlags.h"
+ #include "nsContentTypeParser.h"
+ #include "nsINetworkSeer.h"
+@@ -80,6 +83,9 @@
+       mScriptTextLength(0),
+       mJSVersion(aVersion),
+       mLineNo(1),
++#ifdef TxJS
++      mIntrospector(JS::UndefinedValue()),
++#endif
+       mCORSMode(aCORSMode)
+   {
+   }
+@@ -120,6 +126,9 @@
+   nsAutoCString mURL;   // Keep the URI's filename alive during off thread parsing.
+   int32_t mLineNo;
+   const CORSMode mCORSMode;
++#ifdef TxJS
++  JS::Value mIntrospector;
++#endif
+ };
+ 
+ // The nsScriptLoadRequest is passed as the context to necko, and thus
+@@ -136,6 +145,9 @@
+     mBlockerCount(0),
+     mEnabled(true),
+     mDeferEnabled(false),
++#ifdef TxJS
++    mIntrospector(JS::UndefinedValue()),
++#endif
+     mDocumentParsingDone(false),
+     mBlockingDOMContentLoaded(false)
+ {
+@@ -643,6 +655,14 @@
+     request->mJSVersion = version;
+ 
+     if (aElement->GetScriptAsync()) {
++#ifdef TxJS
++      JSContext *cx = nullptr;
++      cx = globalObject->GetScriptContext()->GetNativeContext();
++      JS::Value ispect = JS_GetIntrospector(cx);
++      if (!ispect.isUndefined()) {
++        request->mIntrospector = ispect;
++      }
++#endif
+       mAsyncRequests.AppendElement(request);
+       if (!request->mLoading) {
+         // The script is available already. Run it ASAP when the event
+@@ -738,6 +758,24 @@
+   request->mURI = mDocument->GetDocumentURI();
+   request->mLineNo = aElement->GetScriptLineNumber();
+ 
++#ifdef TxJS
++  /*
++  JSContext *cx = nullptr;
++  cx = globalObject->GetScriptContext()->GetNativeContext();
++  JS::Value ispect = JS_GetIntrospector(cx);
++  if (ispect.isUndefined()) {
++    nsIDocShell *ds = ((nsPIDOMWindow*)globalObject)->GetDocShell();
++    nsDocLoader *dl = (nsDocLoader*)ds;
++    if (false && !dl->introspector.isUndefined()) {
++      ispect = dl->introspector;
++    }
++  }
++  */
++  if (!mIntrospector.isUndefined()) {
++    request->mIntrospector = mIntrospector;
++  }
++#endif
++
+   if (aElement->GetParserCreated() == FROM_PARSER_XSLT &&
+       (!ReadyToExecuteScripts() || !mXSLTRequests.IsEmpty())) {
+     // Need to maintain order for XSLT-inserted scripts
+@@ -1067,6 +1105,9 @@
+     MOZ_ASSERT(elementVal.isObject());
+     aOptions->setElement(&elementVal.toObject());
+   }
++#ifdef TxJS
++  aOptions->setIntrospector(aRequest->mIntrospector);
++#endif
+ }
+ 
+ nsresult
+

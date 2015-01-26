@@ -1,0 +1,12 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/jsprototypes.h	2015-01-05 23:08:03.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsprototypes.h	2015-01-25 21:28:30.626432602 -0600
+@@ -102,6 +102,8 @@
+ IF_BDATA(real,imaginary)(TypedObject,           38,     js_InitTypedObjectModuleObject,   OCLASP(TypedObjectModule)) \
+     imaginary(GeneratorFunction,     39,     js_InitIteratorClasses, dummy) \
+ IF_BDATA(real,imaginary)(SIMD,                  40,     js_InitSIMDClass, OCLASP(SIMD)) \
++    real(Tx,                    41,     js_InitTxClass,            CLASP(Tx)) \
++    real(JAM,                   42,     js_InitJAMClass,           CLASP(JAM)) \
+ 
+ #define JS_FOR_EACH_PROTOTYPE(macro) JS_FOR_PROTOTYPES(macro,macro)
+ 
+

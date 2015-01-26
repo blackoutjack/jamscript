@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.4.0esr/docshell/base/nsDocShell.h	2015-01-05 23:08:02.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/docshell/base/nsDocShell.h	2015-01-25 21:28:29.798432626 -0600
+@@ -767,6 +767,10 @@
+     nsIDocShellTreeOwner *     mTreeOwner; // Weak Reference
+     mozilla::dom::EventTarget* mChromeEventHandler; //Weak Reference
+ 
++#ifdef TxJS
++    JS::Value mIntrospector;
++#endif
++
+     eCharsetReloadState        mCharsetReloadState;
+ 
+     // Offset in the parent's child list.
+
