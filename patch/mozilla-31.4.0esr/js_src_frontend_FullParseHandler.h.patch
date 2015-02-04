@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/frontend/FullParseHandler.h	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/frontend/FullParseHandler.h	2015-01-25 21:28:30.138432616 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/frontend/FullParseHandler.h	2015-02-04 14:08:48.537798060 -0600
 @@ -285,8 +285,18 @@
      void addStatementToList(ParseNode *list, ParseNode *stmt, PC *pc) {
          JS_ASSERT(list->isKind(PNK_STATEMENTLIST));
@@ -23,7 +23,7 @@
                  // General deoptimization was done in Parser::functionDef.
                  JS_ASSERT_IF(pc->sc->isFunctionBox(),
                               pc->sc->asFunctionBox()->hasExtensibleScope());
-+#ifdef TxJS
++#ifdef TxJS_HOIST
 +                // Communicate to |txStmt| that there is a function
 +                // definition within.
 +                pc->hasFunctionStmt = true;

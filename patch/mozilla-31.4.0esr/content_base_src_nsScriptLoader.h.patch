@@ -1,23 +1,25 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-01-25 21:28:29.670432630 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-02-01 14:28:23.519818764 -0600
 @@ -17,6 +17,9 @@
  #include "nsAutoPtr.h"
  #include "nsIDocument.h"
  #include "nsIStreamLoader.h"
-+// TxJS begin
++#if 0//def TxJS
 +#include "jsapi.h"
-+// TxJS end
++#endif
  
  class nsScriptLoadRequest;
  class nsIURI;
-@@ -223,6 +226,9 @@
-   nsresult ProcessOffThreadRequest(nsScriptLoadRequest *aRequest,
-                                    void **aOffThreadToken);
- 
+@@ -336,6 +339,11 @@
+   uint32_t mBlockerCount;
+   bool mEnabled;
+   bool mDeferEnabled;
 +#ifdef TxJS
++public:
 +  JS::Value mIntrospector;
++private:
 +#endif
- private:
-   /**
-    * Unblocks the creator parser of the parser-blocking scripts.
+   bool mDocumentParsingDone;
+   bool mBlockingDOMContentLoaded;
+ };
 

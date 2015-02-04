@@ -1,19 +1,20 @@
 --- ff-orig/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-01-25 21:28:29.690432629 -0600
-@@ -21,6 +21,9 @@
- #include "nsIPermissionManager.h"
- #include "nsIPresShell.h"
++++ ff-dev/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-02-01 17:05:48.711502435 -0600
+@@ -23,6 +23,10 @@
  #include "nsIScrollable.h"
-+#ifdef TxJS
-+#include "nsIScriptContext.h"
-+#endif
  #include "nsPresContext.h"
  #include "nsServiceManagerUtils.h"
++#ifdef TxJS
++#include "nsIScriptContext.h"
++#include "jsapi.h"
++#endif
  
-@@ -178,6 +181,16 @@
-     return NS_OK;
+ using namespace mozilla;
+ using namespace mozilla::dom;
+@@ -179,6 +183,16 @@
    }
  
+   nsresult rv = mFrameLoader->LoadFrame();
 +#ifdef TxJS
 +  nsIScriptContext* sctx = GetContextForEventHandlers(&rv);
 +  if (sctx) {
@@ -24,7 +25,7 @@
 +    }
 +  }
 +#endif
-   nsresult rv = mFrameLoader->LoadFrame();
  #ifdef DEBUG
    if (NS_FAILED(rv)) {
+     NS_WARNING("failed to load URL");
 

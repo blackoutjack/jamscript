@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jscntxt.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jscntxt.h	2015-01-25 21:28:30.506432605 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jscntxt.h	2015-01-27 08:15:59.677091994 -0600
 @@ -423,6 +423,51 @@
      /* Per-context options. */
      JS::ContextOptions  options_;

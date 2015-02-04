@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-01-25 21:28:30.534432604 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-02-03 21:13:30.619838265 -0600
 @@ -0,0 +1,1137 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -21,7 +21,7 @@
 +#include "jsapi.h"
 +#include "jsatom.h"
 +#include "jscntxt.h"
-+#include "jsversion.h"
++#include "jsobj.h"
 +#include "jsjam.h"
 +
 +#include "jsobjinlines.h"
@@ -631,7 +631,7 @@
 +
 +JAMProfiler profiler;
 +
-+Class JAMClass = {
++const Class js::JAMClass = {
 +    js_JAM_str,
 +    JSCLASS_HAS_CACHED_PROTO(JSProto_JAM),
 +    JS_PropertyStub,         // addProperty
@@ -867,13 +867,13 @@
 +    TxContext *tx = cx->getRunningTx();
 +    if (tx) {
 +        bool construct = true;
-+        if (SuspendCall(cx, tx, args, &construct)) {
++        InterpreterActivation *act = cx->mainThread().activation()->asInterpreter();
++        if (SuspendCall(cx, tx, *act, args, &construct)) {
 +            // Force non-inline execution.
 +            int path = 1;
 +            // Not used.
 +            bool newType;
 +            RootedScript s(cx, cx->interpreterFrame()->script());
-+            InterpreterActivation *act = cx->mainThread().activation()->asInterpreter();
 +            bool ok = IntrospectTx(cx, tx, act, true, s, &path, &newType);
 +            args.rval().set(tx->getReturnValue());
 +            return ok;

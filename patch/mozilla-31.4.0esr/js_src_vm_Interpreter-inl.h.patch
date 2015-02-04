@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-01-25 21:28:30.722432599 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-02-02 16:48:53.752642799 -0600
 @@ -13,6 +13,10 @@
  #include "jsinfer.h"
  #include "jsnum.h"
@@ -41,13 +41,35 @@
  /*
   * One optimized consumer of MagicValue(JS_OPTIMIZED_ARGUMENTS) is f.apply.
   * However, this speculation must be guarded before calling 'apply' in case it
-@@ -198,6 +225,20 @@
+@@ -170,8 +197,22 @@
+ FetchName(JSContext *cx, HandleObject obj, HandleObject obj2, HandlePropertyName name,
+           HandleShape shape, MutableHandleValue vp)
+ {
++#ifdef TxJS
++    TxContext *tx = cx->getRunningTx();
++#endif
+     if (!shape) {
+         if (TypeOf) {
++#ifdef TxJS
++            if (tx) {
++                // Update the already-created read set node to reflect the value
++                // and the scope in which it was found.
++                //node->obj = pobj.get();
++                // Add the property to the read set, with the head of the scope
++                // chain as the object, and an undefined value.
++                // %%% Need to root?
++                tx->recordAction(cx, obj.get(), NameToId(name), UndefinedValue(), AX_READ);
++            }
++#endif
+             vp.setUndefined();
+             return true;
+         }
+@@ -198,6 +239,19 @@
              return false;
          }
      }
 +
 +#ifdef TxJS
-+    TxContext *tx = cx->getRunningTx();
 +    if (tx) {
 +        // Update the already-created read set node to reflect the value
 +        // and the scope in which it was found.
@@ -62,7 +84,7 @@
      return true;
  }
  
-@@ -343,9 +384,21 @@
+@@ -343,9 +397,21 @@
  {
      JS_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
  
@@ -84,7 +106,7 @@
              if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
                  break;
  
-@@ -358,6 +411,14 @@
+@@ -358,6 +424,14 @@
  
          JSAtom *name = ToAtom<NoGC>(cx, rref);
          if (name) {
@@ -99,7 +121,7 @@
              if (name->isIndex(&index)) {
                  if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
                      break;
-@@ -373,6 +434,13 @@
+@@ -373,6 +447,13 @@
          if (!name)
              return false;
  
@@ -113,7 +135,7 @@
          if (name->isIndex(&index)) {
              if (!JSObject::getElement(cx, obj, obj, index, res))
                  return false;
-@@ -384,6 +452,12 @@
+@@ -384,6 +465,12 @@
          objArg = obj;
      } while (0);
  
@@ -126,7 +148,7 @@
  #if JS_HAS_NO_SUCH_METHOD
      if (op == JSOP_CALLELEM && MOZ_UNLIKELY(res.isUndefined()) && wasObject) {
          RootedObject obj(cx, objArg);
-@@ -417,6 +491,9 @@
+@@ -417,6 +504,9 @@
              return false;
  
          lref.set(ObjectValue(frame.argsObj()));
@@ -136,7 +158,7 @@
      }
  
      return true;
-@@ -436,6 +513,10 @@
+@@ -436,6 +526,10 @@
              if (!str)
                  return false;
              res.setString(str);

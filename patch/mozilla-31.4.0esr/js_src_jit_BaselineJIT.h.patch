@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jit/BaselineJIT.h	2015-01-05 23:08:02.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jit/BaselineJIT.h	2015-01-25 21:28:30.310432611 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jit/BaselineJIT.h	2015-01-27 08:15:59.657091995 -0600
 @@ -345,6 +345,10 @@
  inline bool
  IsBaselineEnabled(JSContext *cx)

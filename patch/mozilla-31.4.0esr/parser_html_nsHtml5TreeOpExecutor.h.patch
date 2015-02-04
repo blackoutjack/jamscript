@@ -1,17 +1,16 @@
 --- ff-orig/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.h	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.h	2015-01-25 21:28:30.894432594 -0600
-@@ -23,6 +23,10 @@
++++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.h	2015-02-01 14:31:57.199811608 -0600
+@@ -23,6 +23,9 @@
  #include "nsTHashtable.h"
  #include "nsHashKeys.h"
  #include "mozilla/LinkedList.h"
-+// TxJS begin
-+// %%% Needed?
++#if 0//def TxJS
 +#include "jsapi.h"
-+// TxJS end
++#endif
  #include "nsHtml5DocumentBuilder.h"
  
  class nsHtml5Parser;
-@@ -41,6 +45,10 @@
+@@ -41,6 +44,10 @@
      NS_DECL_AND_IMPL_ZEROING_OPERATOR_NEW
      NS_DECL_ISUPPORTS_INHERITED
  

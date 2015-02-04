@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/frontend/BytecodeEmitter.cpp	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/frontend/BytecodeEmitter.cpp	2015-01-25 21:28:30.122432616 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/frontend/BytecodeEmitter.cpp	2015-02-04 13:48:49.249838225 -0600
 @@ -316,6 +316,11 @@
      "if statement",          /* IF */
      "else statement",        /* ELSE */
@@ -81,8 +81,8 @@
 +        bce->emittingForInit = oldEmittingForInit;
 +    }
 +    */
-+    if (NewSrcNote2(cx, bce, SRC_SETLINE, bce->offset() - top) < 0)
-+        return false;
++    //if (NewSrcNote2(cx, bce, SRC_SETLINE, bce->offset() - top) < 0)
++    //    return false;
 +
 +    //if (Emit1(cx, bce, pn->getOp()) < 0)
 +    if (Emit3(cx, bce, pn->getOp(), ARGC_HI(argc), ARGC_LO(argc)) < 0)

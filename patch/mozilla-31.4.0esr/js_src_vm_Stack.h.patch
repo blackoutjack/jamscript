@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Stack.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Stack.h	2015-01-25 21:28:30.750432598 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Stack.h	2015-02-02 18:18:32.928462645 -0600
 @@ -11,6 +11,9 @@
  
  #include "jsfun.h"
@@ -10,17 +10,7 @@
  
  #include "jit/AsmJSLink.h"
  #include "jit/JitFrameIterator.h"
-@@ -336,6 +339,9 @@
- 
-         /* Miscellaneous state. */
-         USE_NEW_TYPE       =    0x20000   /* Use new type for constructed |this| object. */
-+#ifdef TxJS
-+       ,HAS_SUSPENDED_TX   =    0x40000
-+#endif
-     };
- 
-   private:
-@@ -362,6 +368,13 @@
+@@ -362,6 +365,13 @@
      Value               *prevsp_;
  
      void                *hookData_;     /* if HAS_HOOK_DATA, closure returned by call hook */
@@ -34,16 +24,15 @@
  
      /*
       * For an eval-in-frame DEBUGGER frame, the frame in whose scope we're
-@@ -742,6 +755,16 @@
+@@ -742,6 +752,15 @@
  
      inline JSCompartment *compartment() const;
  
 +#ifdef TxJS
 +    inline TxContext *suspendedTx() const {
-+        return (flags_ & HAS_SUSPENDED_TX) ? suspendedTx_ : NULL;
++        return (suspendedTx_ && suspendedTx_->inState(TX_SUSPEND1 | TX_END1)) ? suspendedTx_ : nullptr;
 +    }
 +    inline void setSuspendedTx(TxContext *tx) {
-+        flags_ |= HAS_SUSPENDED_TX;
 +        suspendedTx_ = tx;
 +    }
 +#endif

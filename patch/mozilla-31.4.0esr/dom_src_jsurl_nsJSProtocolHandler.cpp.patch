@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-05 23:08:05.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-25 21:28:29.978432621 -0600
++++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-02-01 14:31:10.023813188 -0600
 @@ -65,6 +65,9 @@
                              PopupControlState aPopupState,
                              uint32_t aExecutionPolicy,
@@ -26,21 +26,21 @@
          nsJSUtils::EvaluateOptions evalOptions;
          evalOptions.setCoerceToString(true);
 +#ifdef TxJS
-+        options->mIntrospector = mIntrospector;
++        options.setIntrospector(mIntrospector);
 +#endif
          rv = nsJSUtils::EvaluateString(cx, NS_ConvertUTF8toUTF16(script),
                                         globalJSObject, options, evalOptions, &v);
  
-@@ -427,6 +437,9 @@
+@@ -426,6 +436,9 @@
+     uint32_t                mExecutionPolicy;
      bool                    mIsAsync;
      bool                    mIsActive;
-     bool                    mOpenedStreamChannel;
 +#ifdef TxJS
 +    JS::Value mIntrospector;
 +#endif
+     bool                    mOpenedStreamChannel;
  };
  
- nsJSChannel::nsJSChannel() :
 @@ -437,6 +450,9 @@
      mExecutionPolicy(EXECUTE_IN_SANDBOX),
      mIsAsync(true),
@@ -51,30 +51,36 @@
      mOpenedStreamChannel(false)
  {
  }
-@@ -505,6 +521,22 @@
+@@ -505,6 +521,28 @@
                    nsIStreamListener, nsIScriptChannel, nsIPropertyBag,
                    nsIPropertyBag2)
  
-+#ifdef TxJS
++// TxJS begin
 +NS_IMETHODIMP
-+nsJSChannel::GetIntrospector(JS::Value *aIntrospector)
++nsJSChannel::GetIntrospector(JS::MutableHandleValue aIntrospector)
 +{
-+    *aIntrospector = mIntrospector;
++#ifdef TxJS
++    aIntrospector.set(mIntrospector);
++#else
++    aIntrospector.set(JS::UndefinedValue());
++#endif
 +    return NS_OK;
 +}
 +
 +NS_IMETHODIMP
-+nsJSChannel::SetIntrospector(const JS::Value &aIntrospector)
++nsJSChannel::SetIntrospector(JS::HandleValue aIntrospector)
 +{
++#ifdef TxJS
 +    mIntrospector = aIntrospector;
++#endif
 +    return NS_OK;
 +}
-+#endif
++// TxJS end
 +
  //
  // nsIRequest implementation...
  //
-@@ -618,6 +650,17 @@
+@@ -618,6 +656,17 @@
  
      mIsActive = true;
  
@@ -84,7 +90,7 @@
 +        JSContext* cx = scriptContext->GetNativeContext();
 +        JS::Value ispect = JS_GetIntrospector(cx);
 +        if (!ispect.isUndefined()) {
-+            SetIntrospector(ispect);
++            SetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&ispect));
 +        }
 +    }
 +#endif
@@ -92,12 +98,12 @@
      // Temporarily set the LOAD_BACKGROUND flag to suppress load group observer
      // notifications (and hence nsIWebProgressListener notifications) from
      // being dispatched.  This is required since we suppress LOAD_DOCUMENT_URI,
-@@ -716,6 +759,9 @@
+@@ -716,6 +765,9 @@
      // script returns it).
      
      if (NS_SUCCEEDED(mStatus)) {
 +#ifdef TxJS
-+        GetIntrospector(&mIOThunk->mIntrospector);
++        GetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&mIOThunk->mIntrospector));
 +#endif
          nsresult rv = mIOThunk->EvaluateScript(mStreamChannel, mPopupState,
                                                 mExecutionPolicy,

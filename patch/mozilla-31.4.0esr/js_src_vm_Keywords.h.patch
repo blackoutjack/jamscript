@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Keywords.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Keywords.h	2015-01-25 21:28:30.726432599 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Keywords.h	2015-01-27 08:15:59.713091993 -0600
 @@ -48,6 +48,9 @@
      macro(enum, enum_, TOK_RESERVED, JSVERSION_DEFAULT) \
      macro(extends, extends, TOK_RESERVED, JSVERSION_DEFAULT) \

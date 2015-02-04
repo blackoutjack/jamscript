@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/js/src/js.pc	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/js/src/js.pc	2015-01-25 21:30:31.858429057 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/js/src/js.pc	2015-01-27 08:15:59.705091993 -0600
 @@ -0,0 +1,11 @@
 +prefix=/usr/local
 +exec_prefix=${prefix}

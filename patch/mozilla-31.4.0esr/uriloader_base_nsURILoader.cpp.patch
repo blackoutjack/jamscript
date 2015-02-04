@@ -1,17 +1,16 @@
 --- ff-orig/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-01-25 21:28:30.954432592 -0600
-@@ -48,6 +48,10 @@
++++ ff-dev/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-02-01 16:31:55.955570514 -0600
+@@ -48,6 +48,9 @@
  #include "nsMimeTypes.h"
  
  #include "nsDocLoader.h"
 +#ifdef TxJS
 +#include "nsHtml5StreamParser.h"
-+#include "jsapi.h"
 +#endif
  #include "mozilla/Attributes.h"
  #include "mozilla/Preferences.h"
  
-@@ -159,6 +163,11 @@
+@@ -159,6 +162,11 @@
     * nsIURIContentListeners.
     */
    nsRefPtr<nsURILoader> mURILoader;
@@ -23,7 +22,7 @@
  };
  
  NS_IMPL_ADDREF(nsDocumentOpenInfo)
-@@ -181,6 +190,9 @@
+@@ -181,6 +189,9 @@
                                         nsURILoader* aURILoader)
    : m_originalContext(aWindowContext),
      mFlags(aFlags),
@@ -33,7 +32,7 @@
      mURILoader(aURILoader)
  {
  }
-@@ -729,6 +741,14 @@
+@@ -729,6 +740,14 @@
      LOG(("  Listener has aborted the load"));
      m_targetStreamListener = nullptr;
    }
@@ -48,7 +47,7 @@
  
    NS_ASSERTION(abort || m_targetStreamListener, "DoContent returned no listener?");
  
-@@ -748,6 +768,9 @@
+@@ -748,6 +767,9 @@
      mLog = PR_NewLogModule("URILoader");
    }
  #endif
@@ -58,7 +57,7 @@
  }
  
  nsURILoader::~nsURILoader()
-@@ -869,6 +892,9 @@
+@@ -869,6 +891,9 @@
    // the url and discover the content type....
    nsRefPtr<nsDocumentOpenInfo> loader =
      new nsDocumentOpenInfo(aWindowContext, aFlags, this);

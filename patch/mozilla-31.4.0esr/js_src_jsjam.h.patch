@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsjam.h	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.h	2015-01-25 21:28:30.534432604 -0600
-@@ -0,0 +1,50 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.h	2015-02-01 22:06:56.462897326 -0600
+@@ -0,0 +1,49 @@
 +/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -15,7 +15,6 @@
 +/*
 + * Built-in JAM functions.
 + */
-+extern js::Class JAMClass;
 +
 +extern JSObject *
 +js_InitJAMClass(JSContext *cx, js::HandleObject obj);

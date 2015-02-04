@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-25 21:28:30.402432608 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-27 09:30:00.635011129 -0600
 @@ -1003,7 +1003,14 @@
   */
  #define JSFUN_GENERIC_NATIVE   0x800
@@ -27,14 +27,34 @@
  /*
   * Format is a string of the following characters (spaces are insignificant),
   * specifying the tabulated type conversions:
-@@ -3506,6 +3518,9 @@
-     bool defineOnScope;
-     bool noScriptRval;
-     bool selfHostingMode;
+@@ -3638,12 +3650,18 @@
+     RootedObject elementRoot;
+     RootedString elementAttributeNameRoot;
+     RootedScript introductionScriptRoot;
 +#ifdef TxJS
-+    Value introspector;
++    RootedValue introspector;
 +#endif
-     bool canLazilyParse;
-     bool strictOption;
-     bool extraWarningsOption;
+ 
+   public:
+     explicit CompileOptions(JSContext *cx, JSVersion version = JSVERSION_UNKNOWN);
+     CompileOptions(js::ContextFriendFields *cx, const ReadOnlyCompileOptions &rhs)
+       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
+         introductionScriptRoot(cx)
++#ifdef TxJS
++      , introspector(cx, JS::UndefinedValue())
++#endif
+     {
+         copyPODOptions(rhs);
+ 
+@@ -3659,6 +3677,10 @@
+     JSString *elementAttributeName() const MOZ_OVERRIDE { return elementAttributeNameRoot; }
+     JSScript *introductionScript() const MOZ_OVERRIDE { return introductionScriptRoot; }
+ 
++#ifdef TxJS
++    Value getIntrospector() { return introspector; }
++    CompileOptions &setIntrospector(Value &ispect) { introspector = ispect; return *this; }
++#endif
+     CompileOptions &setFile(const char *f) { filename_ = f; return *this; }
+     CompileOptions &setLine(unsigned l) { lineno = l; return *this; }
+     CompileOptions &setFileAndLine(const char *f, unsigned l) {
 

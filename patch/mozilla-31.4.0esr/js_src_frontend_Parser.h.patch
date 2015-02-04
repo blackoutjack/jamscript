@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/frontend/Parser.h	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/frontend/Parser.h	2015-01-25 21:28:30.158432615 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/frontend/Parser.h	2015-02-04 13:35:31.337864948 -0600
 @@ -99,6 +99,11 @@
  
      StmtInfoPC      *topStmt;       /* top of statement info stack */

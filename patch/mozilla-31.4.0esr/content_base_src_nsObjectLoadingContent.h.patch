@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.h	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.h	2015-01-25 21:28:29.658432630 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.h	2015-02-01 14:27:44.347820076 -0600
 @@ -539,7 +539,9 @@
      // as a root for other resource requests.
      nsCOMPtr<nsIURI>            mBaseURI;

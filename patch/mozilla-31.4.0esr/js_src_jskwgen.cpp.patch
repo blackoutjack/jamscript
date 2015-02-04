@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jskwgen.cpp	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jskwgen.cpp	2015-01-25 21:28:30.542432604 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jskwgen.cpp	2015-01-27 08:15:59.701091993 -0600
 @@ -109,7 +109,14 @@
      min_nchar_index = min_span_index = 0;
      do {

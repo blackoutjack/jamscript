@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-25 21:28:29.670432630 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-02-01 14:33:08.827809209 -0600
 @@ -47,6 +47,9 @@
  #include "nsCRT.h"
  #include "nsContentCreatorFunctions.h"
@@ -20,16 +20,16 @@
        mCORSMode(aCORSMode)
    {
    }
-@@ -120,6 +126,9 @@
+@@ -119,6 +125,9 @@
+   nsCOMPtr<nsIPrincipal> mOriginPrincipal;
    nsAutoCString mURL;   // Keep the URI's filename alive during off thread parsing.
    int32_t mLineNo;
-   const CORSMode mCORSMode;
 +#ifdef TxJS
 +  JS::Value mIntrospector;
 +#endif
+   const CORSMode mCORSMode;
  };
  
- // The nsScriptLoadRequest is passed as the context to necko, and thus
 @@ -136,6 +145,9 @@
      mBlockerCount(0),
      mEnabled(true),
@@ -40,12 +40,15 @@
      mDocumentParsingDone(false),
      mBlockingDOMContentLoaded(false)
  {
-@@ -643,6 +655,14 @@
+@@ -643,6 +655,17 @@
      request->mJSVersion = version;
  
      if (aElement->GetScriptAsync()) {
 +#ifdef TxJS
 +      JSContext *cx = nullptr;
++      nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
++      if (!globalObject)
++        return false;
 +      cx = globalObject->GetScriptContext()->GetNativeContext();
 +      JS::Value ispect = JS_GetIntrospector(cx);
 +      if (!ispect.isUndefined()) {
@@ -55,7 +58,7 @@
        mAsyncRequests.AppendElement(request);
        if (!request->mLoading) {
          // The script is available already. Run it ASAP when the event
-@@ -738,6 +758,24 @@
+@@ -738,6 +761,24 @@
    request->mURI = mDocument->GetDocumentURI();
    request->mLineNo = aElement->GetScriptLineNumber();
  
@@ -80,7 +83,7 @@
    if (aElement->GetParserCreated() == FROM_PARSER_XSLT &&
        (!ReadyToExecuteScripts() || !mXSLTRequests.IsEmpty())) {
      // Need to maintain order for XSLT-inserted scripts
-@@ -1067,6 +1105,9 @@
+@@ -1067,6 +1108,9 @@
      MOZ_ASSERT(elementVal.isObject());
      aOptions->setElement(&elementVal.toObject());
    }

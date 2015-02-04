@@ -1,12 +1,12 @@
 --- ff-orig/mozilla-31.4.0esr/parser/html/nsHtml5StreamParser.h	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5StreamParser.h	2015-01-25 21:28:30.874432595 -0600
++++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5StreamParser.h	2015-02-01 14:28:08.603819264 -0600
 @@ -19,6 +19,9 @@
  #include "nsHtml5Speculation.h"
  #include "nsITimer.h"
  #include "nsICharsetDetector.h"
-+// TxJS begin
++#if 0//def TxJS
 +#include "jsapi.h"
-+// TxJS end
++#endif
  
  class nsHtml5Parser;
  

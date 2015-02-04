@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/frontend/Parser.cpp	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/frontend/Parser.cpp	2015-01-25 21:28:30.158432615 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/frontend/Parser.cpp	2015-02-04 14:00:04.757815602 -0600
 @@ -660,6 +660,11 @@
              return ENDS_IN_OTHER;
          return HasFinalReturn(pn->last());
@@ -97,7 +97,7 @@
        case TOK_DEBUGGER:
          return debuggerStatement();
  
-@@ -5454,6 +5522,129 @@
+@@ -5454,6 +5522,127 @@
      return pn;
  }
  
@@ -106,10 +106,7 @@
 +ParseNode *
 +Parser<FullParseHandler>::txStmt()
 +{
-+    JS_ASSERT(tokenStream.currentToken().type == TOK_TX);
-+
-+    ParseNode *pn, *pn1;
-+
++    uint32_t begin = pos().begin;
 +    StmtInfoPC stmtInfo(context);
 +#ifdef TxJS_HOIST
 +    StmtInfoPC *txTop = pc->topStmt;
@@ -129,23 +126,25 @@
 +     * This code models transactions as inline blocks.
 +     */
 +
-+    pn = BinaryNode::create(PNK_TX, &handler);
++    ParseNode *pn = BinaryNode::create(PNK_TX, &handler);
 +    if (!pn)
-+      return NULL;
++      return null();
++    pn->pn_pos.begin = begin;
 +    pn->setOp(JSOP_BEGIN_TX);
 +
 +    /* Parse the "argument list" to get the policy function. */
 +    if (!txArguments(pn))
-+        return NULL;
++        return null();
 +
++    ParseNode *pn1;
 +#ifdef TxJS_HOIST
 +    if (tokenStream.peekToken(TokenStream::Operand) == TOK_LC) {
 +        tokenStream.getToken(TokenStream::Operand);
-+        JS_CHECK_RECURSION(context, return NULL);
++        JS_CHECK_RECURSION(context, return null());
 +
 +        StmtInfoPC stmtInfo1(context);
 +        if (!PushBlocklikeStatement(tokenStream, &stmtInfo1, STMT_BLOCK, pc))
-+            return NULL;
++            return null();
 +        if (hasTxTop) {
 +            pc->txTop = txTop;
 +            pc->hasTxTop = true;
@@ -164,7 +163,7 @@
 +        pn1 = statement();
 +
 +    if (!pn1)
-+        return NULL;
++        return null();
 +    pn->pn_right = pn1;
 +
 +    // Pop the value if the transaction is not an expression.
@@ -187,24 +186,23 @@
 +ParseNode *
 +Parser<FullParseHandler>::txExpr()
 +{
++    uint32_t begin = pos().begin;
 +    if (!tokenStream.matchToken(TOK_TX))
-+        return NULL;
++        return null();
 +
-+    // This code models transactions as inline blocks.
-+    ParseNode *pn, *pn1;
-+
-+    pn = BinaryNode::create(PNK_TX, &handler);
++    ParseNode *pn = BinaryNode::create(PNK_TX, &handler);
 +    if (!pn)
-+      return NULL;
++      return null();
++    pn->pn_pos.begin = begin;
 +    pn->setOp(JSOP_BEGIN_TX);
 +
 +    /* Parse the "argument list" to get the policy function. */
 +    if (!txArguments(pn))
-+        return NULL;
++        return null();
 +
-+    pn1 = statement();
++    ParseNode *pn1 = statement();
 +    if (!pn1)
-+        return NULL;
++        return null();
 +    pn->pn_right = pn1;
 +
 +    //PopStatementPC(tokenStream, pc);
@@ -227,7 +225,7 @@
  template <typename ParseHandler>
  MOZ_ALWAYS_INLINE typename ParseHandler::Node
  Parser<ParseHandler>::condExpr1()
-@@ -5584,6 +5775,14 @@
+@@ -5584,6 +5773,14 @@
      TokenStream::Position start(keepAtoms);
      tokenStream.tell(&start);
  

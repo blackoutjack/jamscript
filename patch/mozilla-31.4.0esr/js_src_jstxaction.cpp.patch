@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstxaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-01-25 21:28:30.670432600 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-01-27 08:15:59.709091993 -0600
 @@ -0,0 +1,380 @@
 +#include "jsversion.h"
 +#ifdef TxJS

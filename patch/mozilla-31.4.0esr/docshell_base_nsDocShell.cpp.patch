@@ -1,63 +1,90 @@
 --- ff-orig/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-01-05 23:08:02.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-01-25 21:28:29.782432626 -0600
-@@ -847,6 +847,9 @@
-     mDefaultLoadFlags(nsIRequest::LOAD_NORMAL),
-     mFrameType(eFrameTypeRegular),
-     mOwnOrContainingAppId(nsIScriptSecurityManager::UNKNOWN_APP_ID),
++++ ff-dev/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-02-01 14:30:19.967814864 -0600
+@@ -185,6 +185,9 @@
+ #include "nsISupportsArray.h"
+ #include "nsIURIFixup.h"
+ #include "nsIURILoader.h"
++#ifdef TxJS
++#include "nsURILoader.h"
++#endif
+ #include "nsIWebBrowserFind.h"
+ #include "nsIWidget.h"
+ #include "mozilla/dom/EncodingUtils.h"
+@@ -797,6 +800,9 @@
+     mDefaultScrollbarPref(Scrollbar_Auto, Scrollbar_Auto),
+     mTreeOwner(nullptr),
+     mChromeEventHandler(nullptr),
 +#ifdef TxJS
 +    mIntrospector(JS::UndefinedValue()),
 +#endif
-     mParentCharsetSource(0)
- {
-     mHistoryID = ++gDocshellIDCounter;
-@@ -1798,6 +1801,20 @@
+     mCharsetReloadState(eCharsetReloadInit),
+     mChildOffset(0),
+     mBusyFlags(BUSY_FLAGS_NONE),
+@@ -1798,6 +1804,26 @@
          originIsFile && targetIsFile;
  }
  
-+#ifdef TxJS
++// TxJS begin
 +NS_IMETHODIMP
-+nsDocShell::GetIntrospector(JS::Value *aIntrospector) {
-+    *aIntrospector = mIntrospector;
++nsDocShell::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++#ifdef TxJS
++    aIntrospector.set(mIntrospector);
++#else
++    aIntrospector.set(JS::UndefinedValue());
++#endif
 +    return NS_OK;
 +}
 +
 +NS_IMETHODIMP
-+nsDocShell::SetIntrospector(const JS::Value & aIntrospector) {
++nsDocShell::SetIntrospector(JS::HandleValue aIntrospector) {
++#ifdef TxJS
 +    mIntrospector = aIntrospector;
++#endif
 +    return NS_OK;
 +}
-+#endif
++// TxJS end
 +
  NS_IMETHODIMP
  nsDocShell::GetEldestPresContext(nsPresContext** aPresContext)
  {
-@@ -9735,6 +9752,10 @@
+@@ -9735,6 +9761,15 @@
  
      uriLoader = do_GetService(NS_URI_LOADER_CONTRACTID, &rv);
      if (NS_FAILED(rv)) return rv;
 +#ifdef TxJS
 +    JS::Value ispect;
-+    GetIntrospector(&ispect);
++    JSContext *cx = nsContentUtils::GetCurrentJSContext();
++    if (cx) {
++        JS::RootedValue rootIspect(cx);
++        GetIntrospector(&rootIspect);
++        ispect = rootIspect.get();
++    }
 +#endif
  
      nsLoadFlags loadFlags = mDefaultLoadFlags;
      if (aFirstParty) {
-@@ -10029,6 +10050,9 @@
+@@ -10029,6 +10064,11 @@
          // Allow execution against our context if the principals match
          scriptChannel->
              SetExecutionPolicy(nsIScriptChannel::EXECUTE_NORMAL);
 +#ifdef TxJS
-+        scriptChannel->SetIntrospector(ispect);
++        if (cx) {
++            scriptChannel->SetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&ispect));
++        }
 +#endif
      }
  
      if (aIsNewWindowTarget) {
-@@ -10047,7 +10071,7 @@
+@@ -10047,7 +10087,11 @@
              timedChannel->SetInitiatorType(NS_LITERAL_STRING("subdocument"));
          }
      }
 -
-+    static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = ispect;
++#ifdef TxJS
++    if (cx) {
++        static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = ispect;
++    }
++#endif
      rv = DoChannelLoad(channel, uriLoader, aBypassClassifier);
  
      //

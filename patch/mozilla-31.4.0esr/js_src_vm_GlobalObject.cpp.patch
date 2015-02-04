@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/GlobalObject.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/GlobalObject.cpp	2015-01-25 21:28:30.714432599 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/GlobalObject.cpp	2015-01-27 08:15:59.709091993 -0600
 @@ -15,6 +15,10 @@
  #include "jsprototypes.h"
  #include "jsweakmap.h"

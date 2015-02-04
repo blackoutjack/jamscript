@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstransaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.cpp	2015-01-25 21:28:30.666432601 -0600
-@@ -0,0 +1,336 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.cpp	2015-02-02 17:18:31.916583246 -0600
+@@ -0,0 +1,323 @@
 +#include "jsversion.h"
 +#ifdef TxJS
 +#include <string.h>
@@ -8,11 +8,8 @@
 +#include "jsapi.h"
 +#include "jsarray.h"
 +#include "jscntxt.h"
-+#include "jstransaction.h"
 +#include "jsproxy.h"
-+
-+#define JSVAL_HOLE_FLAG jsval(4 << JSVAL_TAGBITS)
-+#define JSVAL_HOLE (JSVAL_VOID | JSVAL_HOLE_FLAG)
++#include "jstransaction.h"
 +
 +using namespace js;
 +
@@ -252,27 +249,18 @@
 +    return true;
 +}
 +
-+/** Description of this class: */
-+Class TxClass =
++// Description of this class:
++const Class js::TxClass =
 +{
 +    js_Tx_str,
 +    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_CACHED_PROTO(JSProto_Tx),
-+    JS_PropertyStub,             /* addProperty stub */
-+    JS_DeletePropertyStub,       /* deleteProperty stub */
-+    JS_PropertyStub,             /* getProperty stub */
-+    JS_StrictPropertyStub,       /* setProperty stub */
-+    JS_EnumerateStub,            /* enumerateProperty stub */
-+    JS_ResolveStub,              /* resolveProperty stub */
-+    JS_ConvertStub,              /* convertProperty stub */
-+    NULL,                        /* finalizer */
-+
-+    /* Optional members below instead of JSCLASS_NO_OPTIONAL_MEMBERS */
-+    //NULL,//tx_getObjectOps,//NULL,                        /**< getObjectOps */
-+    NULL,                        /* checkAccess */
-+    NULL,                        /* call */
-+    NULL,                        /* hasInstance */
-+    NULL,                        /* construct */
-+    NULL,                        /* GC Trace */
++    JS_PropertyStub,             // addProperty stub
++    JS_DeletePropertyStub,       // deleteProperty stub
++    JS_PropertyStub,             // getProperty stub
++    JS_StrictPropertyStub,       // setProperty stub
++    JS_EnumerateStub,            // enumerateProperty stub
++    JS_ResolveStub,              // resolveProperty stub
++    JS_ConvertStub               // convertProperty stub
 +};
 +
 +static JSFunctionSpec tx_methods[] =
@@ -302,22 +290,21 @@
 +
 +    RootedObject txProto(cx, global->createBlankPrototype(cx, &TxClass));
 +    if (!txProto)
-+        return NULL;
++        return nullptr;
 +
-+    /* Now create the Tx function. */
-+    RootedFunction ctor(cx);
-+    ctor = global->createConstructor(cx, js_Tx, cx->names().Tx, 0);
++    // Now create the Tx function.
++    RootedFunction ctor(cx, global->createConstructor(cx, js_Tx, cx->names().Tx, 0));
 +    if (!ctor)
-+        return NULL;
++        return nullptr;
 +
 +    if (!LinkConstructorAndPrototype(cx, ctor, txProto))
-+        return NULL;
++        return nullptr;
 +
-+    if (!DefinePropertiesAndBrand(cx, txProto, NULL, tx_methods))
-+        return NULL;
++    if (!DefinePropertiesAndBrand(cx, txProto, nullptr, tx_methods))
++        return nullptr;
 +
 +    if (!GlobalObject::initBuiltinConstructor(cx, global, JSProto_Tx, ctor, txProto))
-+        return NULL;
++        return nullptr;
 +
 +    return txProto;
 +}

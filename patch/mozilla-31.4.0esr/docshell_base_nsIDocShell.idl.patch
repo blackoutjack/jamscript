@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/docshell/base/nsIDocShell.idl	2015-01-05 23:08:02.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/docshell/base/nsIDocShell.idl	2015-01-25 21:28:29.830432625 -0600
++++ ff-dev/mozilla-31.4.0esr/docshell/base/nsIDocShell.idl	2015-01-27 08:15:59.653091995 -0600
 @@ -189,6 +189,10 @@
     */ 
    void setCurrentURI(in nsIURI aURI);

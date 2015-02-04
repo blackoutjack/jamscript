@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstransaction.h	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.h	2015-01-25 21:28:30.666432601 -0600
-@@ -0,0 +1,64 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.h	2015-02-02 08:38:47.353627651 -0600
+@@ -0,0 +1,48 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -17,14 +17,7 @@
 +#include "jspubtd.h"
 +#include "jsobj.h"
 +#include "jscntxt.h"
-+#include "jsgcinlines.h"
 +#include "jsobjinlines.h"
-+
-+extern "C" {
-+
-+// %%% Use js or js::tx namespace?
-+
-+extern js::Class TxClass;
 +
 +extern JSObject *
 +js_InitTxClass(JSContext *cx, js::HandleObject obj);
@@ -34,13 +27,6 @@
 +
 +extern bool
 +js_Tx(JSContext *cx, unsigned argc, js::Value *rval);
-+
-+static MOZ_ALWAYS_INLINE bool
-+JSVAL_IS_TXOBJ(js::Value v)
-+{
-+    JS_ASSERT(v.isObject());
-+    return v.toObject().hasClass(&TxClass);
-+}
 +
 +extern bool
 +tx_commit(JSContext *cx, unsigned argc, js::Value *vp);
@@ -59,8 +45,6 @@
 +
 +extern bool
 +tx_setRetval(JSContext *cx, unsigned argc, js::Value *vp);
-+
-+}
 +
 +#endif
 +

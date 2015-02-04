@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-25 21:28:30.382432609 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-28 15:20:43.090441302 -0600
 @@ -44,6 +44,10 @@
  #include "jsworkers.h"
  #endif
@@ -42,22 +42,22 @@
              flags &= ~JSFUN_GENERIC_NATIVE;
              JSFunction *fun = DefineFunction(cx, ctor, id,
                                               js_generic_native_method_dispatcher,
-@@ -4452,6 +4462,9 @@
-     extraWarningsOption = cx->options().extraWarnings();
-     werrorOption = cx->options().werror();
-     asmJSOption = cx->runtime()->options().asmJS();
+@@ -4443,6 +4453,9 @@
+ JS::CompileOptions::CompileOptions(JSContext *cx, JSVersion version)
+     : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
+       introductionScriptRoot(cx)
 +#ifdef TxJS
-+    introspector = JS::UndefinedValue();
++    , introspector(cx, JS::UndefinedValue())
 +#endif
- }
+ {
+     this->version = (version != JSVERSION_UNKNOWN) ? version : cx->findVersion();
  
- bool
 @@ -4858,6 +4871,9 @@
                                                      srcBuf, nullptr, 0, &sct));
      if (!script)
          return false;
 +#ifdef TxJS
-+    script->setIntrospector(options.introspector);
++    script->setIntrospector(options.getIntrospector());
 +#endif
  
      JS_ASSERT(script->getVersion() == options.version);
