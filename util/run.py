@@ -39,9 +39,12 @@ def load_testcases(from_dir, default_policy=None, filter=None):
     if filter is not None and base != filter:
       continue
 
-    # Find any applicable policy files.
-    # Not currently in use.
-    policies = {}
+    # Find an applicable policy file.
+    polfile = "%s.policy.js" % base
+    polpath = os.path.join(from_dir, polfile)
+    policies = []
+    if os.path.isfile(polpath):
+      policies.append(polpath)
 
     flpath = os.path.join(from_dir, flname)
     specs = (flpath, policies)
