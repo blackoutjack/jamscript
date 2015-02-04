@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/jsobj.h	2015-01-05 23:08:03.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsobj.h	2015-02-02 17:04:07.600612193 -0600
+@@ -167,6 +167,10 @@
+ extern const Class IntlClass;
+ extern const Class JSONClass;
+ extern const Class MathClass;
++#ifdef TxJS
++extern const Class JAMClass;
++extern const Class TxClass;
++#endif
+ 
+ class GlobalObject;
+ class MapObject;
+
