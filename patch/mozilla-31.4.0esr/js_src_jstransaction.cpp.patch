@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstransaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.cpp	2015-02-02 17:18:31.916583246 -0600
-@@ -0,0 +1,323 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstransaction.cpp	2015-02-05 02:03:49.765499217 -0600
+@@ -0,0 +1,327 @@
 +#include "jsversion.h"
 +#ifdef TxJS
 +#include <string.h>
@@ -200,9 +200,8 @@
 +        return false;
 +    }
 +
-+    RootedValue handler(cx, tx->getHandler());
-+    cx->compartment()->wrap(cx, &handler);
-+    args.rval().set(handler); 
++    tx->getIntrospector(args.rval());
++    cx->compartment()->wrap(cx, args.rval());
 +    return true;
 +}
 +
@@ -235,16 +234,8 @@
 +    tx_commit(cx, argc, vp);
 +    tx_suppress(cx, argc, vp);
 +
-+    JS::CallArgs args = CallArgsFromVp(argc, vp);
-+    // %%% Should check that both operations were successful.
-+    args.rval().set(JSVAL_TRUE);
-+    return true;
-+}
-+
-+bool js_Tx(JSContext *cx, unsigned argc, Value *vp)
-+{
 +    CallArgs args = CallArgsFromVp(argc, vp);
-+
++    // %%% Should check that both operations were successful.
 +    args.rval().set(JSVAL_TRUE);
 +    return true;
 +}
@@ -280,6 +271,19 @@
 +    JS_FN("commitAndFlush", tx_commitAndFlush, 0, JSFUN_GENERIC_NATIVE | JSFUN_TX_NOSUSPEND),
 +    JS_FS_END
 +};
++
++bool js_Tx(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    JSObject *obj = NewBuiltinClassInstance(cx, &TxClass);
++    if (!obj)
++        return false;
++    obj->setPrivate(nullptr);
++
++    args.rval().set(ObjectValue(*obj));
++    return true;
++}
 +
 +JSObject *
 +js_InitTxClass(JSContext *cx, HandleObject obj)

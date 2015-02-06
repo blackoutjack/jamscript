@@ -1,15 +1,15 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Stack.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Stack.cpp	2015-02-02 18:19:55.848459868 -0600
-@@ -92,6 +92,9 @@
-     Debug_SetValueRangeToCrashOnTouch(&rval_, 1);
-     hookData_ = (void *)0xbad;
- #endif
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Stack.cpp	2015-02-05 01:37:15.673549214 -0600
+@@ -84,6 +84,9 @@
+     prev_ = nullptr;
+     prevpc_ = nullptr;
+     prevsp_ = nullptr;
 +#ifdef TxJS
 +    suspendedTx_ = nullptr;
 +#endif
- }
  
- template <InterpreterFrame::TriggerPostBarriers doPostBarrier>
+     JS_ASSERT_IF(evalInFramePrev, isDebuggerFrame());
+     evalInFramePrev_ = evalInFramePrev;
 @@ -479,6 +482,18 @@
  
      fp->mark_ = mark;

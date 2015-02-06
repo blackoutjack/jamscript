@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-02-03 21:13:30.619838265 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-02-05 00:57:20.137624348 -0600
 @@ -0,0 +1,1137 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -798,12 +798,12 @@
 +    CallArgs args = CallArgsFromVp(argc, vp);
 +
 +    if (argc == 0) {
-+        cx->interpreterFrame()->script()->setIntrospector(JSVAL_VOID);
++        cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(JSVAL_VOID);
 +        args.rval().setBoolean(true);
 +        return true;
 +    }
 +
-+    cx->interpreterFrame()->script()->setIntrospector(args[0]);
++    cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(args[0]);
 +    vp->setBoolean(true);
 +    return true;
 +}
@@ -873,9 +873,9 @@
 +            int path = 1;
 +            // Not used.
 +            bool newType;
-+            RootedScript s(cx, cx->interpreterFrame()->script());
++            RootedScript s(cx, cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT));
 +            bool ok = IntrospectTx(cx, tx, act, true, s, &path, &newType);
-+            args.rval().set(tx->getReturnValue());
++            tx->getReturnValue(args.rval());
 +            return ok;
 +        }
 +    }

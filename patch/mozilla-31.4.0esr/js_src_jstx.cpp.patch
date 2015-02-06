@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-01-27 08:15:59.709091993 -0600
-@@ -0,0 +1,744 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-05 00:59:45.449619790 -0600
+@@ -0,0 +1,745 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -23,7 +23,7 @@
 +// TxContext methods
 +
 +TxContext *
-+TxContext::initTx(JSContext *cx, TxContext *tx, const Value &handler)
++TxContext::initTx(JSContext *cx, TxContext *tx, HandleValue ispect)
 +{
 +    // Since we only maintain one stack of transactions, push onto the
 +    // top, regardless of whether the current top tx is running.
@@ -34,7 +34,7 @@
 +    //memset(tx, 0, sizeof(TxContext));
 +
 +    tx->state_ = TX_INIT;
-+    tx->seq_ = NULL;
++    tx->seq_ = nullptr;
 +    tx->seqsize_ = 0;
 +    tx->capacity_ = 0;
 +#ifdef TxJS_PROFILE_ACTIONS
@@ -45,13 +45,13 @@
 +    tx->forinsize_ = 0;
 +#endif
 +#ifdef TxJS_HASH
-+    tx->values_ = NULL;
++    tx->values_ = nullptr;
 +#endif
 +
 +    tx->suspend_.active = false;
-+    tx->retval_ = JSVAL_VOID;
++    tx->retval_.init(JSVAL_VOID);
 +    tx->next_ = parent;
-+    tx->handler_ = handler;
++    tx->introspector_.init(ispect);
 +
 +#ifdef TxJS_ITYPE
 +    tx->itypes_ = AX_ANY;
@@ -146,15 +146,15 @@
 +    //this->clear(cx);
 +
 +#ifdef TxJS_HASH
-+    if (values_ != NULL) {
++    if (values_ != nullptr) {
 +        values_->finish();
 +        delete values_;
 +    }
 +#endif
 +
-+    if (seq_ != NULL) {
++    if (seq_ != nullptr) {
 +        js_free(seq_);
-+        seq_ = NULL;
++        seq_ = nullptr;
 +        seqsize_ = 0;
 +        capacity_ = 0;
 +#ifdef TxJS_PROFILE_ACTIONS
@@ -172,14 +172,14 @@
 +void
 +TxContext::clear(JSContext *cx) {
 +#ifdef TxJS_HASH
-+    if (values_ != NULL) {
++    if (values_ != nullptr) {
 +        values_->clear();
 +    }
 +#endif
 +
-+    if (seq_ != NULL) {
++    if (seq_ != nullptr) {
 +        js_free(seq_);
-+        seq_ = NULL;
++        seq_ = nullptr;
 +        seqsize_ = 0;
 +        capacity_ = 0;
 +#ifdef TxJS_PROFILE_ACTIONS
@@ -199,7 +199,7 @@
 +{
 +    // Invariant: only the topmost running transaction can suspend.
 +    JS_ASSERT(this == cx->getRunningTx());
-+    //if (suspend_ != NULL) {
++    //if (suspend_ != nullptr) {
 +    //  js_free(suspend_);
 +    //}
 +
@@ -235,12 +235,12 @@
 +}
 +
 +bool
-+TxContext::recordSuspend(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
++TxContext::recordSuspend(JSContext *cx, HandleObject obj, HandleId id, HandleValue val, TxActionType type)
 +{
 +    // Invariant: only the topmost running transaction can suspend.
 +    JS_ASSERT(this == cx->getRunningTx());
 +    /*
-+    if (suspend_ != NULL) {
++    if (suspend_ != nullptr) {
 +      js_free(suspend_);
 +    }
 +    */
@@ -249,13 +249,14 @@
 +    // The second condition is because of some weird CSS objects that
 +    // are proxies without being a proxy to anything.
 +    // (Test case: colorpicker.preprocessed.modular.js).
-+    while (IsProxy(obj) && GetProxyPrivate(obj).isObjectOrNull()) {
-+      obj = GetProxyTargetObject(obj);
++    RootedObject mobj(cx, obj);
++    while (IsProxy(mobj) && GetProxyPrivate(mobj).isObjectOrNull()) {
++      mobj.set(GetProxyTargetObject(mobj));
 +    }
 +
 +    // Cases other than array length/indices come straight here.
 +    //suspend_ = (TxAction*)cx->malloc_(sizeof(TxAction));
-+    init_action(cx, &suspend_, obj, id, val, type);
++    init_action(cx, &suspend_, mobj, id, val, type);
 +#ifdef TxJS_PROFILE_ACTIONS
 +    switch (type) {
 +      case AX_WRITE: ++writesize_; break;
@@ -273,7 +274,7 @@
 +}
 +
 +bool
-+TxContext::recordAction(JSContext *cx, JSObject *obj, jsid id, Value val, TxActionType type)
++TxContext::recordAction(JSContext *cx, HandleObject obj, HandleId id, HandleValue val, TxActionType type)
 +{
 +#ifdef TxJS_ITYPE
 +    if (!(itypes_ & type)) {
@@ -285,11 +286,12 @@
 +    // The second condition is because of some weird CSS objects that
 +    // are proxies without being a proxy to anything.
 +    // (Test case: colorpicker.preprocessed.modular.js).
-+    while (IsProxy(obj) && GetProxyPrivate(obj).isObjectOrNull()) {
-+        obj = GetProxyTargetObject(obj);
++    RootedObject mobj(cx, obj);
++    while (IsProxy(mobj) && GetProxyPrivate(mobj).isObjectOrNull()) {
++        mobj.set(GetProxyTargetObject(mobj));
 +    }
 +
-+    if ((type & AX_MODIFY) && values_ == NULL) {
++    if ((type & AX_MODIFY) && values_ == nullptr) {
 +        values_ = new Values(TempAllocPolicy(cx));
 +        values_->init(4);
 +        if (!values_->initialized()) {
@@ -298,11 +300,11 @@
 +        }
 +    }
 +
-+    if ((type & AX_WRITE) && obj && obj->is<ArrayObject>()) {
++    if ((type & AX_WRITE) && mobj && mobj->is<ArrayObject>()) {
 +        // For an assignment to an array's |length| property, we need to
 +        // add nodes signifying an implicit delete of any elements < the
 +        // old length but >= the new length.
-+        jsid lenId = AtomToId(cx->names().length);
++        RootedId lenId(cx, AtomToId(cx->names().length));
 +        if (id == lenId) {
 +            uint32_t len;
 +            double d;
@@ -310,18 +312,17 @@
 +            // not convertible to a number) or the subsequent checks
 +            // fail, the write would have
 +            // failed. See jsarray.cpp:array_length_setter.
-+            RootedValue rootval(cx, val);
-+            if (!ToUint32(cx, rootval, &len))
++            if (!ToUint32(cx, val, &len))
 +                return false;
-+            if (!ToNumber(cx, rootval, &d))
++            if (!ToNumber(cx, val, &d))
 +                return false;
 +            if (d != len) {
-+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
++                JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_ARRAY_LENGTH);
 +                return false; 
 +            }
 +            
 +            // Get the current length.
-+            uint32_t curLen = getArrayLength(cx, HandleObject::fromMarkedLocation(&obj));
++            uint32_t curLen = getArrayLength(cx, mobj);
 +            // Gotta be careful about wrap-around here.
 +            int64_t idx = ((int64_t)curLen) - 1;
 +            int64_t ilen = (int64_t)len;
@@ -329,10 +330,10 @@
 +                // %%% Could be more efficient for degenerate cases.
 +                //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +                TxAction *addl = expandSequence(cx);
-+                jsid addlid = INT_TO_JSID(idx);
++                RootedId addlid(cx, INT_TO_JSID(idx));
 +                RootedValue holeVal(cx);
 +                holeVal.setMagic(JS_ELEMENTS_HOLE);
-+                init_action(cx, addl, obj, addlid, holeVal, AX_DELETE);
++                init_action(cx, addl, mobj, addlid, holeVal, AX_DELETE);
 +                //seq_ = append_action(seq_, act);
 +#ifdef TxJS_PROFILE_ACTIONS
 +                ++deletesize_;
@@ -347,11 +348,12 @@
 +            // to the length property.
 +            uint32_t idx;
 +            if (js_IdIsIndex(id, &idx)) {
-+                uint32_t curLen = getArrayLength(cx, HandleObject::fromMarkedLocation(&obj));
++                uint32_t curLen = getArrayLength(cx, mobj);
 +                if (idx >= curLen) {
 +                    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +                    TxAction *addl = expandSequence(cx);
-+                    init_action(cx, addl, obj, lenId, NumberValue(idx + 1), AX_WRITE);    
++                    RootedValue val(cx, NumberValue(idx + 1));
++                    init_action(cx, addl, mobj, lenId, val, AX_WRITE);
 +                    //seq_ = append_action(seq_, act);
 +#ifdef TxJS_PROFILE_ACTIONS
 +                    ++writesize_;
@@ -367,7 +369,7 @@
 +    // Cases other than array length/indices come straight here.
 +    //TxAction *act = (TxAction*)cx->malloc_(sizeof(TxAction));
 +    TxAction *act = expandSequence(cx);
-+    init_action(cx, act, obj, id, val, type);
++    init_action(cx, act, mobj, id, val, type);
 +    //seq_ = append_action(seq_, act);
 +#ifdef TxJS_PROFILE_ACTIONS
 +    switch (type) {
@@ -388,11 +390,11 @@
 +}
 +
 +bool
-+TxContext::lookupProperty(JSContext *cx, HandleObject obj, jsid id, MutableHandleObject pobj, MutableHandleValue vp)
++TxContext::lookupProperty(JSContext *cx, HandleObject obj, HandleId id, MutableHandleObject pobj, MutableHandleValue vp)
 +{
 +    pobj.set(obj);
 +    // Search starting with obj and following the prototype chain.
-+    while (pobj != NULL) {
++    while (pobj != nullptr) {
 +        // |getProperty| searches the whole transaction chain.
 +        if (getProperty(cx, pobj, id, vp)) {
 +            return true;
@@ -404,13 +406,13 @@
 +}
 +
 +bool
-+TxContext::getProperty(JSContext *cx, HandleObject obj, jsid id, MutableHandleValue vp)
++TxContext::getProperty(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp)
 +{
 +#ifdef TxJS_PROFILE_ACTIONS
 +    uint32_t missCount = 0;
 +#endif
 +    TxContext *tx = this;
-+    while (tx != NULL) {
++    while (tx != nullptr) {
 +#ifdef TxJS_ITYPE
 +        if (!(tx->itypes_ & AX_MODIFY)) {
 +            //fprintf(stderr, "SKIPPING GETPROPERTY\n");
@@ -425,10 +427,9 @@
 +        while (IsProxy(sobj) && GetProxyPrivate(sobj).isObjectOrNull()) {
 +            sobj = GetProxyTargetObject(sobj);
 +        }
-+        if (tx->values_ != NULL) {
++        if (tx->values_ != nullptr) {
 +            TxProperty prop;
-+            prop.type = TX_OBJECT;
-+            prop.i.id = id;
++            prop.id = id;
 +            prop.object.init(sobj);
 +            Values::Ptr node = tx->values_->lookup(prop);
 +            if (node) {
@@ -454,7 +455,7 @@
 +        while (IsProxy(objp) && GetProxyPrivate(objp).isObjectOrNull()) {
 +          objp = GetProxyTargetObject(objp);
 +        }
-+        if ((node = get_action_node(cx, tx->getActionSequence(), objp, id, tx->seqsize_, AX_MODIFY)) != NULL) {
++        if ((node = get_action_node(cx, tx->getActionSequence(), objp, id, tx->seqsize_, AX_MODIFY)) != nullptr) {
 +            vp.set(get_node_val(node));
 +            return true;
 +        }
@@ -475,7 +476,7 @@
 +bool
 +TxContext::lookupName(JSContext *cx, HandlePropertyName name, HandleObject scopeChain, MutableHandleObject objp, MutableHandleObject pobjp, MutableHandleValue vp)
 +{
-+    jsid id = NameToId(name);
++    RootedId id(cx, NameToId(name));
 +    for (RootedObject scope(cx, scopeChain); scope; scope = scope->enclosingScope()) {
 +        if (getProperty(cx, scope, id, vp)) {
 +            objp.set(scope);
@@ -498,7 +499,8 @@
 +
 +    uint32_t len;
 +    RootedValue lenVal(cx);
-+    if (getProperty(cx, obj, AtomToId(cx->names().length), &lenVal)) {
++    RootedId id(cx, AtomToId(cx->names().length));
++    if (getProperty(cx, obj, id, &lenVal)) {
 +        ToUint32(cx, lenVal, &len);
 +    } else {
 +        // Get the original length.
@@ -531,7 +533,7 @@
 +        return false;
 +    }
 +
-+    TxAction *act = NULL;
++    TxAction *act = nullptr;
 +    uint32_t idx = 0;
 +    for (uint32_t i=0; i<seqsize_; i++) {
 +      act = getActionSequence() + i;
@@ -582,29 +584,27 @@
 +    // If we're in a nested transaction, just propagate this
 +    // write to the parent transaction's write set. Otherwise,
 +    // actually perform the write.
-+    JSObject *obj = act->prop.object.get();
++    RootedObject obj(cx, act->prop.object);
++    cx->compartment()->wrap(cx, &obj);
++    RootedId id(cx, act->prop.id);
++    RootedValue writeVal(cx, act->value);
++    cx->compartment()->wrap(cx, &writeVal);
 +    if (nextTx) {
-+        nextTx->recordAction(cx, obj, act->prop.i.id, act->value, act->type);
++        nextTx->recordAction(cx, obj, id, writeVal, act->type);
 +    } else {
-+        RootedObject rootObj(cx, obj); 
-+        cx->compartment()->wrap(cx, &rootObj);
 +        if ((act->type & AX_DELETE) || act->value.isMagic(JS_ELEMENTS_HOLE)) {
 +            RootedValue rval(cx);
 +            bool success;
-+            if (!JSObject::deleteByValue(cx, HandleObject::fromMarkedLocation(&obj), IdToValue(act->prop.i.id), &success))
++            if (!JSObject::deleteByValue(cx, obj, IdToValue(id), &success))
 +                return false;
 +            rval.setBoolean(success);
 +        } else {
 +            // %%% Does this already account for custom setters?
-+            RootedValue writeVal(cx, act->value);
-+            cx->compartment()->wrap(cx, &writeVal);
-+            RootedId rootId(cx, act->prop.i.id);
-+            RootedObject robj(cx, obj);
-+            if (robj->is<GlobalObject>()) {
++            if (obj->is<GlobalObject>()) {
 +              // See jsinterpinlines.h:SetNameOperation.
-+              return baseops::SetPropertyHelper<SequentialExecution>(cx, robj, robj, rootId, baseops::Unqualified, &writeVal, false);
++              return baseops::SetPropertyHelper<SequentialExecution>(cx, obj, obj, id, baseops::Unqualified, &writeVal, false);
 +            }
-+            return JSObject::setGeneric(cx, robj, robj, rootId, &writeVal, false); // %%% Strict? (last parameter)
++            return JSObject::setGeneric(cx, obj, obj, id, &writeVal, false); // %%% Strict? (last parameter)
 +        }
 +    }
 +
@@ -614,7 +614,7 @@
 +bool
 +TxContext::commit(JSContext *cx)
 +{
-+    if (seq_ == NULL) {
++    if (seq_ == nullptr) {
 +        return true;
 +    }
 +
@@ -623,7 +623,7 @@
 +    // We actually want the next running transaction. This logic comes
 +    // into play when a transaction is created during the suspension
 +    // of the parent (e.g. when |eval| suspends).
-+    while (nextTx != NULL) {
++    while (nextTx != nullptr) {
 +        if (nextTx->inState(TX_RUNNING)) {
 +          break;
 +        }
@@ -641,12 +641,13 @@
 +    //JS_ASSERT(checkConsistency(cx));
 +#endif
 +    // Iterate through and apply all most-recent values.
-+    if (values_ != NULL) {
++    if (values_ != nullptr) {
 +        for (Values::Range r=values_->all(); !r.empty(); r.popFront())
 +        {
 +            TxAction act;
 +            act.type = AX_WRITE;
-+            act.prop = r.front().key();
++            act.prop.object.init(r.front().key().object);
++            act.prop.id.init(r.front().key().id);
 +            act.value = r.front().value();
 +            act.active = true;
 +            if (!commitAction(cx, nextTx, &act)) {
@@ -656,7 +657,7 @@
 +    }
 +#else
 +    // Iterate through each TxAction node.
-+    TxAction *act = NULL;
++    TxAction *act = nullptr;
 +    for (uint32_t i=0; i<seqsize_; i++) {
 +        act = getActionSequence() + i;
 +        if (act->type & AX_MODIFY) {
@@ -700,13 +701,13 @@
 +        TxAction *actHash = getActionSequence() + idx * sizeof(TxAction);
 +        TxAction *actSeq;
 +        if (actHash->prop.object) {
-+            actSeq = get_action_node(cx, (TxAction*)seq_, actHash->prop.object, actHash->prop.i.id, seqsize_, AX_MODIFY);
++            actSeq = get_action_node(cx, (TxAction*)seq_, actHash->prop.object, actHash->prop.id, seqsize_, AX_MODIFY);
 +            JS_ASSERT(actHash == actSeq);
 +        } else {
 +            uint32_t i;
 +            JS_ASSERT(js_IdIsIndex(actHash->id, &i));
 +            actSeq = get_action_node(cx, (TxAction*)seq_, actHash->fp, i, seqsize_, AX_MODIFY);
-+            if (actSeq == NULL) {
++            if (actSeq == nullptr) {
 +                JS_ASSERT(!actHash->active);
 +            } else {
 +                JS_ASSERT(actHash == actSeq);
@@ -727,9 +728,9 @@
 +    //uint32_t txidx = depth();
 +
 +    //JS_SET_TRACING_INDEX(trc, "tx_handler", txidx);
-+    gc::MarkValueUnbarriered(trc, &handler_, "tx_handler");
++    gc::MarkValueUnbarriered(trc, introspector_.unsafeGet(), "tx_introspector");
 +    //JS_SET_TRACING_INDEX(trc, "tx_retval", txidx);
-+    gc::MarkValueUnbarriered(trc, &retval_, "tx_retval");
++    gc::MarkValueUnbarriered(trc, retval_.unsafeGet(), "tx_retval");
 +
 +    tx_actionsequence_trace(trc, getActionSequence(), seqsize_);
 +

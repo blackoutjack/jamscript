@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jscntxt.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jscntxt.h	2015-01-27 08:15:59.677091994 -0600
-@@ -423,6 +423,51 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jscntxt.h	2015-02-05 00:03:25.641725795 -0600
+@@ -423,6 +423,43 @@
      /* Per-context options. */
      JS::ContextOptions  options_;
  
@@ -37,16 +37,8 @@
 +    // Return the new transaction to simplify jsinterp.cpp.
 +    inline TxContext *setTxContext(TxContext *tx) { tx_ = tx; return tx_; }
 +
-+    inline const js::Value getIntrospector() {
-+        if (currentlyRunningInInterpreter()) {
-+            return interpreterFrame()->script()->getIntrospector();
-+        }
-+        return JS::UndefinedValue();
-+    }
-+    inline void setIntrospector(const js::Value &ispect) {
-+        JS_ASSERT(currentlyRunningInInterpreter());
-+        interpreterFrame()->script()->setIntrospector(ispect);
-+    }
++    inline const js::Value getIntrospector();
++    inline void setIntrospector(const js::Value &ispect);
 +#endif
 +
    public:

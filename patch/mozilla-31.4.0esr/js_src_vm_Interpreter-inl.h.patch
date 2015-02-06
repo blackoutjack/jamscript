@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-02-02 16:48:53.752642799 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-02-04 22:04:24.837949760 -0600
 @@ -13,6 +13,10 @@
  #include "jsinfer.h"
  #include "jsnum.h"
@@ -41,7 +41,7 @@
  /*
   * One optimized consumer of MagicValue(JS_OPTIMIZED_ARGUMENTS) is f.apply.
   * However, this speculation must be guarded before calling 'apply' in case it
-@@ -170,8 +197,22 @@
+@@ -170,9 +197,24 @@
  FetchName(JSContext *cx, HandleObject obj, HandleObject obj2, HandlePropertyName name,
            HandleShape shape, MutableHandleValue vp)
  {
@@ -51,6 +51,7 @@
      if (!shape) {
          if (TypeOf) {
 +#ifdef TxJS
+             vp.setUndefined();
 +            if (tx) {
 +                // Update the already-created read set node to reflect the value
 +                // and the scope in which it was found.
@@ -58,13 +59,14 @@
 +                // Add the property to the read set, with the head of the scope
 +                // chain as the object, and an undefined value.
 +                // %%% Need to root?
-+                tx->recordAction(cx, obj.get(), NameToId(name), UndefinedValue(), AX_READ);
++                RootedId id(cx, NameToId(name));
++                tx->recordAction(cx, obj, id, vp, AX_READ);
 +            }
 +#endif
-             vp.setUndefined();
              return true;
          }
-@@ -198,6 +239,19 @@
+         JSAutoByteString printable;
+@@ -198,6 +240,19 @@
              return false;
          }
      }
@@ -76,15 +78,15 @@
 +        //node->obj = pobj.get();
 +        // Add the property to the read set, with the head of the scope
 +        // chain as the object, and an undefined value.
-+        // %%% Need to root?
-+        tx->recordAction(cx, obj.get(), NameToId(name), vp, AX_READ);
++        RootedId id(cx, NameToId(name));
++        tx->recordAction(cx, obj, id, vp, AX_READ);
 +    }
 +#endif
 +
      return true;
  }
  
-@@ -343,9 +397,21 @@
+@@ -343,9 +398,21 @@
  {
      JS_ASSERT(op == JSOP_GETELEM || op == JSOP_CALLELEM);
  
@@ -99,14 +101,14 @@
 +            IndexToId(cx, index, &id);
 +            if (tx) {
 +                RootedObject robj(cx, objArg);
-+                if (tx->getProperty(cx, robj, id.get(), res))
++                if (tx->getProperty(cx, robj, id, res))
 +                    break;
 +            }
 +#endif
              if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
                  break;
  
-@@ -358,6 +424,14 @@
+@@ -358,6 +425,14 @@
  
          JSAtom *name = ToAtom<NoGC>(cx, rref);
          if (name) {
@@ -114,41 +116,41 @@
 +            id = AtomToId(name);
 +            if (tx) {
 +                RootedObject robj(cx, objArg);
-+                if (tx->getProperty(cx, robj, id.get(), res))
++                if (tx->getProperty(cx, robj, id, res))
 +                    break;
 +            }
 +#endif
              if (name->isIndex(&index)) {
                  if (JSObject::getElementNoGC(cx, objArg, objArg, index, res.address()))
                      break;
-@@ -373,6 +447,13 @@
+@@ -373,6 +448,13 @@
          if (!name)
              return false;
  
 +#ifdef TxJS
 +        id = AtomToId(name);
 +        if (tx) {
-+            if (tx->getProperty(cx, obj, id.get(), res))
++            if (tx->getProperty(cx, obj, id, res))
 +                break;
 +        }
 +#endif
          if (name->isIndex(&index)) {
              if (!JSObject::getElement(cx, obj, obj, index, res))
                  return false;
-@@ -384,6 +465,12 @@
+@@ -384,6 +466,12 @@
          objArg = obj;
      } while (0);
  
 +#ifdef TxJS
 +    if (tx) {
 +        RootedObject robj(cx, objArg);
-+        tx->recordAction(cx, robj, id.get(), res.get(), AX_READ);
++        tx->recordAction(cx, robj, id, res, AX_READ);
 +    }
 +#endif
  #if JS_HAS_NO_SUCH_METHOD
      if (op == JSOP_CALLELEM && MOZ_UNLIKELY(res.isUndefined()) && wasObject) {
          RootedObject obj(cx, objArg);
-@@ -417,6 +504,9 @@
+@@ -417,6 +505,9 @@
              return false;
  
          lref.set(ObjectValue(frame.argsObj()));
@@ -158,7 +160,7 @@
      }
  
      return true;
-@@ -436,6 +526,10 @@
+@@ -436,6 +527,10 @@
              if (!str)
                  return false;
              res.setString(str);

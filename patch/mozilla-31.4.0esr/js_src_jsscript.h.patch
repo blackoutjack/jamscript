@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsscript.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsscript.h	2015-01-27 08:15:59.705091993 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsscript.h	2015-02-05 12:51:54.062926991 -0600
 @@ -66,6 +66,9 @@
      JSTRY_CATCH,
      JSTRY_FINALLY,
@@ -27,4 +27,23 @@
    private:
      // This script's ScriptSourceObject, or a CCW thereof.
      //
+@@ -969,7 +982,18 @@
+     }
+ 
+     size_t nslots() const {
++#ifdef TxJS
++        // Transaction suspension may occur on various operations,
++        // thereby pushing extra 3 values onto the stack to invoke
++        // the introspector.
++        // %%% This could be obviated by adding JOF_TMPSLOT3 for all
++        // %%% applicable ops in Opcodes.h.
++        // %%% We could also make this conditional on whether the script
++        // %%% contains a transaction block.
++        return nslots_ + 3;
++#else
+         return nslots_;
++#endif
+     }
+ 
+     size_t staticLevel() const {
 

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsarray.cpp	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsarray.cpp	2015-01-27 08:15:59.673091994 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsarray.cpp	2015-02-04 22:32:42.765896506 -0600
 @@ -19,6 +19,9 @@
  #include "jsiter.h"
  #include "jsnum.h"
@@ -41,7 +41,7 @@
 +#ifdef TxJS
 +    if (tx) {
 +        // Check if the length property has been overwritten.
-+        jsid lenId = NON_INTEGER_ATOM_TO_JSID(cx->names().length);
++        RootedId lenId(cx, NON_INTEGER_ATOM_TO_JSID(cx->names().length));
 +        RootedValue val(cx);
 +        if (tx->getProperty(cx, obj, lenId, &val)) {
 +            // %%% Any reason to add to read set again?
@@ -78,7 +78,7 @@
      }
 +#ifdef TxJS
 +    if (tx) {
-+        tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++        tx->recordAction(cx, obj, id, vp, AX_READ);
 +    }
 +#endif
      return true;
@@ -90,7 +90,7 @@
      AssertGreaterThanZero(index);
 +#ifdef TxJS
 +    TxContext *tx = cx->getRunningTx();
-+    jsid id = INT_TO_JSID(index);
++    RootedId id(cx, INT_TO_JSID(index));
 +    if (tx) {
 +        if (tx->getProperty(cx, obj, id, vp)) {
 +            *hole = false;
@@ -105,7 +105,7 @@
              *hole = false;
 +#ifdef TxJS
 +            if (tx) {
-+                tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++                tx->recordAction(cx, obj, id, vp, AX_READ);
 +            }
 +#endif
              return true;
@@ -116,7 +116,7 @@
              *hole = false;
 +#ifdef TxJS
 +            if (tx) {
-+                tx->recordAction(cx, obj, id, vp.get(), AX_READ);
++                tx->recordAction(cx, obj, id, vp, AX_READ);
 +            }
 +#endif
              return true;
@@ -131,7 +131,7 @@
 +#endif
      for (uint32_t i = 0; i < length; i++) {
 +#ifdef TxJS
-+        jsid id = INT_TO_JSID(i);
++        RootedId id(cx, INT_TO_JSID(i));
 +        if (tx) {
 +            if (tx->getProperty(cx, aobj, id, MutableHandleValue::fromMarkedLocation(&vp[i]))) {
 +                // %%% Any reason to add to read set again?
@@ -143,7 +143,7 @@
              return false;
 +#ifdef TxJS
 +        if (tx) {
-+            tx->recordAction(cx, aobj.get(), id, *vp, AX_READ);
++            tx->recordAction(cx, aobj, id, HandleValue::fromMarkedLocation(&vp[i]), AX_READ);
 +        }
 +#endif
      }
@@ -166,7 +166,7 @@
          for (Value *dst = vp; src < srcend; ++dst, ++src)
 +#ifdef TxJS
 +        {
-+            jsid id = INT_TO_JSID(i);
++            RootedId id(cx, INT_TO_JSID(i));
 +            if (tx) {
 +                i++;
 +                if (tx->getProperty(cx, aobj, id, MutableHandleValue::fromMarkedLocation(dst))) {
@@ -178,7 +178,7 @@
              *dst = src->isMagic(JS_ELEMENTS_HOLE) ? UndefinedValue() : *src;
 +#ifdef TxJS
 +            if (tx) {
-+                tx->recordAction(cx, aobj, id, *dst, AX_READ);
++                tx->recordAction(cx, aobj, id, MutableHandleValue::fromMarkedLocation(dst), AX_READ);
 +            }
 +        }
 +#endif
@@ -208,7 +208,7 @@
 +            return false;
 +        }
 +
-+        tx->recordAction(cx, obj, id.get(), v, AX_WRITE);
++        tx->recordAction(cx, obj, id, v, AX_WRITE);
 +
 +        // %%% Should add length property to the write set in a way
 +        // %%% that doesn't play it back explicitely during commit.
@@ -279,7 +279,7 @@
 +        if (!GetElement(cx, obj, index, &hole, &vp))
 +            return 0;
 +        if (!hole)
-+            tx->recordAction(cx, obj, id.get(), vp, AX_DELETE);
++            tx->recordAction(cx, obj, id, vp, AX_DELETE);
 +        return 1;
 +    }
 +#endif
@@ -287,21 +287,22 @@
      if (obj->is<ArrayObject>() && !obj->isIndexed()) {
          if (index <= UINT32_MAX) {
              uint32_t idx = uint32_t(index);
-@@ -364,6 +541,13 @@
+@@ -364,6 +541,14 @@
  js::SetLengthProperty(JSContext *cx, HandleObject obj, double length)
  {
      RootedValue v(cx, NumberValue(length));
 +#ifdef TxJS
 +    TxContext *tx = cx->getRunningTx();
 +    if (tx) {
-+        tx->recordAction(cx, obj, AtomToId(cx->names().length), v, AX_WRITE);
++        RootedId id(cx, AtomToId(cx->names().length));
++        tx->recordAction(cx, obj, id, v, AX_WRITE);
 +        return true;
 +    } else
 +#endif
      return JSObject::setProperty(cx, obj, obj, cx->names().length, &v, true);
  }
  
-@@ -2238,6 +2422,7 @@
+@@ -2238,6 +2423,7 @@
      if (args.length() > 0) {
          /* Slide up the array to make room for all args at the bottom. */
          if (length > 0) {
@@ -309,7 +310,7 @@
              bool optimized = false;
              do {
                  if (!obj->is<ArrayObject>())
-@@ -2319,6 +2504,14 @@
+@@ -2319,6 +2505,14 @@
  static inline bool
  CanOptimizeForDenseStorage(HandleObject arr, uint32_t startingIndex, uint32_t count, JSContext *cx)
  {

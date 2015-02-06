@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.h	2015-02-02 18:25:07.204449440 -0600
-@@ -0,0 +1,158 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.h	2015-02-05 01:00:16.789618807 -0600
+@@ -0,0 +1,154 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -35,10 +35,6 @@
 +// %%% the top of the transaction block. This deviates from other
 +// %%% cases, e.g. a definition inside of an IF block.
 +#define TxJS_HOIST 1
-+
-+// Capture reads and writes to local variables.
-+//#define TxJS_LOCAL 1
-+
 +
 +
 +class TxContext;
@@ -84,9 +80,9 @@
 +    // Suspended transaction state
 +    TxAction suspend_;
 +    // Return value of the suspended expression
-+    js::Value retval_;
++    js::HeapValue retval_;
 +    // Suspend/finish handler function (i.e. the policy.
-+    js::Value handler_;
++    js::HeapValue introspector_;
 +    // The enclosing transaction, if there is one
 +    TxContext *next_;
 +
@@ -95,7 +91,7 @@
 +    // %%% Make private
 +    int itypes_;
 +#endif
-+    static TxContext *initTx(JSContext *, TxContext *tx, const js::Value &handler);
++    static TxContext *initTx(JSContext *, TxContext *tx, js::HandleValue ispect);
 +    //bool suspend(JSContext *, JSString *);
 +    void finish(JSContext *);
 +    void clear(JSContext *);
@@ -111,9 +107,9 @@
 +    inline uint32_t getDeleteCount() { return deletesize_; }
 +    inline uint32_t getForinCount() { return forinsize_; }
 +#endif
-+    inline const js::Value getHandler() { return handler_; }
++    inline const bool getIntrospector(js::MutableHandleValue ispect) { ispect.set(introspector_); return true; }
 +    inline TxAction *getSuspend() { return &suspend_; }
-+    inline const js::Value getReturnValue() { return retval_; }
++    inline const bool getReturnValue(js::MutableHandleValue rval) { rval.set(retval_); return true; }
 +    inline void setReturnValue(const js::Value &val) { retval_ = val; }
 +
 +    inline TxContext *getNext() { return next_; }
@@ -132,12 +128,12 @@
 +   
 +  public:  
 +    bool recordSuspend(JSContext *, const js::CallArgs *, bool construct);
-+    bool recordSuspend(JSContext *, JSObject *, jsid, js::Value, TxActionType);
++    bool recordSuspend(JSContext *, js::HandleObject, js::HandleId, js::HandleValue, TxActionType);
 +    bool recordAction(JSContext *, const js::CallArgs *, bool);
-+    bool recordAction(JSContext *, JSObject *, jsid, js::Value, TxActionType);
++    bool recordAction(JSContext *, js::HandleObject, js::HandleId, js::HandleValue, TxActionType);
 +
-+    bool getProperty(JSContext *, js::HandleObject, jsid, js::MutableHandleValue);
-+    bool lookupProperty(JSContext *, js::HandleObject, jsid, js::MutableHandleObject, js::MutableHandleValue);
++    bool getProperty(JSContext *, js::HandleObject, js::HandleId, js::MutableHandleValue);
++    bool lookupProperty(JSContext *, js::HandleObject, js::HandleId, js::MutableHandleObject, js::MutableHandleValue);
 +    bool lookupName(JSContext *, js::HandlePropertyName, js::HandleObject, js::MutableHandleObject, js::MutableHandleObject, js::MutableHandleValue);
 +    //bool findProperty(JSContext *, jsid, JSObject **, JSObject **, JSProperty **);
 +    //bool objectHasProperty(JSContext *, jsid, JSObject *, JSObject **, JSProperty **);
