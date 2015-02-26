@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-27 09:30:00.635011129 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-02-16 22:43:11.617621053 -0600
 @@ -1003,7 +1003,14 @@
   */
  #define JSFUN_GENERIC_NATIVE   0x800
@@ -27,34 +27,64 @@
  /*
   * Format is a string of the following characters (spaces are insignificant),
   * specifying the tabulated type conversions:
-@@ -3638,12 +3650,18 @@
-     RootedObject elementRoot;
-     RootedString elementAttributeNameRoot;
-     RootedScript introductionScriptRoot;
+@@ -3446,6 +3458,9 @@
+     const char *filename_;
+     const char *introducerFilename_;
+     const jschar *sourceMapURL_;
 +#ifdef TxJS
-+    RootedValue introspector;
++    Value introspector_;
 +#endif
  
-   public:
-     explicit CompileOptions(JSContext *cx, JSVersion version = JSVERSION_UNKNOWN);
-     CompileOptions(js::ContextFriendFields *cx, const ReadOnlyCompileOptions &rhs)
-       : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-         introductionScriptRoot(cx)
+     // This constructor leaves 'version' set to JSVERSION_UNKNOWN. The structure
+     // is unusable until that's set to something more specific; the derived
+@@ -3456,6 +3471,9 @@
+         filename_(nullptr),
+         introducerFilename_(nullptr),
+         sourceMapURL_(nullptr),
 +#ifdef TxJS
-+      , introspector(cx, JS::UndefinedValue())
++        introspector_(UndefinedValue()),
 +#endif
-     {
-         copyPODOptions(rhs);
- 
-@@ -3659,6 +3677,10 @@
-     JSString *elementAttributeName() const MOZ_OVERRIDE { return elementAttributeNameRoot; }
-     JSScript *introductionScript() const MOZ_OVERRIDE { return introductionScriptRoot; }
- 
+         version(JSVERSION_UNKNOWN),
+         versionSet(false),
+         utf8(false),
+@@ -3491,6 +3509,9 @@
+     const char *filename() const { return filename_; }
+     const char *introducerFilename() const { return introducerFilename_; }
+     const jschar *sourceMapURL() const { return sourceMapURL_; }
 +#ifdef TxJS
-+    Value getIntrospector() { return introspector; }
-+    CompileOptions &setIntrospector(Value &ispect) { introspector = ispect; return *this; }
++    const Value getIntrospector() const { return introspector_; }
 +#endif
-     CompileOptions &setFile(const char *f) { filename_ = f; return *this; }
-     CompileOptions &setLine(unsigned l) { lineno = l; return *this; }
-     CompileOptions &setFileAndLine(const char *f, unsigned l) {
+     virtual JSObject *element() const = 0;
+     virtual JSString *elementAttributeName() const = 0;
+     virtual JSScript *introductionScript() const = 0;
+@@ -3573,6 +3594,9 @@
+     bool setIntroducerFilename(JSContext *cx, const char *s);
+ 
+     /* These setters are infallible, and can be chained. */
++#ifdef TxJS
++    OwningCompileOptions &setIntrospector(const Value &ispect) { introspector_ = ispect; return *this; }
++#endif
+     OwningCompileOptions &setLine(unsigned l)             { lineno = l;              return *this; }
+     OwningCompileOptions &setElement(JSObject *e) {
+         elementRoot = e;
+@@ -3650,6 +3674,9 @@
+         originPrincipals_ = rhs.originPrincipals_;
+         filename_ = rhs.filename();
+         sourceMapURL_ = rhs.sourceMapURL();
++#ifdef TxJS
++        introspector_ = rhs.getIntrospector();
++#endif
+         elementRoot = rhs.element();
+         elementAttributeNameRoot = rhs.elementAttributeName();
+         introductionScriptRoot = rhs.introductionScript();
+@@ -3665,6 +3692,9 @@
+         filename_ = f; lineno = l; return *this;
+     }
+     CompileOptions &setSourceMapURL(const jschar *s) { sourceMapURL_ = s;       return *this; }
++#ifdef TxJS
++    CompileOptions &setIntrospector(const Value &ispect) { introspector_ = ispect; return *this; }
++#endif
+     CompileOptions &setElement(JSObject *e)          { elementRoot = e;         return *this; }
+     CompileOptions &setElementAttributeName(JSString *p) {
+         elementAttributeNameRoot = p;
 

@@ -1,6 +1,41 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.h	2015-02-05 01:09:04.501602256 -0600
-@@ -323,6 +323,20 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.h	2015-02-25 13:24:47.940090357 -0600
+@@ -178,10 +178,16 @@
+     enum Kind { Execute, Invoke, Generator };
+     Kind kind_;
+ 
++#ifdef TxJS
++    RootedValue introspector_;
++#endif
+     RootedScript script_;
+ 
+     explicit RunState(JSContext *cx, Kind kind, JSScript *script)
+       : kind_(kind),
++#ifdef TxJS
++        introspector_(cx, UndefinedValue()),
++#endif
+         script_(cx, script)
+     { }
+ 
+@@ -203,6 +209,17 @@
+         return (GeneratorState *)this;
+     }
+ 
++#ifdef TxJS
++    bool getIntrospector(MutableHandleValue ispect) const {
++        ispect.set(introspector_);
++        return true;
++    }
++    bool setIntrospector(HandleValue ispect) {
++        introspector_.set(ispect);
++        return true;
++    }
++#endif
++
+     JSScript *script() const { return script_; }
+ 
+     virtual InterpreterFrame *pushInterpreterFrame(JSContext *cx) = 0;
+@@ -323,6 +340,20 @@
  extern void
  UnwindScope(JSContext *cx, ScopeIter &si, jsbytecode *pc);
  

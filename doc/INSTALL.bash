@@ -5,7 +5,7 @@
 # Set this to the checked-out repository root.
 #JAMSCRIPTPKG=/path/to/jamscript
 
-VERSION=17.0.3esr
+VERSION=31.4.0esr
 
 sudo apt-get -y install pkg-config gtk+-2.0 libdbus-1-dev libdbus-glib-1-dev yasm libasound2-dev libcurl4-openssl-dev libiw-dev mesa-common-dev
 
@@ -48,16 +48,16 @@ cd ./ff-dev/mozilla-$VERSION/ && cp mozconfig-release .mozconfig
 
 #5) Build the browser (takes ~30 minutes from scratch with the -j4
 #   option in .mozconfig).
-make -f client.mk build
+./mach build
 
 #6) If built successfully, you can run the browser as follows.
-./obj-release/browser/dist/bin/firefox
+./obj-release/dist/bin/firefox
 
 # You can also find the js shell at the following location. It is good
 # for playing around with how transactions behave and is used by the 
 # automated test suite found in ./tests/run.py.
 
-# ./obj-release/browser/dist/bin/js 
+# ./obj-release/dist/bin/js 
 
 # The following allow testing with a local web server.
 sudo apt-get -y install apache2 php5 libapache2-mod-php5

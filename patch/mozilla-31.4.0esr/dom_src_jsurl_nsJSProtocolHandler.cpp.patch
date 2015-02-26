@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-05 23:08:05.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-02-01 14:31:10.023813188 -0600
++++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-02-24 20:38:50.952768720 -0600
 @@ -65,6 +65,9 @@
                              PopupControlState aPopupState,
                              uint32_t aExecutionPolicy,

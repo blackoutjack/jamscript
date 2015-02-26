@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-05 00:59:45.449619790 -0600
-@@ -0,0 +1,745 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-24 22:17:08.836702433 -0600
+@@ -0,0 +1,746 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -641,7 +641,8 @@
 +    //JS_ASSERT(checkConsistency(cx));
 +#endif
 +    // Iterate through and apply all most-recent values.
-+    if (values_ != nullptr) {
++    // %%% Not sure why nullptr and 0 have to be checked.
++    if (values_ != nullptr && values_ != 0x0) {
 +        for (Values::Range r=values_->all(); !r.empty(); r.popFront())
 +        {
 +            TxAction act;

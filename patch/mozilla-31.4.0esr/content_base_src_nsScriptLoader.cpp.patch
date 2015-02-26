@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-02-01 14:33:08.827809209 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-02-18 18:06:57.133568862 -0600
 @@ -47,6 +47,9 @@
  #include "nsCRT.h"
  #include "nsContentCreatorFunctions.h"
@@ -83,12 +83,23 @@
    if (aElement->GetParserCreated() == FROM_PARSER_XSLT &&
        (!ReadyToExecuteScripts() || !mXSLTRequests.IsEmpty())) {
      // Need to maintain order for XSLT-inserted scripts
-@@ -1067,6 +1108,9 @@
+@@ -1067,6 +1108,20 @@
      MOZ_ASSERT(elementVal.isObject());
      aOptions->setElement(&elementVal.toObject());
    }
 +#ifdef TxJS
-+  aOptions->setIntrospector(aRequest->mIntrospector);
++  JS::Value ispect = aRequest->mIntrospector;
++  if (ispect.isUndefined()) {
++    nsAutoString ispectName;
++    mDocument->GetHeaderData(nsGkAtoms::jamIntrospector, ispectName);
++    if (!ispectName.IsEmpty()) {
++      nsIGlobalObject *global = mDocument->GetScopeObject(); 
++      if (global) {
++        fprintf(stderr, "GOT THIS FAR!!\n"/*: %s\n", (char *)ispectName.mStringBuffer->Data()*/);
++      }
++    }
++  }
++  aOptions->setIntrospector(ispect);
 +#endif
  }
  

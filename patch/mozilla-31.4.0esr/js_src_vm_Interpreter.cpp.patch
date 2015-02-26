@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-02-05 12:28:02.355633898 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-02-26 09:03:59.767295166 -0600
 @@ -29,6 +29,11 @@
  #include "jsprf.h"
  #include "jsscript.h"
@@ -63,65 +63,36 @@
  
      /* Perform GC if necessary on exit from the function. */
      AutoGCIfNeeded gcIfNeeded(cx);
-@@ -625,6 +662,57 @@
+@@ -625,8 +662,28 @@
  
      TypeScript::SetThis(cx, script, thisv);
  
 +#ifdef TxJS
-+    if (cx->mainThread().activation() && cx->currentlyRunningInInterpreter()) {
++    RootedValue ispect(cx, script->getIntrospector());
++    if (ispect.isUndefined() && cx->mainThread().activation() && cx->currentlyRunningInInterpreter()) {
 +        // Descend the stack to find the first dynamic introspector.
-+        RootedValue ispect(cx, UndefinedValue());
 +        InterpreterFrame *prevfp = cx->interpreterFrame();
 +        while (ispect.isUndefined()) {
 +            ispect = prevfp->script()->getIntrospector();
 +            prevfp = prevfp->prev();
 +            if (!prevfp) break;
 +        }
-+
-+        if (!ispect.isUndefined()) {
-+#ifdef TxJS_TRANSPARENT
-+            cx->compartment()->wrap(cx, &ispect);
-+            if (TxSubsumed(cx, ispect)) {
-+                ispect = UndefinedValue();
-+            } else {
-+#endif
-+                if (!BeginTx(cx, ispect))
-+                    return false;
-+                TxContext *tx = cx->getTxContext();
-+
-+                probes::StartExecution(script);
-+                ExecuteState state(cx, script, thisv, scopeChainArg, type, evalInFrame, result);
-+                bool ok = RunScript(cx, state);
-+                probes::StopExecution(script);
-+
-+                if (!ok) {
-+                    // Destroy the transaction in the error case.
-+                    cx->setTxContext(tx->getNext());
-+                    tx->finish(cx);
-+                    js_free(tx);
-+                    return false;
-+                }
-+
-+                // Force non-inline execution.
-+                int path = 1;
-+                // Not used.
-+                bool newType;
-+                InterpreterActivation *act = cx->mainThread().activation()->asInterpreter();
-+                if (!IntrospectTx(cx, tx, act, true, script, &path, &newType))
-+                    return false;
-+                JS_ASSERT(path == 1);
-+                return true;
-+#ifdef TxJS_TRANSPARENT
-+            }
-+#endif
-+        }
 +    }
++#ifdef TxJS_TRANSPARENT
++    if (!ispect.isUndefined() && TxSubsumed(cx, ispect))
++        ispect.setUndefined();
++#endif
 +#endif
 +
      probes::StartExecution(script);
      ExecuteState state(cx, script, thisv, scopeChainArg, type, evalInFrame, result);
++#ifdef TxJS
++    state.setIntrospector(ispect);
++#endif
      bool ok = RunScript(cx, state);
-@@ -667,6 +755,518 @@
+     probes::StopExecution(script);
+ 
+@@ -667,6 +724,517 @@
                           NullFramePtr() /* evalInFrame */, rval);
  }
  
@@ -269,8 +240,8 @@
 +            
 +        if (tx->inState(TX_END0 | TX_SUSPEND0)) {
 +            // This means that a native function was used as the 
-+            // transaction handler, so execution doesn't go through
-+            // JSOP_STOP. So we need to advance the transaction state
++            // introspector, so execution doesn't go through
++            // JSOP_RETRVAL. So we need to advance the transaction state
 +            // twice.
 +
 +            // TX_END0|TX_SUSPEND0 -> TX_END1|TX_SUSPEND1
@@ -316,7 +287,6 @@
 +            tx = cx->setTxContext(tx->getNext());
 +            doneTx->finish(cx);
 +            js_free(doneTx);
-+
 +        }
 +
 +        *path = 1;
@@ -337,7 +307,7 @@
 +
 +    // Save a transaction that is in the process of suspending,
 +    // so we can automatically resume when this frame returns.
-+    JS_ASSERT(regs.fp()->suspendedTx() == NULL);
++    JS_ASSERT(regs.fp()->suspendedTx() == nullptr);
 +    regs.fp()->setSuspendedTx(tx);
 +
 +    // TX_SUSPEND0|TX_END0 -> TX_SUSPEND1|TX_END1;
@@ -352,11 +322,11 @@
 +js::TxSubsumed(JSContext *cx, HandleValue ispect)
 +{
 +    TxContext *curtx = cx->getRunningTx();
-+    if (curtx != NULL) {
++    if (curtx != nullptr) {
 +        RootedObject ispectObj(cx, &ispect.toObject());
 +        RootedValue subsumer(cx);
 +        bool checkSubsume = JSObject::getProperty(cx, ispectObj, ispectObj, cx->names().subsumedBy, &subsumer);
-+        while (curtx != NULL) {
++        while (curtx != nullptr) {
 +            RootedValue curIspect(cx);
 +            curtx->getIntrospector(&curIspect);
 +            if (curIspect == ispect || (checkSubsume && curIspect == subsumer)) {
@@ -387,7 +357,7 @@
 +        callee = &calleev.toObject();
 +    }
 +
-+    JSFunction *fun = NULL;
++    JSFunction *fun = nullptr;
 +    if (IsSuspendingFunction(cx, calleev, &fun)) {
 +        if (fun->isBoundFunction()) {
 +            JSAutoByteString bytes;
@@ -407,7 +377,7 @@
 +        uint32_t newargc = boundargc + argc;
 +
 +        // Pop the arguments and temporarily save.
-+        Value *tmpargs = NULL;
++        Value *tmpargs = nullptr;
 +        if (newargc > 0)
 +            tmpargs = (Value*)js_malloc(newargc * sizeof(Value));
 +        for (uint32_t i=0; i<boundargc; i++) {
@@ -528,7 +498,7 @@
 +        uint32_t newargc = argc - 1;
 +
 +        // Pop the arguments and temporarily save.
-+        Value *tmpargs = NULL;
++        Value *tmpargs = nullptr;
 +        if (newargc > 0)
 +            tmpargs = (Value*)js_malloc(newargc * sizeof(Value));
 +        for (uint32_t i=0; i<newargc; i++) {
@@ -640,7 +610,7 @@
  bool
  js::HasInstance(JSContext *cx, HandleObject obj, HandleValue v, bool *bp)
  {
-@@ -983,6 +1583,9 @@
+@@ -983,6 +1551,9 @@
      SuccessfulReturnContinuation,
      ErrorReturnContinuation,
      CatchContinuation,
@@ -650,7 +620,7 @@
      FinallyContinuation
  };
  
-@@ -1042,6 +1645,17 @@
+@@ -1042,6 +1613,17 @@
                case JSTRY_FINALLY:
                  return FinallyContinuation;
  
@@ -668,7 +638,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -1304,6 +1918,9 @@
+@@ -1304,6 +1886,9 @@
  {
      types::TypeScript::MonitorAssign(cx, obj, id);
  
@@ -678,7 +648,7 @@
  #ifdef JS_ION
      if (obj->isNative() && JSID_IS_INT(id)) {
          uint32_t length = obj->getDenseInitializedLength();
-@@ -1320,6 +1937,17 @@
+@@ -1320,6 +1905,17 @@
          return false;
  
      RootedValue tmp(cx, value);
@@ -696,19 +666,26 @@
      return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
  }
  
-@@ -1460,6 +2088,11 @@
+@@ -1460,6 +2056,18 @@
      TraceLogStartEvent(logger, scriptLogId);
      TraceLogStartEvent(logger, TraceLogger::Interpreter);
  
 +#ifdef TxJS
 +    // Variables used in transaction processing.
-+    TxContext *tx = NULL;
++    TxContext *tx = nullptr;
++    RootedValue globalIntrospector(cx);
++    state.getIntrospector(&globalIntrospector);
++    if (!globalIntrospector.isUndefined()) {
++        if (!BeginTx(cx, globalIntrospector))
++            return false;
++        tx = cx->getTxContext();
++    }
 +#endif
 +
      /*
       * Pool of rooters for use in this interpreter frame. References to these
       * are used for local variables within interpreter cases. This avoids
-@@ -1725,6 +2358,40 @@
+@@ -1725,6 +2333,40 @@
  
              if (activation.entryFrame() != REGS.fp())
                  goto jit_return_pop_frame;
@@ -727,7 +704,7 @@
 +                // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
 +                JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
 +                tx->advanceState();
-+                REGS.fp()->setSuspendedTx(NULL);
++                REGS.fp()->setSuspendedTx(nullptr);
 +                    
 +                // Push the transaction return value before popping.
 +                if (tx->inState(TX_DONE) || tx->getSuspend()->type != AX_FORIN) {
@@ -749,7 +726,7 @@
              goto leave_on_safe_point;
          }
      }
-@@ -1796,6 +2463,97 @@
+@@ -1796,6 +2438,97 @@
      if (activation.entryFrame() != REGS.fp())
    inline_return:
      {
@@ -847,7 +824,7 @@
          // Stop the engine. (No details about which engine exactly, could be
          // interpreter, Baseline or IonMonkey.)
          TraceLogStopEvent(logger);
-@@ -1814,6 +2572,89 @@
+@@ -1814,6 +2547,89 @@
  #if defined(JS_ION)
    jit_return_pop_frame:
  #endif
@@ -863,7 +840,7 @@
 +            // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
 +            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
 +            tx->advanceState();
-+            REGS.fp()->setSuspendedTx(NULL);
++            REGS.fp()->setSuspendedTx(nullptr);
 +                
 +            // Push the transaction return value before popping.
 +            if (tx->inState(TX_DONE) || tx->getSuspend()->type != AX_FORIN) {
@@ -937,7 +914,7 @@
  
          activation.popInlineFrame(REGS.fp());
          SET_SCRIPT(REGS.fp()->script());
-@@ -1828,6 +2669,14 @@
+@@ -1828,6 +2644,14 @@
          if (MOZ_LIKELY(interpReturnOK)) {
              TypeScript::Monitor(cx, script, REGS.pc, REGS.sp[-1]);
  
@@ -952,7 +929,7 @@
              ADVANCE_AND_DISPATCH(JSOP_CALL_LENGTH);
          }
  
-@@ -1835,6 +2684,22 @@
+@@ -1835,6 +2659,22 @@
          REGS.pc += JSOP_CALL_LENGTH;
          goto error;
      } else {
@@ -969,13 +946,13 @@
 +            // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
 +            JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
 +            tx->advanceState();
-+            REGS.fp()->setSuspendedTx(NULL);
++            REGS.fp()->setSuspendedTx(nullptr);
 +        }
 +#endif
          JS_ASSERT(REGS.stackDepth() == 0);
      }
      goto exit;
-@@ -1930,6 +2795,43 @@
+@@ -1930,6 +2770,43 @@
      JS_ASSERT(REGS.stackDepth() >= 1);
      uint8_t flags = GET_UINT8(REGS.pc);
      MutableHandleValue res = REGS.stackHandleAt(-1);
@@ -1019,7 +996,7 @@
      if (!ValueToIterator(cx, flags, res))
          goto error;
      JS_ASSERT(!res.isPrimitive());
-@@ -2331,6 +3233,76 @@
+@@ -2331,6 +3208,76 @@
      FETCH_OBJECT(cx, -1, obj);
  
      bool succeeded;
@@ -1096,7 +1073,7 @@
      if (!JSObject::deleteProperty(cx, obj, name, &succeeded))
          goto error;
      if (!succeeded && script->strict()) {
-@@ -2352,6 +3324,43 @@
+@@ -2352,6 +3299,43 @@
      propval = REGS.sp[-1];
  
      bool succeeded;
@@ -1140,7 +1117,7 @@
      if (!JSObject::deleteByValue(cx, obj, propval, &succeeded))
          goto error;
      if (!succeeded && script->strict()) {
-@@ -2412,6 +3421,114 @@
+@@ -2412,6 +3396,115 @@
  {
  
      MutableHandleValue lval = REGS.stackHandleAt(-1);
@@ -1161,8 +1138,8 @@
 +                lobj = &lval.toObject();
 +            } else {
 +                // Convert |lval| to an object.
-+                JSObject *objp = NULL;
-+                if (lval.isNullOrUndefined() || (objp = PrimitiveToObject(cx, lval)) == NULL) {
++                JSObject *objp = nullptr;
++                if (lval.isNullOrUndefined() || (objp = PrimitiveToObject(cx, lval)) == nullptr) {
 +                    js_ReportIsNullOrUndefined(cx, JSDVG_SEARCH_STACK, lval, NullPtr());
 +                    goto error;
 +                }
@@ -1250,12 +1227,13 @@
 +            }
 +#endif
 +        }
++        cx->compartment()->wrap(cx, lval);
 +    } else
 +#endif
      if (!GetPropertyOperation(cx, REGS.fp(), script, REGS.pc, lval, lval))
          goto error;
  
-@@ -2440,6 +3557,19 @@
+@@ -2440,6 +3533,19 @@
  
      HandleValue value = REGS.stackHandleAt(-1);
  
@@ -1275,7 +1253,7 @@
      if (!SetNameOperation(cx, script, REGS.pc, scope, value))
          goto error;
  
-@@ -2453,6 +3583,41 @@
+@@ -2453,6 +3559,42 @@
      HandleValue lval = REGS.stackHandleAt(-2);
      HandleValue rval = REGS.stackHandleAt(-1);
  
@@ -1292,7 +1270,8 @@
 +        RootedObject &pobj = rootObject1;
 +        if (!JSObject::lookupProperty(cx, obj, name, &pobj, &shape))
 +            goto error;
-+        bool hasSetter = shape && (shape->hasSetterValue() || !shape->hasDefaultSetter());
++        bool hasSetter = shape && (IsImplicitDenseOrTypedArrayElement(shape)
++            || shape->hasSetterValue() || !shape->hasDefaultSetter());
 +
 +        if (hasSetter)
 +        {
@@ -1317,7 +1296,7 @@
      if (!SetPropertyOperation(cx, script, REGS.pc, lval, rval))
          goto error;
  
-@@ -2469,6 +3634,130 @@
+@@ -2469,6 +3611,130 @@
      MutableHandleValue res = REGS.stackHandleAt(-2);
  
      bool done = false;
@@ -1331,7 +1310,7 @@
 +    {
 +        if (lval.isString() && rval.isInt32()) {
 +            JSString *fullstr = lval.toString();
-+            JSString *charstr = NULL;
++            JSString *charstr = nullptr;
 +            int32_t i = rval.toInt32();
 +            if (size_t(i) < fullstr->length()) {
 +                charstr = cx->runtime()->staticStrings->getUnitStringForElement(cx, fullstr, size_t(i));
@@ -1448,7 +1427,7 @@
      if (!GetElemOptimizedArguments(cx, REGS.fp(), lval, rval, res, &done))
          goto error;
  
-@@ -2489,6 +3778,29 @@
+@@ -2489,6 +3755,29 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(-2, id);
      Value &value = REGS.sp[-1];
@@ -1478,7 +1457,7 @@
      if (!SetObjectElementOperation(cx, obj, id, value, script->strict()))
          goto error;
      REGS.sp[-3] = value;
-@@ -2499,6 +3811,18 @@
+@@ -2499,6 +3788,18 @@
  CASE(JSOP_EVAL)
  {
      CallArgs args = CallArgsFromSp(GET_ARGC(REGS.pc), REGS.sp);
@@ -1497,7 +1476,7 @@
      if (REGS.fp()->scopeChain()->global().valueIsEval(args.calleev())) {
          if (!DirectEval(cx, args))
              goto error;
-@@ -2613,6 +3937,20 @@
+@@ -2613,6 +3914,20 @@
  
      /* Don't bother trying to fast-path calls to scripted non-constructors. */
      if (!isFunction || !fun->isInterpretedConstructor()) {
@@ -1518,7 +1497,7 @@
          if (construct) {
              if (!InvokeConstructor(cx, args))
                  goto error;
-@@ -2668,6 +4006,13 @@
+@@ -2668,6 +3983,13 @@
      funScript = fun->nonLazyScript();
      if (!activation.pushInlineFrame(args, funScript, initial))
          goto error;
@@ -1532,7 +1511,7 @@
  
      if (newType)
          REGS.fp()->setUseNewType();
-@@ -2947,8 +4292,10 @@
+@@ -2947,8 +4269,10 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1543,7 +1522,7 @@
  }
  END_CASE(JSOP_GETLOCAL)
  
-@@ -3077,6 +4424,9 @@
+@@ -3077,6 +4401,9 @@
  {
      uint8_t i = GET_UINT8(REGS.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1553,7 +1532,7 @@
  
      RootedObject &obj = rootObject0;
      NewObjectKind newKind;
-@@ -3172,6 +4522,17 @@
+@@ -3172,6 +4499,17 @@
  
      if (!DefineNativeProperty(cx, obj, id, rval, nullptr, nullptr, JSPROP_ENUMERATE))
          goto error;
@@ -1571,7 +1550,7 @@
  
      REGS.sp--;
  }
-@@ -3186,6 +4547,19 @@
+@@ -3186,6 +4524,19 @@
      RootedObject &obj = rootObject0;
      obj = &REGS.sp[-3].toObject();
  
@@ -1591,7 +1570,7 @@
      if (!InitElemOperation(cx, obj, id, val))
          goto error;
  
-@@ -3448,6 +4822,96 @@
+@@ -3448,6 +4799,101 @@
  }
  END_CASE(JSOP_ARRAYPUSH)
  
@@ -1613,6 +1592,7 @@
 +CASE(JSOP_END_TX)
 +{
 +#ifdef TxJS
++  end_tx:
 +    // Invariant: only the innermost running/dummy transaction can end.
 +    tx = cx->getClosingTx();
 +    // BEGIN_TX and END_TX should always be matched.
@@ -1624,7 +1604,7 @@
 +        TxContext *doneTx = tx;
 +        tx = cx->setTxContext(tx->getNext());
 +        // A dummy transaction should never be top-level.
-+        JS_ASSERT(tx != NULL);
++        JS_ASSERT(tx != nullptr);
 +        doneTx->finish(cx);
 +        js_free(doneTx);
 +
@@ -1636,6 +1616,10 @@
 +        } else {
 +            PUSH_UNDEFINED();
 +        }
++        
++        // We might be handling a transaction ended by exception.
++        if (cx->isExceptionPending())
++            goto error;
 +
 +        ADVANCE_AND_DISPATCH(JSOP_END_TX_LENGTH);
 +    }
@@ -1688,26 +1672,37 @@
  DEFAULT()
  {
      char numBuf[12];
-@@ -3473,6 +4937,12 @@
+@@ -3473,6 +4919,11 @@
        case CatchContinuation:
          ADVANCE_AND_DISPATCH(0);
  
 +#ifdef TxJS
 +      case TxContinuation:
-+        tx = cx->getClosingTx();
-+        goto handle_tx;
++        goto end_tx;
 +#endif
 +
        case FinallyContinuation:
          /*
           * Push (true, exception) pair for finally to indicate that [retsub]
-@@ -3491,6 +4961,40 @@
+@@ -3491,6 +4942,53 @@
      MOZ_ASSUME_UNREACHABLE("Invalid HandleError continuation");
  
    exit:
 +#ifdef TxJS
-+    // Resume the transaction if the frame that is returning is a
-+    // transaction handler function.
++    if (!globalIntrospector.isUndefined()) {
++        tx = cx->getRunningTx();
++        JS_ASSERT(tx);
++        // Force non-inline execution.
++        int path = 1;
++        bool newType;
++        if (!IntrospectTx(cx, tx, &activation, true, script, &path, &newType))
++            return false;
++        JS_ASSERT(tx->inState(TX_RUNNING));
++        JS_ASSERT(path == 1);
++    }
++
++    // Resume the transaction if the frame that is returning is an
++    // introspector.
 +    if (REGS.fp()->suspendedTx()) {
 +        
 +        // Unsuspend the transaction.
@@ -1720,7 +1715,7 @@
 +        // TX_SUSPEND1|TX_END1 -> TX_RESUME|TX_DONE
 +        JS_ASSERT(tx->inState(TX_SUSPEND1 | TX_END1));
 +        tx->advanceState();
-+        REGS.fp()->setSuspendedTx(NULL);
++        REGS.fp()->setSuspendedTx(nullptr);
 +            
 +        // Push the transaction return value before popping.
 +        if (tx->inState(TX_DONE) || tx->getSuspend()->type != AX_FORIN) {
@@ -1738,11 +1733,12 @@
 +            tx->advanceState();
 +        }
 +    }
++
 +#endif
      if (MOZ_UNLIKELY(cx->compartment()->debugMode()))
          interpReturnOK = ScriptDebugEpilogue(cx, REGS.fp(), REGS.pc, interpReturnOK);
      if (!REGS.fp()->isYielding())
-@@ -3872,6 +5376,46 @@
+@@ -3872,6 +5370,46 @@
  {
      RootedObject scope(cx), pobj(cx);
      RootedShape shape(cx);

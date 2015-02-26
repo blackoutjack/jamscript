@@ -1,0 +1,13 @@
+A version with debugging symbols can be built by altering the
+.mozconfig file, rebuilding (in a directory that is segregated from
+the release version) and run as follows. (See doc/INSTALL.bash for the
+definition of environment variables that are referenced here.)
+ 
+mv $JAMSCRIPTPKG/ff-dev/mozilla-$VERSION/mozconfig-debug $JAMSCRIPTPKG/ff-dev/mozilla-$VERSION/.mozconfig
+
+./obj-debug/dist/bin/firefox -no-remote -jsconsole
+
+It's also recommended (especially if attaching a debugger) that you
+disable the script timeout by going to about:config in the Firefox
+address bar and setting the |dom.max_script_run_time| setting to 0.
+

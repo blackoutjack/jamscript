@@ -2,7 +2,7 @@
 // tag in the HTML page, and then this file, followed by all others.
 
 const PERFORMANCE_TESTING = false;
-const DEFAULT_ALLOW = true;
+const DEFAULT_ALLOW = false;
 const MIMIC = false;
 
 // Allow testing scripts with |alert| in the JS shell.

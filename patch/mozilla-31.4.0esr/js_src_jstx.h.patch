@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.h	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.h	2015-02-05 01:00:16.789618807 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.h	2015-02-25 22:37:19.979717756 -0600
 @@ -0,0 +1,154 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -17,7 +17,7 @@
 +//#define TxJS_SUSPEND_NATIVE 1
 +
 +/* Use "transparent" transaction semantics. */
-+//#define TxJS_TRANSPARENT
++#define TxJS_TRANSPARENT
 +
 +#ifdef DEBUG
 +#define TxJS_PROFILE_TX 1
@@ -99,20 +99,20 @@
 +    void advanceState();
 +    void setState(TxState);
 +    inline TxAction *getActionSequence() { return (TxAction*)seq_; }
-+    inline uint32_t getSequenceSize() { return seqsize_; }
++    inline uint32_t getSequenceSize() const { return seqsize_; }
 +#ifdef TxJS_PROFILE_ACTIONS
-+    inline uint32_t getWriteCount() { return writesize_; }
-+    inline uint32_t getReadCount() { return readsize_; }
-+    inline uint32_t getCallCount() { return callsize_; }
-+    inline uint32_t getDeleteCount() { return deletesize_; }
-+    inline uint32_t getForinCount() { return forinsize_; }
++    inline uint32_t getWriteCount() const { return writesize_; }
++    inline uint32_t getReadCount() const { return readsize_; }
++    inline uint32_t getCallCount() const { return callsize_; }
++    inline uint32_t getDeleteCount() const { return deletesize_; }
++    inline uint32_t getForinCount() const { return forinsize_; }
 +#endif
-+    inline const bool getIntrospector(js::MutableHandleValue ispect) { ispect.set(introspector_); return true; }
++    inline const bool getIntrospector(js::MutableHandleValue ispect) const { ispect.set(introspector_); return true; }
 +    inline TxAction *getSuspend() { return &suspend_; }
-+    inline const bool getReturnValue(js::MutableHandleValue rval) { rval.set(retval_); return true; }
++    inline const bool getReturnValue(js::MutableHandleValue rval) const { rval.set(retval_); return true; }
 +    inline void setReturnValue(const js::Value &val) { retval_ = val; }
 +
-+    inline TxContext *getNext() { return next_; }
++    inline TxContext *getNext() const { return next_; }
 +    inline uint32_t depth() {
 +        int ret = -1;
 +        TxContext *tx = this;

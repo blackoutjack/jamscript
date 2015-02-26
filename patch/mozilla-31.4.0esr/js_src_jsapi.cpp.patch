@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-28 15:20:43.090441302 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-02-16 17:58:39.837776642 -0600
 @@ -44,6 +44,10 @@
  #include "jsworkers.h"
  #endif
@@ -42,16 +42,16 @@
              flags &= ~JSFUN_GENERIC_NATIVE;
              JSFunction *fun = DefineFunction(cx, ctor, id,
                                               js_generic_native_method_dispatcher,
-@@ -4443,6 +4453,9 @@
- JS::CompileOptions::CompileOptions(JSContext *cx, JSVersion version)
-     : ReadOnlyCompileOptions(), elementRoot(cx), elementAttributeNameRoot(cx),
-       introductionScriptRoot(cx)
+@@ -4350,6 +4360,9 @@
+     setElement(rhs.element());
+     setElementAttributeName(rhs.elementAttributeName());
+     setIntroductionScript(rhs.introductionScript());
 +#ifdef TxJS
-+    , introspector(cx, JS::UndefinedValue())
++    setIntrospector(rhs.getIntrospector());
 +#endif
- {
-     this->version = (version != JSVERSION_UNKNOWN) ? version : cx->findVersion();
  
+     return (setFileAndLine(cx, rhs.filename(), rhs.lineno) &&
+             setSourceMapURL(cx, rhs.sourceMapURL()) &&
 @@ -4858,6 +4871,9 @@
                                                      srcBuf, nullptr, 0, &sct));
      if (!script)
