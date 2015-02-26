@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-02-26 09:03:59.767295166 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-02-26 11:58:24.009393957 -0600
 @@ -29,6 +29,11 @@
  #include "jsprf.h"
  #include "jsscript.h"
@@ -92,7 +92,7 @@
      bool ok = RunScript(cx, state);
      probes::StopExecution(script);
  
-@@ -667,6 +724,517 @@
+@@ -667,6 +724,535 @@
                           NullFramePtr() /* evalInFrame */, rval);
  }
  
@@ -232,8 +232,23 @@
 +
 +    /* Don't bother trying to fast-path calls to scripted non-constructors. */
 +    if (*path == 1 || !isFunction || !fun->isInterpretedConstructor()) {
-+        if (!Invoke(cx, args))
++        if (!Invoke(cx, args)) {
++            // An exception was thrown during execution of the
++            // introspector, so we just advance the state and propagate
++            // the error onward.
++            if (tx->inState(TX_RESUME)) {
++                // TX_RESUME -> TX_RUNNING
++                tx->advanceState();
++            } else {
++                JS_ASSERT(tx->inState(TX_DONE));
++                // Pop the current transaction context.
++                TxContext *doneTx = tx;
++                tx = cx->setTxContext(tx->getNext());
++                doneTx->finish(cx);
++                js_free(doneTx);
++            }
 +            return false;
++        }
 +        Value *newsp = args.spAfterCall();
 +        TypeScript::Monitor(cx, script, regs.pc, newsp[-1]);
 +        regs.sp = newsp;
@@ -267,8 +282,11 @@
 +                // Create the iterator.
 +                uint8_t flags = GET_UINT8(regs.pc);
 +                MutableHandleValue res = MutableHandleValue::fromMarkedLocation(&regs.sp[-1]);
-+                if (!ValueToIterator(cx, flags, res))
++                if (!ValueToIterator(cx, flags, res)) {
++                    // TX_RESUME -> TX_RUNNING
++                    tx->advanceState();
 +                    return false;
++                }
 +                JS_ASSERT(!res.isPrimitive());
 +            } else {
 +                // Cases AX_READ, AX_CALL, AX_DELETE, AX_WRITE.
@@ -610,7 +628,7 @@
  bool
  js::HasInstance(JSContext *cx, HandleObject obj, HandleValue v, bool *bp)
  {
-@@ -983,6 +1551,9 @@
+@@ -983,6 +1569,9 @@
      SuccessfulReturnContinuation,
      ErrorReturnContinuation,
      CatchContinuation,
@@ -620,7 +638,7 @@
      FinallyContinuation
  };
  
-@@ -1042,6 +1613,17 @@
+@@ -1042,6 +1631,17 @@
                case JSTRY_FINALLY:
                  return FinallyContinuation;
  
@@ -638,7 +656,7 @@
                case JSTRY_ITER: {
                  /* This is similar to JSOP_ENDITER in the interpreter loop. */
                  JS_ASSERT(JSOp(*regs.pc) == JSOP_ENDITER);
-@@ -1304,6 +1886,9 @@
+@@ -1304,6 +1904,9 @@
  {
      types::TypeScript::MonitorAssign(cx, obj, id);
  
@@ -648,7 +666,7 @@
  #ifdef JS_ION
      if (obj->isNative() && JSID_IS_INT(id)) {
          uint32_t length = obj->getDenseInitializedLength();
-@@ -1320,6 +1905,17 @@
+@@ -1320,6 +1923,17 @@
          return false;
  
      RootedValue tmp(cx, value);
@@ -666,7 +684,7 @@
      return JSObject::setGeneric(cx, obj, obj, id, &tmp, strict);
  }
  
-@@ -1460,6 +2056,18 @@
+@@ -1460,6 +2074,18 @@
      TraceLogStartEvent(logger, scriptLogId);
      TraceLogStartEvent(logger, TraceLogger::Interpreter);
  
@@ -685,7 +703,7 @@
      /*
       * Pool of rooters for use in this interpreter frame. References to these
       * are used for local variables within interpreter cases. This avoids
-@@ -1725,6 +2333,40 @@
+@@ -1725,6 +2351,40 @@
  
              if (activation.entryFrame() != REGS.fp())
                  goto jit_return_pop_frame;
@@ -726,7 +744,7 @@
              goto leave_on_safe_point;
          }
      }
-@@ -1796,6 +2438,97 @@
+@@ -1796,6 +2456,97 @@
      if (activation.entryFrame() != REGS.fp())
    inline_return:
      {
@@ -824,7 +842,7 @@
          // Stop the engine. (No details about which engine exactly, could be
          // interpreter, Baseline or IonMonkey.)
          TraceLogStopEvent(logger);
-@@ -1814,6 +2547,89 @@
+@@ -1814,6 +2565,89 @@
  #if defined(JS_ION)
    jit_return_pop_frame:
  #endif
@@ -914,7 +932,7 @@
  
          activation.popInlineFrame(REGS.fp());
          SET_SCRIPT(REGS.fp()->script());
-@@ -1828,6 +2644,14 @@
+@@ -1828,6 +2662,14 @@
          if (MOZ_LIKELY(interpReturnOK)) {
              TypeScript::Monitor(cx, script, REGS.pc, REGS.sp[-1]);
  
@@ -929,7 +947,7 @@
              ADVANCE_AND_DISPATCH(JSOP_CALL_LENGTH);
          }
  
-@@ -1835,6 +2659,22 @@
+@@ -1835,6 +2677,22 @@
          REGS.pc += JSOP_CALL_LENGTH;
          goto error;
      } else {
@@ -952,7 +970,7 @@
          JS_ASSERT(REGS.stackDepth() == 0);
      }
      goto exit;
-@@ -1930,6 +2770,43 @@
+@@ -1930,6 +2788,43 @@
      JS_ASSERT(REGS.stackDepth() >= 1);
      uint8_t flags = GET_UINT8(REGS.pc);
      MutableHandleValue res = REGS.stackHandleAt(-1);
@@ -996,7 +1014,7 @@
      if (!ValueToIterator(cx, flags, res))
          goto error;
      JS_ASSERT(!res.isPrimitive());
-@@ -2331,6 +3208,76 @@
+@@ -2331,6 +3226,76 @@
      FETCH_OBJECT(cx, -1, obj);
  
      bool succeeded;
@@ -1073,7 +1091,7 @@
      if (!JSObject::deleteProperty(cx, obj, name, &succeeded))
          goto error;
      if (!succeeded && script->strict()) {
-@@ -2352,6 +3299,43 @@
+@@ -2352,6 +3317,43 @@
      propval = REGS.sp[-1];
  
      bool succeeded;
@@ -1117,7 +1135,7 @@
      if (!JSObject::deleteByValue(cx, obj, propval, &succeeded))
          goto error;
      if (!succeeded && script->strict()) {
-@@ -2412,6 +3396,115 @@
+@@ -2412,6 +3414,115 @@
  {
  
      MutableHandleValue lval = REGS.stackHandleAt(-1);
@@ -1233,7 +1251,7 @@
      if (!GetPropertyOperation(cx, REGS.fp(), script, REGS.pc, lval, lval))
          goto error;
  
-@@ -2440,6 +3533,19 @@
+@@ -2440,6 +3551,19 @@
  
      HandleValue value = REGS.stackHandleAt(-1);
  
@@ -1253,7 +1271,7 @@
      if (!SetNameOperation(cx, script, REGS.pc, scope, value))
          goto error;
  
-@@ -2453,6 +3559,42 @@
+@@ -2453,6 +3577,42 @@
      HandleValue lval = REGS.stackHandleAt(-2);
      HandleValue rval = REGS.stackHandleAt(-1);
  
@@ -1296,7 +1314,7 @@
      if (!SetPropertyOperation(cx, script, REGS.pc, lval, rval))
          goto error;
  
-@@ -2469,6 +3611,130 @@
+@@ -2469,6 +3629,130 @@
      MutableHandleValue res = REGS.stackHandleAt(-2);
  
      bool done = false;
@@ -1427,7 +1445,7 @@
      if (!GetElemOptimizedArguments(cx, REGS.fp(), lval, rval, res, &done))
          goto error;
  
-@@ -2489,6 +3755,29 @@
+@@ -2489,6 +3773,29 @@
      RootedId &id = rootId0;
      FETCH_ELEMENT_ID(-2, id);
      Value &value = REGS.sp[-1];
@@ -1457,7 +1475,7 @@
      if (!SetObjectElementOperation(cx, obj, id, value, script->strict()))
          goto error;
      REGS.sp[-3] = value;
-@@ -2499,6 +3788,18 @@
+@@ -2499,6 +3806,18 @@
  CASE(JSOP_EVAL)
  {
      CallArgs args = CallArgsFromSp(GET_ARGC(REGS.pc), REGS.sp);
@@ -1476,7 +1494,7 @@
      if (REGS.fp()->scopeChain()->global().valueIsEval(args.calleev())) {
          if (!DirectEval(cx, args))
              goto error;
-@@ -2613,6 +3914,20 @@
+@@ -2613,6 +3932,20 @@
  
      /* Don't bother trying to fast-path calls to scripted non-constructors. */
      if (!isFunction || !fun->isInterpretedConstructor()) {
@@ -1497,7 +1515,7 @@
          if (construct) {
              if (!InvokeConstructor(cx, args))
                  goto error;
-@@ -2668,6 +3983,13 @@
+@@ -2668,6 +4001,13 @@
      funScript = fun->nonLazyScript();
      if (!activation.pushInlineFrame(args, funScript, initial))
          goto error;
@@ -1511,7 +1529,7 @@
  
      if (newType)
          REGS.fp()->setUseNewType();
-@@ -2947,8 +4269,10 @@
+@@ -2947,8 +4287,10 @@
       * method JIT, and a GETLOCAL followed by POP is not considered to be
       * a use of the variable.
       */
@@ -1522,7 +1540,7 @@
  }
  END_CASE(JSOP_GETLOCAL)
  
-@@ -3077,6 +4401,9 @@
+@@ -3077,6 +4419,9 @@
  {
      uint8_t i = GET_UINT8(REGS.pc);
      JS_ASSERT(i == JSProto_Array || i == JSProto_Object);
@@ -1532,7 +1550,7 @@
  
      RootedObject &obj = rootObject0;
      NewObjectKind newKind;
-@@ -3172,6 +4499,17 @@
+@@ -3172,6 +4517,17 @@
  
      if (!DefineNativeProperty(cx, obj, id, rval, nullptr, nullptr, JSPROP_ENUMERATE))
          goto error;
@@ -1550,7 +1568,7 @@
  
      REGS.sp--;
  }
-@@ -3186,6 +4524,19 @@
+@@ -3186,6 +4542,19 @@
      RootedObject &obj = rootObject0;
      obj = &REGS.sp[-3].toObject();
  
@@ -1570,7 +1588,7 @@
      if (!InitElemOperation(cx, obj, id, val))
          goto error;
  
-@@ -3448,6 +4799,101 @@
+@@ -3448,6 +4817,101 @@
  }
  END_CASE(JSOP_ARRAYPUSH)
  
@@ -1672,7 +1690,7 @@
  DEFAULT()
  {
      char numBuf[12];
-@@ -3473,6 +4919,11 @@
+@@ -3473,6 +4937,11 @@
        case CatchContinuation:
          ADVANCE_AND_DISPATCH(0);
  
@@ -1684,7 +1702,7 @@
        case FinallyContinuation:
          /*
           * Push (true, exception) pair for finally to indicate that [retsub]
-@@ -3491,6 +4942,53 @@
+@@ -3491,6 +4960,53 @@
      MOZ_ASSUME_UNREACHABLE("Invalid HandleError continuation");
  
    exit:
@@ -1738,7 +1756,7 @@
      if (MOZ_UNLIKELY(cx->compartment()->debugMode()))
          interpReturnOK = ScriptDebugEpilogue(cx, REGS.fp(), REGS.pc, interpReturnOK);
      if (!REGS.fp()->isYielding())
-@@ -3872,6 +5370,46 @@
+@@ -3872,6 +5388,46 @@
  {
      RootedObject scope(cx), pobj(cx);
      RootedShape shape(cx);

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-24 22:17:08.836702433 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-26 13:40:18.324469821 -0600
 @@ -0,0 +1,746 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
@@ -729,9 +729,9 @@
 +    //uint32_t txidx = depth();
 +
 +    //JS_SET_TRACING_INDEX(trc, "tx_handler", txidx);
-+    gc::MarkValueUnbarriered(trc, introspector_.unsafeGet(), "tx_introspector");
++    gc::MarkValue(trc, &introspector_, "tx_introspector");
 +    //JS_SET_TRACING_INDEX(trc, "tx_retval", txidx);
-+    gc::MarkValueUnbarriered(trc, retval_.unsafeGet(), "tx_retval");
++    gc::MarkValue(trc, &retval_, "tx_retval");
 +
 +    tx_actionsequence_trace(trc, getActionSequence(), seqsize_);
 +

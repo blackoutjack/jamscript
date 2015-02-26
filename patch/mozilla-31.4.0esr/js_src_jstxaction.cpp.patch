@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstxaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-02-24 11:52:12.800285737 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-02-26 13:40:24.784469748 -0600
 @@ -0,0 +1,280 @@
 +#include "jsversion.h"
 +#ifdef TxJS
@@ -260,7 +260,7 @@
 +{
 +    gc::MarkObject(trc, &act->prop.object, "tx_action_obj");
 +
-+    gc::MarkValueUnbarriered(trc, act->value.unsafeGet(), "tx_action_value");
++    gc::MarkValue(trc, &act->value, "tx_action_value");
 +
 +    for (uint32_t i=0; i<act->argc; i++) {
 +        //JS_SET_TRACING_INDEX(trc, "tx_action_argv", i);
