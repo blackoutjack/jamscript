@@ -1,16 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-01-05 23:08:02.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-02-28 20:45:57.419577406 -0600
-@@ -185,6 +185,9 @@
- #include "nsISupportsArray.h"
- #include "nsIURIFixup.h"
- #include "nsIURILoader.h"
-+#ifdef TxJS
-+#include "nsURILoader.h"
-+#endif
- #include "nsIWebBrowserFind.h"
- #include "nsIWidget.h"
- #include "mozilla/dom/EncodingUtils.h"
-@@ -797,6 +800,9 @@
++++ ff-dev/mozilla-31.4.0esr/docshell/base/nsDocShell.cpp	2015-03-01 11:21:05.266987262 -0600
+@@ -797,6 +797,9 @@
      mDefaultScrollbarPref(Scrollbar_Auto, Scrollbar_Auto),
      mTreeOwner(nullptr),
      mChromeEventHandler(nullptr),
@@ -20,7 +10,7 @@
      mCharsetReloadState(eCharsetReloadInit),
      mChildOffset(0),
      mBusyFlags(BUSY_FLAGS_NONE),
-@@ -1798,6 +1804,26 @@
+@@ -1798,6 +1801,26 @@
          originIsFile && targetIsFile;
  }
  
@@ -47,44 +37,30 @@
  NS_IMETHODIMP
  nsDocShell::GetEldestPresContext(nsPresContext** aPresContext)
  {
-@@ -9735,6 +9761,15 @@
- 
-     uriLoader = do_GetService(NS_URI_LOADER_CONTRACTID, &rv);
-     if (NS_FAILED(rv)) return rv;
-+#ifdef TxJS
-+    JS::Value ispect;
-+    JSContext *cx = nsContentUtils::GetCurrentJSContext();
-+    if (cx) {
-+        JS::RootedValue rootIspect(cx);
-+        GetIntrospector(&rootIspect);
-+        ispect = rootIspect.get();
-+    }
-+#endif
- 
-     nsLoadFlags loadFlags = mDefaultLoadFlags;
-     if (aFirstParty) {
-@@ -10029,6 +10064,11 @@
-         // Allow execution against our context if the principals match
-         scriptChannel->
+@@ -10031,6 +10054,18 @@
              SetExecutionPolicy(nsIScriptChannel::EXECUTE_NORMAL);
-+#ifdef TxJS
-+        if (cx) {
-+            channel->SetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&ispect));
-+        }
-+#endif
      }
  
++#ifdef TxJS
++    JSContext *cx = nsContentUtils::GetCurrentJSContext();
++    if (cx) {
++        JS::RootedValue ispect(cx);
++        GetIntrospector(&ispect);
++        // %%% Not sure if we need to do both.
++        if (scriptChannel)
++            channel->SetIntrospector(ispect);
++        uriLoader->SetIntrospector(ispect);
++    }
++#endif
++
      if (aIsNewWindowTarget) {
-@@ -10047,7 +10087,11 @@
+         nsCOMPtr<nsIWritablePropertyBag2> props = do_QueryInterface(channel);
+         if (props) {
+@@ -10047,7 +10082,6 @@
              timedChannel->SetInitiatorType(NS_LITERAL_STRING("subdocument"));
          }
      }
 -
-+#ifdef TxJS
-+    if (cx) {
-+        static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = ispect;
-+    }
-+#endif
      rv = DoChannelLoad(channel, uriLoader, aBypassClassifier);
  
      //

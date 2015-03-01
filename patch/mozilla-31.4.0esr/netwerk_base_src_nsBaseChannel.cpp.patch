@@ -1,6 +1,16 @@
 --- ff-orig/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.cpp	2015-01-05 23:07:57.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.cpp	2015-02-28 22:50:42.399493281 -0600
-@@ -389,6 +389,26 @@
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.cpp	2015-03-01 11:31:06.202980508 -0600
+@@ -59,6 +59,9 @@
+   , mStatus(NS_OK)
+   , mContentDispositionHint(UINT32_MAX)
+   , mContentLength(-1)
++#ifdef TxJS
++  , mIntrospector(JS::UndefinedValue())
++#endif
+ {
+   mContentType.AssignLiteral(UNKNOWN_CONTENT_TYPE);
+ }
+@@ -389,6 +392,26 @@
    return NS_OK;
  }
  

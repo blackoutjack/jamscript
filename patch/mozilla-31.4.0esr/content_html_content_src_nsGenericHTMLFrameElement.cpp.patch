@@ -1,28 +1,24 @@
 --- ff-orig/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-01-05 23:08:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-02-01 17:05:48.711502435 -0600
-@@ -23,6 +23,10 @@
++++ ff-dev/mozilla-31.4.0esr/content/html/content/src/nsGenericHTMLFrameElement.cpp	2015-03-01 11:13:20.478992485 -0600
+@@ -23,6 +23,9 @@
  #include "nsIScrollable.h"
  #include "nsPresContext.h"
  #include "nsServiceManagerUtils.h"
 +#ifdef TxJS
-+#include "nsIScriptContext.h"
 +#include "jsapi.h"
 +#endif
  
  using namespace mozilla;
  using namespace mozilla::dom;
-@@ -179,6 +183,16 @@
+@@ -179,6 +182,13 @@
    }
  
    nsresult rv = mFrameLoader->LoadFrame();
 +#ifdef TxJS
-+  nsIScriptContext* sctx = GetContextForEventHandlers(&rv);
-+  if (sctx) {
-+    JSContext* cx = sctx->GetNativeContext();
-+    JS::Value ispect = JS_GetIntrospector(cx);
-+    if (!ispect.isUndefined()) {
-+      mFrameLoader->mIntrospector = ispect;
-+    }
++  nsIDocument *doc = GetContentDocument();
++  if (doc) {
++    JSContext *cx = nsContentUtils::GetContextFromDocument(doc);
++    mFrameLoader->mIntrospector = JS_GetIntrospector(cx);
 +  }
 +#endif
  #ifdef DEBUG

@@ -1,16 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-02-18 18:06:57.133568862 -0600
-@@ -47,6 +47,9 @@
- #include "nsCRT.h"
- #include "nsContentCreatorFunctions.h"
- #include "nsCrossSiteListenerProxy.h"
-+#ifdef TxJS
-+#include "nsDocLoader.h"
-+#endif
- #include "nsSandboxFlags.h"
- #include "nsContentTypeParser.h"
- #include "nsINetworkSeer.h"
-@@ -80,6 +83,9 @@
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-03-01 10:44:36.231011865 -0600
+@@ -80,6 +80,9 @@
        mScriptTextLength(0),
        mJSVersion(aVersion),
        mLineNo(1),
@@ -20,7 +10,7 @@
        mCORSMode(aCORSMode)
    {
    }
-@@ -119,6 +125,9 @@
+@@ -119,6 +122,9 @@
    nsCOMPtr<nsIPrincipal> mOriginPrincipal;
    nsAutoCString mURL;   // Keep the URI's filename alive during off thread parsing.
    int32_t mLineNo;
@@ -30,7 +20,7 @@
    const CORSMode mCORSMode;
  };
  
-@@ -136,6 +145,9 @@
+@@ -136,6 +142,9 @@
      mBlockerCount(0),
      mEnabled(true),
      mDeferEnabled(false),
@@ -40,50 +30,29 @@
      mDocumentParsingDone(false),
      mBlockingDOMContentLoaded(false)
  {
-@@ -643,6 +655,17 @@
+@@ -643,6 +652,10 @@
      request->mJSVersion = version;
  
      if (aElement->GetScriptAsync()) {
 +#ifdef TxJS
-+      JSContext *cx = nullptr;
-+      nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
-+      if (!globalObject)
-+        return false;
-+      cx = globalObject->GetScriptContext()->GetNativeContext();
-+      JS::Value ispect = JS_GetIntrospector(cx);
-+      if (!ispect.isUndefined()) {
-+        request->mIntrospector = ispect;
-+      }
++      JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
++      request->mIntrospector = JS_GetIntrospector(cx);
 +#endif
        mAsyncRequests.AppendElement(request);
        if (!request->mLoading) {
          // The script is available already. Run it ASAP when the event
-@@ -738,6 +761,24 @@
+@@ -738,6 +751,10 @@
    request->mURI = mDocument->GetDocumentURI();
    request->mLineNo = aElement->GetScriptLineNumber();
  
 +#ifdef TxJS
-+  /*
-+  JSContext *cx = nullptr;
-+  cx = globalObject->GetScriptContext()->GetNativeContext();
-+  JS::Value ispect = JS_GetIntrospector(cx);
-+  if (ispect.isUndefined()) {
-+    nsIDocShell *ds = ((nsPIDOMWindow*)globalObject)->GetDocShell();
-+    nsDocLoader *dl = (nsDocLoader*)ds;
-+    if (false && !dl->introspector.isUndefined()) {
-+      ispect = dl->introspector;
-+    }
-+  }
-+  */
-+  if (!mIntrospector.isUndefined()) {
-+    request->mIntrospector = mIntrospector;
-+  }
++  request->mIntrospector = mIntrospector;
 +#endif
 +
    if (aElement->GetParserCreated() == FROM_PARSER_XSLT &&
        (!ReadyToExecuteScripts() || !mXSLTRequests.IsEmpty())) {
      // Need to maintain order for XSLT-inserted scripts
-@@ -1067,6 +1108,20 @@
+@@ -1067,6 +1084,20 @@
      MOZ_ASSERT(elementVal.isObject());
      aOptions->setElement(&elementVal.toObject());
    }

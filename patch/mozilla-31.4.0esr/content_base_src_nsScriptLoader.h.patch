@@ -1,16 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-02-01 14:28:23.519818764 -0600
-@@ -17,6 +17,9 @@
- #include "nsAutoPtr.h"
- #include "nsIDocument.h"
- #include "nsIStreamLoader.h"
-+#if 0//def TxJS
-+#include "jsapi.h"
-+#endif
- 
- class nsScriptLoadRequest;
- class nsIURI;
-@@ -336,6 +339,11 @@
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.h	2015-03-01 11:06:23.082997177 -0600
+@@ -336,6 +336,11 @@
    uint32_t mBlockerCount;
    bool mEnabled;
    bool mDeferEnabled;

@@ -46,7 +46,7 @@ cd ./ff-dev/mozilla-$VERSION/ && cp mozconfig-release .mozconfig
 # cd /usr/lib/python2.7
 # ln -s plat-x86_64-linux-gnu/_sysconfigdata_nd.py .
 
-#5) Build the browser (takes ~30 minutes from scratch with the -j4
+#5) Build the browser (takes ~70 minutes from scratch with the -j4
 #   option in .mozconfig).
 ./mach build
 

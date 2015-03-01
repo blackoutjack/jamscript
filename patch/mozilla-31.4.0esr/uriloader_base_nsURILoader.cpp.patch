@@ -1,16 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-02-28 19:13:54.623639478 -0600
-@@ -48,6 +48,9 @@
- #include "nsMimeTypes.h"
- 
- #include "nsDocLoader.h"
-+#ifdef TxJS
-+#include "nsHtml5StreamParser.h"
-+#endif
- #include "mozilla/Attributes.h"
- #include "mozilla/Preferences.h"
- 
-@@ -159,6 +162,11 @@
++++ ff-dev/mozilla-31.4.0esr/uriloader/base/nsURILoader.cpp	2015-03-01 10:43:45.459012435 -0600
+@@ -159,6 +159,11 @@
     * nsIURIContentListeners.
     */
    nsRefPtr<nsURILoader> mURILoader;
@@ -22,7 +12,7 @@
  };
  
  NS_IMPL_ADDREF(nsDocumentOpenInfo)
-@@ -182,6 +190,9 @@
+@@ -182,6 +187,9 @@
    : m_originalContext(aWindowContext),
      mFlags(aFlags),
      mURILoader(aURILoader)
@@ -32,7 +22,7 @@
  {
  }
  
-@@ -268,6 +279,9 @@
+@@ -268,6 +276,9 @@
  
    NS_ENSURE_SUCCESS(rv, rv);
    
@@ -42,17 +32,17 @@
    if (m_targetStreamListener)
      rv = m_targetStreamListener->OnStartRequest(request, aCtxt);
  
-@@ -748,6 +762,9 @@
-     mLog = PR_NewLogModule("URILoader");
-   }
- #endif
-+#ifdef TxJS
-+  mIntrospector = JS::UndefinedValue();
-+#endif
- }
+@@ -742,6 +753,9 @@
+ ///////////////////////////////////////////////////////////////////////////////////////////////
  
- nsURILoader::~nsURILoader()
-@@ -869,6 +886,9 @@
+ nsURILoader::nsURILoader()
++#ifdef TxJS
++  : mIntrospector(JS::UndefinedValue())
++#endif
+ {
+ #ifdef PR_LOGGING
+   if (!mLog) {
+@@ -869,6 +883,9 @@
    // the url and discover the content type....
    nsRefPtr<nsDocumentOpenInfo> loader =
      new nsDocumentOpenInfo(aWindowContext, aFlags, this);
@@ -62,4 +52,27 @@
  
    if (!loader) return NS_ERROR_OUT_OF_MEMORY;
  
+@@ -951,3 +968,22 @@
+   return rv;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsURILoader::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++#ifdef TxJS
++    aIntrospector.set(mIntrospector);
++#else
++    aIntrospector.set(JS::UndefinedValue());
++#endif
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsURILoader::SetIntrospector(JS::HandleValue aIntrospector) {
++#ifdef TxJS
++    mIntrospector = aIntrospector;
++#endif
++    return NS_OK;
++}
++// TxJS end
 

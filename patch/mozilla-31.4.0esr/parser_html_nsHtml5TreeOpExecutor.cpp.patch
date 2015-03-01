@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.cpp	2015-02-28 16:58:31.111730779 -0600
++++ ff-dev/mozilla-31.4.0esr/parser/html/nsHtml5TreeOpExecutor.cpp	2015-03-01 11:39:04.366975133 -0600
 @@ -62,6 +62,9 @@
  
  nsHtml5TreeOpExecutor::nsHtml5TreeOpExecutor()
@@ -10,15 +10,13 @@
    , mPreloadedURLs(23)  // Mean # of preloadable resources per page on dmoz
  {
    // zeroing operator new for everything else
-@@ -636,6 +639,15 @@
+@@ -636,6 +639,13 @@
  
    NS_ASSERTION(aScriptElement, "No script to run");
    nsCOMPtr<nsIScriptElement> sele = do_QueryInterface(aScriptElement);
 +#ifdef TxJS
 +  if (!mIntrospector.isUndefined()) {
-+    nsCOMPtr<nsIContent> cont =
-+      do_QueryInterface((nsIScriptElement*) sele);
-+    nsIDocument* ownerDoc = cont->OwnerDoc();
++    nsIDocument* ownerDoc = aScriptElement->OwnerDoc();
 +    nsRefPtr<nsScriptLoader> loader = ownerDoc->ScriptLoader();
 +    loader->mIntrospector = mIntrospector;
 +  }

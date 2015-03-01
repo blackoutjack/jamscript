@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-02-28 16:31:43.655748846 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-03-01 10:51:27.763007239 -0600
 @@ -76,6 +76,9 @@
  
  #include "nsWidgetsCID.h"
@@ -10,43 +10,34 @@
  #include "mozilla/BasicEvents.h"
  #include "mozilla/dom/BindingUtils.h"
  #include "mozilla/dom/Element.h"
-@@ -734,7 +737,14 @@
-   , mPlayPreviewCanceled(false)
-   , mIsStopping(false)
-   , mIsLoading(false)
+@@ -727,6 +730,9 @@
+ nsObjectLoadingContent::nsObjectLoadingContent()
+   : mType(eType_Loading)
+   , mFallbackType(eFallbackAlternate)
 +#ifdef TxJS
-+  , mScriptRequested(false)
-+{
-+  mIntrospector = JS::UndefinedValue();       
-+}
-+#else
-   , mScriptRequested(false) {}
++  , mIntrospector(JS::UndefinedValue())
 +#endif
- 
- nsObjectLoadingContent::~nsObjectLoadingContent()
- {
-@@ -2185,6 +2195,9 @@
+   , mChannelLoaded(false)
+   , mInstantiating(false)
+   , mNetworkCreated(true)
+@@ -2185,6 +2191,9 @@
          mType = eType_Null;
          break;
        }
 +#ifdef TxJS
-+      static_cast<nsURILoader*>(uriLoader.get())->mIntrospector = mIntrospector;
++      uriLoader->SetIntrospector(JS::HandleValue::fromMarkedLocation(&mIntrospector));
 +#endif
        rv = uriLoader->OpenChannel(mChannel, nsIURILoader::DONT_RETARGET, req,
                                    getter_AddRefs(finalListener));
        // finalListener will receive OnStartRequest below
-@@ -2383,6 +2396,16 @@
+@@ -2383,6 +2392,12 @@
    NS_ENSURE_SUCCESS(rv, rv);
    LOG(("OBJLC [%p]: Channel opened", this));
    mChannel = chan;
 +#ifdef TxJS
-+  nsIScriptContext* sctx = thisContent->AsElement()->GetContextForEventHandlers(&rv);
-+  if (sctx) {
-+    JSContext* cx = sctx->GetNativeContext();
-+    JS::Value ispect = JS_GetIntrospector(cx);
-+    if (!ispect.isUndefined()) {
-+      mIntrospector = ispect;
-+    }
++  JSContext *cx = nsContentUtils::GetContextFromDocument(doc);
++  if (cx) {
++    mIntrospector = JS_GetIntrospector(cx);
 +  }
 +#endif
    return NS_OK;

@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-31.4.0esr/uriloader/base/nsIURILoader.idl	2015-01-05 23:08:07.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/uriloader/base/nsIURILoader.idl	2015-03-01 10:27:39.355023293 -0600
+@@ -136,5 +136,9 @@
+    * Stops an in progress load
+    */
+   void stop(in nsISupports aLoadCookie);
++
++  // TxJS begin
++  attribute jsval introspector;
++  // TxJS end
+ };
+ 
+
