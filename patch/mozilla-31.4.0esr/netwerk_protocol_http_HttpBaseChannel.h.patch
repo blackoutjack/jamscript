@@ -1,0 +1,24 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/protocol/http/HttpBaseChannel.h	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/protocol/http/HttpBaseChannel.h	2015-02-28 19:08:56.899642824 -0600
+@@ -83,6 +83,10 @@
+   NS_IMETHOD SetLoadGroup(nsILoadGroup *aLoadGroup);
+   NS_IMETHOD GetLoadFlags(nsLoadFlags *aLoadFlags);
+   NS_IMETHOD SetLoadFlags(nsLoadFlags aLoadFlags);
++#ifdef TxJS
++  NS_IMETHOD GetIntrospector(JS::MutableHandleValue aIntrospector);
++  NS_IMETHOD SetIntrospector(JS::HandleValue aIntrospector);
++#endif
+ 
+   // nsIChannel
+   NS_IMETHOD GetOriginalURI(nsIURI **aOriginalURI);
+@@ -351,6 +355,9 @@
+   // copied from the transaction before we null out mTransaction
+   // so that the timing can still be queried from OnStopRequest
+   TimingStruct                      mTransactionTimings;
++#ifdef TxJS
++  JS::Value mIntrospector;
++#endif
+ };
+ 
+ // Share some code while working around C++'s absurd inability to handle casting
+

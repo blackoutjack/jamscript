@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/base/src/nsURIChecker.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsURIChecker.cpp	2015-02-28 22:09:55.407520783 -0600
+@@ -272,6 +272,19 @@
+     return mChannel->SetLoadFlags(aLoadFlags);
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsURIChecker::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsURIChecker::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ //-----------------------------------------------------------------------------
+ // nsIRequestObserver methods:
+ //-----------------------------------------------------------------------------
+

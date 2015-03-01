@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/nsGkAtomList.h	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsGkAtomList.h	2015-02-17 08:26:09.485302270 -0600
+@@ -487,6 +487,10 @@
+ GK_ATOM(itemref, "itemref")
+ GK_ATOM(itemscope, "itemscope")
+ GK_ATOM(itemtype, "itemtype")
++// JAM begin
++GK_ATOM(jamInclude, "jam-include")
++GK_ATOM(jamIntrospector, "jam-introspector")
++// JAM end
+ GK_ATOM(kbd, "kbd")
+ GK_ATOM(noautofocus, "noautofocus")
+ GK_ATOM(keepcurrentinview, "keepcurrentinview")
+

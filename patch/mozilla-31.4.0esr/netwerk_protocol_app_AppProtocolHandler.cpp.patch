@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/protocol/app/AppProtocolHandler.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/protocol/app/AppProtocolHandler.cpp	2015-02-28 22:32:01.263505882 -0600
+@@ -167,6 +167,19 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++DummyChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++DummyChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ NS_IMETHODIMP DummyChannel::GetOriginalURI(nsIURI**)
+ {
+   return NS_ERROR_NOT_IMPLEMENTED;
+

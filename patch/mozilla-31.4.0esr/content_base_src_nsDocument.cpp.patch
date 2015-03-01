@@ -1,0 +1,33 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/nsDocument.cpp	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsDocument.cpp	2015-02-28 22:08:14.263521920 -0600
+@@ -868,6 +868,18 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsOnloadBlocker::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsOnloadBlocker::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
+ // ==================================================================
+ 
+ nsExternalResourceMap::nsExternalResourceMap()
+@@ -8176,6 +8188,10 @@
+       "refresh",
+       "x-dns-prefetch-control",
+       "x-frame-options",
++#ifdef TxJS
++      "jam-include",
++      "jam-introspector",
++#endif
+       // add more http headers if you need
+       // XXXbz don't add content-location support without reading bug
+       // 238654 and its dependencies/dups first.
+

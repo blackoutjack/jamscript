@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/uriloader/exthandler/nsExternalProtocolHandler.cpp	2015-01-05 23:08:07.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/uriloader/exthandler/nsExternalProtocolHandler.cpp	2015-02-28 22:25:46.819510090 -0600
+@@ -85,6 +85,19 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsExtProtocolChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsExtProtocolChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ NS_IMETHODIMP nsExtProtocolChannel::GetNotificationCallbacks(nsIInterfaceRequestor* *aCallbacks)
+ {
+   NS_IF_ADDREF(*aCallbacks = mCallbacks);
+

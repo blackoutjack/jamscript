@@ -1,14 +1,14 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsprototypes.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsprototypes.h	2015-02-02 17:01:22.288617730 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsprototypes.h	2015-02-26 15:22:01.028401231 -0600
 @@ -60,6 +60,12 @@
  #define IF_SAB(real,imaginary) imaginary
  #endif
  
-+//#ifdef TxJS
++#ifdef TxJS
 +#define IF_TxJS(real,imaginary) real
-+//#else
-+//#define IF_TxJS(real,imaginary) imaginary
-+//#endif
++#else
++#define IF_TxJS(real,imaginary) imaginary
++#endif
 +
  #define JS_FOR_PROTOTYPES(real,imaginary) \
      imaginary(Null,              0,     js_InitNullClass,          dummy) \

@@ -1,0 +1,20 @@
+--- ff-orig/mozilla-31.4.0esr/dom/file/AsyncHelper.cpp	2015-01-05 23:08:03.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/dom/file/AsyncHelper.cpp	2015-02-28 22:08:07.627521995 -0600
+@@ -124,3 +124,16 @@
+   NS_WARNING("Shouldn't be called!");
+   return NS_ERROR_NOT_IMPLEMENTED;
+ }
++
++// TxJS begin
++NS_IMETHODIMP
++AsyncHelper::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++AsyncHelper::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
+

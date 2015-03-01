@@ -1,0 +1,30 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.cpp	2015-02-28 22:50:42.399493281 -0600
+@@ -389,6 +389,26 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsBaseChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++#ifdef TxJS
++    aIntrospector.set(mIntrospector);
++#else
++    aIntrospector.set(JS::UndefinedValue());
++#endif
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsBaseChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++#ifdef TxJS
++    mIntrospector = aIntrospector;
++#endif
++    return NS_OK;
++}
++// TxJS end
++
+ //-----------------------------------------------------------------------------
+ // nsBaseChannel::nsIChannel
+ 
+

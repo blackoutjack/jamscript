@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/image/src/imgRequestProxy.cpp	2015-01-05 23:07:56.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/image/src/imgRequestProxy.cpp	2015-02-28 22:27:53.623508665 -0600
+@@ -483,6 +483,19 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++imgRequestProxy::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++imgRequestProxy::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ /**  imgIRequest methods **/
+ 
+ /* attribute imgIContainer image; */
+

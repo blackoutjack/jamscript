@@ -1,0 +1,13 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.h	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsBaseChannel.h	2015-02-28 22:48:41.407494641 -0600
+@@ -280,6 +280,9 @@
+   uint32_t                            mContentDispositionHint;
+   nsAutoPtr<nsString>                 mContentDispositionFilename;
+   int64_t                             mContentLength;
++#ifdef TxJS
++  JS::Value                           mIntrospector;
++#endif
+ 
+   friend class mozilla::net::PrivateBrowsingChannel<nsBaseChannel>;
+ };
+

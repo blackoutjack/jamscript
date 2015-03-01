@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-02-01 14:29:24.547816720 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsObjectLoadingContent.cpp	2015-02-28 16:31:43.655748846 -0600
 @@ -76,6 +76,9 @@
  
  #include "nsWidgetsCID.h"
@@ -10,7 +10,22 @@
  #include "mozilla/BasicEvents.h"
  #include "mozilla/dom/BindingUtils.h"
  #include "mozilla/dom/Element.h"
-@@ -2185,6 +2188,9 @@
+@@ -734,7 +737,14 @@
+   , mPlayPreviewCanceled(false)
+   , mIsStopping(false)
+   , mIsLoading(false)
++#ifdef TxJS
++  , mScriptRequested(false)
++{
++  mIntrospector = JS::UndefinedValue();       
++}
++#else
+   , mScriptRequested(false) {}
++#endif
+ 
+ nsObjectLoadingContent::~nsObjectLoadingContent()
+ {
+@@ -2185,6 +2195,9 @@
          mType = eType_Null;
          break;
        }
@@ -20,7 +35,7 @@
        rv = uriLoader->OpenChannel(mChannel, nsIURILoader::DONT_RETARGET, req,
                                    getter_AddRefs(finalListener));
        // finalListener will receive OnStartRequest below
-@@ -2383,6 +2389,16 @@
+@@ -2383,6 +2396,16 @@
    NS_ENSURE_SUCCESS(rv, rv);
    LOG(("OBJLC [%p]: Channel opened", this));
    mChannel = chan;

@@ -1,0 +1,21 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/WebSocket.cpp	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/WebSocket.cpp	2015-02-28 22:43:37.087498061 -0600
+@@ -1443,5 +1443,17 @@
+   return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++WebSocket::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++WebSocket::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
+ } // dom namespace
+ } // mozilla namespace
+

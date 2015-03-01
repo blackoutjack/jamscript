@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/modules/libjar/nsJARChannel.cpp	2015-01-05 23:07:56.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/modules/libjar/nsJARChannel.cpp	2015-02-28 22:24:46.759510765 -0600
+@@ -517,6 +517,19 @@
+     return NS_OK;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsJARChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsJARChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ //-----------------------------------------------------------------------------
+ // nsIChannel
+ //-----------------------------------------------------------------------------
+

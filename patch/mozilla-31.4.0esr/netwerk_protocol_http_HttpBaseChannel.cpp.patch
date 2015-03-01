@@ -1,0 +1,40 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/protocol/http/HttpBaseChannel.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/protocol/http/HttpBaseChannel.cpp	2015-02-28 21:26:05.739550339 -0600
+@@ -68,6 +68,9 @@
+   , mContentDispositionHint(UINT32_MAX)
+   , mHttpHandler(gHttpHandler)
+   , mRedirectCount(0)
++#ifdef TxJS
++  , mIntrospector(JS::UndefinedValue())
++#endif
+ {
+   LOG(("Creating HttpBaseChannel @%x\n", this));
+ 
+@@ -817,6 +820,26 @@
+ // HttpBaseChannel::nsIHttpChannel
+ //-----------------------------------------------------------------------------
+ 
++// TxJS begin
++NS_IMETHODIMP
++HttpBaseChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++#ifdef TxJS
++    aIntrospector.set(mIntrospector);
++#else
++    aIntrospector.set(JS::UndefinedValue());
++#endif
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++HttpBaseChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++#ifdef TxJS
++    mIntrospector = aIntrospector;
++#endif
++    return NS_OK;
++}
++// TxJS end
++
+ NS_IMETHODIMP
+ HttpBaseChannel::GetRequestMethod(nsACString& aMethod)
+ {
+

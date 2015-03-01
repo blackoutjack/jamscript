@@ -1,0 +1,11 @@
+--- ff-orig/mozilla-31.4.0esr/content/base/src/WebSocket.h	2015-01-05 23:07:58.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/WebSocket.h	2015-02-28 21:48:14.831535401 -0600
+@@ -253,6 +253,7 @@
+ private:
+   WebSocket(const WebSocket& x) MOZ_DELETE;   // prevent bad usage
+   WebSocket& operator=(const WebSocket& x) MOZ_DELETE;
++
+ };
+ 
+ } //namespace dom
+

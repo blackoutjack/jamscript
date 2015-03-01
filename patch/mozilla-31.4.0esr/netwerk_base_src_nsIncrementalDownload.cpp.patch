@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/base/src/nsIncrementalDownload.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/src/nsIncrementalDownload.cpp	2015-02-28 22:07:10.755522634 -0600
+@@ -433,6 +433,19 @@
+   return NS_ERROR_NOT_IMPLEMENTED;
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsIncrementalDownload::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsIncrementalDownload::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ // nsIIncrementalDownload
+ 
+ NS_IMETHODIMP
+

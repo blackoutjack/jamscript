@@ -1,0 +1,14 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/base/public/nsIRequest.idl	2015-01-05 23:07:56.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/base/public/nsIRequest.idl	2015-02-28 18:40:41.907661874 -0600
+@@ -103,6 +103,10 @@
+      */
+     attribute nsLoadFlags loadFlags;
+ 
++    // TxJS begin
++    attribute jsval introspector;
++    // TxJS end
++
+     /**
+      * Mask defining the bits reserved for nsIRequest LoadFlags
+      */
+

@@ -1,0 +1,23 @@
+--- ff-orig/mozilla-31.4.0esr/netwerk/protocol/viewsource/nsViewSourceChannel.cpp	2015-01-05 23:07:57.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/netwerk/protocol/viewsource/nsViewSourceChannel.cpp	2015-02-28 22:21:51.963512730 -0600
+@@ -435,6 +435,19 @@
+     return mChannel->SetLoadGroup(aLoadGroup);
+ }
+ 
++// TxJS begin
++NS_IMETHODIMP
++nsViewSourceChannel::GetIntrospector(JS::MutableHandleValue aIntrospector) {
++    aIntrospector.set(JS::UndefinedValue());
++    return NS_OK;
++}
++
++NS_IMETHODIMP
++nsViewSourceChannel::SetIntrospector(JS::HandleValue aIntrospector) {
++    return NS_ERROR_NOT_IMPLEMENTED;
++}
++// TxJS end
++
+ NS_IMETHODIMP
+ nsViewSourceChannel::GetOwner(nsISupports* *aOwner)
+ {
+
