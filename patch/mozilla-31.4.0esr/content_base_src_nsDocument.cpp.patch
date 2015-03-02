@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsDocument.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsDocument.cpp	2015-02-28 22:08:14.263521920 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsDocument.cpp	2015-03-01 15:03:40.762837157 -0600
 @@ -868,6 +868,18 @@
    return NS_OK;
  }
@@ -19,7 +19,20 @@
  // ==================================================================
  
  nsExternalResourceMap::nsExternalResourceMap()
-@@ -8176,6 +8188,10 @@
+@@ -6972,6 +6984,12 @@
+     nsRefPtr<nsFrameLoader> loader = mInitializableFrameLoaders[0];
+     mInitializableFrameLoaders.RemoveElementAt(0);
+     NS_ASSERTION(loader, "null frameloader in the array?");
++#ifdef TxJS
++    JSContext *cx = nsContentUtils::GetCurrentJSContext();
++    if (cx) {
++      loader->mIntrospector = JS_GetIntrospector(cx);
++    }
++#endif
+     loader->ReallyStartLoading();
+   }
+ 
+@@ -8176,6 +8194,10 @@
        "refresh",
        "x-dns-prefetch-control",
        "x-frame-options",

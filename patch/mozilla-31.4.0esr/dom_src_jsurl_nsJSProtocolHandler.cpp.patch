@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-01-05 23:08:05.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-03-01 11:26:05.126983891 -0600
++++ ff-dev/mozilla-31.4.0esr/dom/src/jsurl/nsJSProtocolHandler.cpp	2015-03-02 10:59:48.929263550 -0600
 @@ -65,6 +65,9 @@
                              PopupControlState aPopupState,
                              uint32_t aExecutionPolicy,
@@ -51,23 +51,26 @@
      mOpenedStreamChannel(false)
  {
  }
-@@ -618,6 +634,15 @@
+@@ -618,6 +634,18 @@
  
      mIsActive = true;
  
 +#ifdef TxJS
-+    nsCOMPtr<nsIScriptContext> scriptContext = global->GetContext();
-+    if (scriptContext) {
-+        JSContext *cx = scriptContext->GetNativeContext();
-+        JS::Value ispect = JS_GetIntrospector(cx);
-+        SetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&ispect));
++    // We could already have an introspector value.
++    if (mIntrospector.isUndefined()) {
++        nsCOMPtr<nsIScriptContext> scriptContext = global->GetContext();
++        if (scriptContext) {
++            JSContext *cx = scriptContext->GetNativeContext();
++            JS::Value ispect = JS_GetIntrospector(cx);
++            SetIntrospector(JS::MutableHandleValue::fromMarkedLocation(&ispect));
++        }
 +    }
 +#endif
 +
      // Temporarily set the LOAD_BACKGROUND flag to suppress load group observer
      // notifications (and hence nsIWebProgressListener notifications) from
      // being dispatched.  This is required since we suppress LOAD_DOCUMENT_URI,
-@@ -716,6 +741,9 @@
+@@ -716,6 +744,9 @@
      // script returns it).
      
      if (NS_SUCCEEDED(mStatus)) {
@@ -77,7 +80,7 @@
          nsresult rv = mIOThunk->EvaluateScript(mStreamChannel, mPopupState,
                                                 mExecutionPolicy,
                                                 mOriginalInnerWindow);
-@@ -933,6 +961,26 @@
+@@ -933,6 +964,26 @@
      return mStreamChannel->SetLoadGroup(aLoadGroup);
  }
  

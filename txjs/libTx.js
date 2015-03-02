@@ -221,6 +221,8 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
         } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
           if (JAM.isNativeFunction(args[0])) {
             args[0] = wrapMethod(pFull, args[0]);
+          } else if (typeof args[0] === "string") {
+            args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
           }
         } else if (JAM.identical(fun, _Function)) {
           // %%% What happens in non-string cases?
@@ -246,16 +248,14 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           ret = _apply_apply(fun, [obj, args]);
           JAM.setDynamicIntrospector();
           invoke = false;
-        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttribute" || fun.name === "setAttributeNode") {
+        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttributeNode") {
           // For |appendChild|, |replaceChild| and |insertBefore|,
           // the first argument is the element to be inserted.
           JAM.setDynamicIntrospector(pFull);
           ret = _apply_apply(fun, [obj, args]);
           JAM.setDynamicIntrospector();
           invoke = false;
-        }
-        
-        if (len > 1) {
+        } else if (len > 1) {
           if (JAM.identical(fun, _String_prototype_replace)) {
             // String.prototype.replace may invoke a user-provided
             // replacement-generator function.
@@ -287,6 +287,23 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             // Wrap the native function in a comprehensive transaction.
             if (JAM.isNativeFunction(args[1])) {
               args[1] = wrapMethod(pFull, args[1]);
+            }
+          } else if (fun.name === "setAttribute") {
+            if (args[0] === "src") {
+              if (JAM.instanceof(obj, _HTMLScriptElement)) {
+                JAM.setDynamicIntrospector(pFull);
+                ret = _apply_apply(fun, [obj, args]);
+                JAM.setDynamicIntrospector();
+                invoke = false;
+              }
+            } else if (_String_startsWith(args[0], "on")) {
+              // Wrap event handlers in transaction blocks.
+              var typ = typeof args[1];
+              if (JAM.isNativeFunction(args[1])) {
+                args[1] = wrapFunction(pFull, args[1], obj);
+              } else if (typ === "string") {
+                args[1] = "introspect(JAM.policy.pFull) { " + args[1] + " }";
+              }
             }
           } else if (len > 2) {
             if (JAM.identical(fun, _defineProperty)) {
@@ -407,7 +424,12 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           args[0] = wrapMethod(pFull, args[0]);
         } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
           // %%% Currently assumes args[0] is a function object
-          args[0] = wrapMethod(pFull, args[0]);
+          var typ = typeof args[0];
+          if (typ === "function") {
+            args[0] = wrapMethod(pFull, args[0]);
+          } else if (typ === "string") {
+            args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
+          }
         } else if (JAM.identical(fun, _Function)) {
           // %%% What happens in non-string cases?
           ret = _apply_apply(fun, [obj, args]);
@@ -416,32 +438,28 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           }
           invoke = false;
         } else if (JAM.identical(fun, _eval)) {
-          // Given that the callsite transformation will handle all
-          // direct calls to |eval|, we can assume this is indirect.
-          // %%% What about the modular case?
-
           // Per MDN, SpiderMonkey no longer supports |eval| with
           // more than 1 argument.
           // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-          JAM.setDynamicIntrospector(pFull);
+          // %%% |setDynamicIntrospector| doesn't work here currently
+          // %%% because the introspector value isn't propagated.
+          // %%% Semantics differ for direct eval with free variables.
+          args[0] = 'introspect(JAM.policy.pFull) {' + args[0] + '}';
           ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
           invoke = false;
         } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
           JAM.setDynamicIntrospector(pFull);
           ret = _apply_apply(fun, [obj, args]);
           JAM.setDynamicIntrospector();
           invoke = false;
-        } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttribute" || fname === "setAttributeNode") {
+        } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttributeNode") {
           // For |appendChild|, |replaceChild| and |insertBefore|,
           // the first argument is the element to be inserted.
           JAM.setDynamicIntrospector(pFull);
           ret = _apply_apply(fun, [obj, args]);
           JAM.setDynamicIntrospector();
           invoke = false;
-        }
-        
-        if (len > 1) {
+        } else if (len > 1) {
           if (JAM.identical(fun, _String_prototype_replace)) {
             // String.prototype.replace may invoke a user-provided
             // replacement-generator function.
@@ -470,6 +488,23 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           } else if (JAM.identical(fun, ___defineGetter__) || JAM.identical(fun, ___defineSetter__)) {
             // Wrap the native function in a comprehensive transaction.
             args[1] = wrapMethod(pFull, args[1]);
+          } else if (fun.name === "setAttribute") {
+            if (args[0] === "src") {
+              if (JAM.instanceof(obj, _HTMLScriptElement)) {
+                JAM.setDynamicIntrospector(pFull);
+                ret = _apply_apply(fun, [obj, args]);
+                JAM.setDynamicIntrospector();
+                invoke = false;
+              }
+            } else if (_String_startsWith(args[0], "on")) {
+              // Wrap event handlers in transaction blocks.
+              var typ = typeof args[1];
+              if (typ === "function") {
+                args[1] = wrapFunction(pFull, args[1], obj);
+              } else if (typ === "string") {
+                args[1] = "introspect(JAM.policy.pFull) { " + args[1] + " }";
+              }
+            }
           } else if (len > 2) {
             if (JAM.identical(fun, _defineProperty)) {
               // Wrap the getter/setter function in a comprehensive transaction.
@@ -618,16 +653,16 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 
       var ret;
       if (typeof ispect === "function") {
-        //if (MIMIC) {
+        if (MIMIC) {
           nodeTx.node = { type: "new", value: c, obj: null, args: args, argc: len };
           ispect(nodeTx);
           ret = nodeTx.ret;
           nodeTx.node = nodeTx.ret = _undefined;
-        //} else {
-        //  introspect(ispect) {
-        //    ret = JAM.newApply(c, args);
-        //  }
-        //}
+        } else {
+          introspect(ispect) {
+            ret = JAM.newApply(c, args);
+          }
+        }
       } else {
         ret = JAM.newApply(c, args);
       }
@@ -696,8 +731,11 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             || JAM.identical(f, _setTimeout) || JAM.identical(f, _setInterval)) {
           // Only protect if a native function is being invoked, since
           // we assume all user-defined functions are instrumented.
-          // %%% What about string values?
-          if (JAM.isNativeFunction(args[0])) ispect = pFull;
+          if (JAM.isNativeFunction(args[0])) {
+            ispect = pFull;
+          } else if (typeof args[0] === "string") {
+            ispect = pFull;
+          }
         }
 
         if (len > 1) {
@@ -747,16 +785,16 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
 
       var ret;
       if (typeof ispect === "function") {
-        //if (MIMIC) {
+        if (MIMIC) {
           nodeTx.node = { type: "call", value: f, obj: rec, args: args, argc: len };
           ispect(nodeTx);
           ret = nodeTx.ret;
           nodeTx.node = nodeTx.ret = _undefined;
-        //} else {
-        //  introspect(ispect) {
-        //    ret = _apply_apply(f, [rec, args]);
-        //  }
-        //}
+        } else {
+          introspect(ispect) {
+            ret = _apply_apply(f, [rec, args]);
+          }
+        }
       } else {
         ret = _apply_apply(f, [rec, args]);
       }
@@ -767,16 +805,16 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       if (obj === null) obj = _global;
       var ret;
       if (ispect) {
-        //if (MIMIC) {
+        if (MIMIC) {
           nodeTx.node = { type: "read", id: memb, obj: obj };
           ispect(nodeTx);
           ret = nodeTx.ret;
           nodeTx.node = nodeTx.ret = _undefined;
-        //} else {
-        //  introspect(ispect) {
-        //    ret = obj[memb];
-        //  }
-        //}
+        } else {
+          introspect(ispect) {
+            ret = obj[memb];
+          }
+        }
       } else {
         ret = obj[memb];
       }
@@ -843,17 +881,17 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       
       if (typeof ispect === "function") {
         var ret;
-        //if (MIMIC) {
+        if (MIMIC) {
           nodeTx.node = { type: "write", id: memb, value: val, obj: obj };
           ispect(nodeTx);
           ret = nodeTx.ret;
           nodeTx.node = nodeTx.ret = _undefined;
-        //} else {
+        } else {
           // %%% Seg. fault occurs when return is inside the transaction.
-        //  introspect(ispect) {
-        //    ret = obj[memb] = val;
-        //  }
-        //}
+          introspect(ispect) {
+            ret = obj[memb] = val;
+          }
+        }
         return ret;
       } else {
         obj[memb] = val;
@@ -938,9 +976,10 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
               args[0] = wrapMethod(pFull, args[0]);
             }
           } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
-            // %%% Currently assumes args[0] is a function object
             if (JAM.isNativeFunction(args[0])) {
               args[0] = wrapMethod(pFull, args[0]);
+            } else if (typeof args[0] === "string") {
+              args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
             }
           } else if (JAM.identical(fun, _Function)) {
             // %%% What happens in non-string cases?
@@ -966,16 +1005,14 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             invoke = false;
-          } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttribute" || fname === "setAttributeNode") {
+          } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttributeNode") {
             // For |appendChild|, |replaceChild| and |insertBefore|,
             // the first argument is the element to be inserted.
             JAM.setDynamicIntrospector(pFull);
             ret = _apply_apply(fun, [obj, args]);
             JAM.setDynamicIntrospector();
             invoke = false;
-          }
-          
-          if (len > 1) {
+          } else if (len > 1) {
             if (JAM.identical(fun, _String_prototype_replace)) {
               // String.prototype.replace may invoke a user-provided
               // replacement-generator function.
@@ -1007,6 +1044,23 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
               // Wrap the native function in a comprehensive transaction.
               if (JAM.isNativeFunction(args[1])) {
                 args[1] = wrapMethod(pFull, args[1]);
+              }
+            } else if (fun.name === "setAttribute") {
+              if (args[0] === "src") {
+                if (JAM.instanceof(obj, _HTMLScriptElement)) {
+                  JAM.setDynamicIntrospector(pFull);
+                  ret = _apply_apply(fun, [obj, args]);
+                  JAM.setDynamicIntrospector();
+                  invoke = false;
+                }
+              } else if (_String_startsWith(args[0], "on")) {
+                // Wrap event handlers in transaction blocks.
+                var typ = typeof args[1];
+                if (typ === "function") {
+                  args[1] = wrapFunction(pFull, args[1], obj);
+                } else if (typ === "string") {
+                  args[1] = "introspect(JAM.policy.pFull) { " + args[1] + " }";
+                }
               }
             } else if (len > 2) {
               if (JAM.identical(fun, _defineProperty)) {
