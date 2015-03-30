@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-03-23 18:01:47.966806411 -0500
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-03-24 10:19:19.745574096 -0500
 @@ -80,6 +80,9 @@
        mScriptTextLength(0),
        mJSVersion(aVersion),
@@ -30,26 +30,26 @@
      mDocumentParsingDone(false),
      mBlockingDOMContentLoaded(false)
  {
-@@ -643,6 +652,19 @@
-     request->mJSVersion = version;
+@@ -641,6 +650,19 @@
+     }
  
-     if (aElement->GetScriptAsync()) {
+     request->mJSVersion = version;
 +#ifdef TxJS
++    if (mIntrospector.isUndefined()) {
++      JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
++      mIntrospector = JS_GetIntrospector(cx);
 +      if (mIntrospector.isUndefined()) {
-+        JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
-+        mIntrospector = JS_GetIntrospector(cx);
-+        if (mIntrospector.isUndefined()) {
-+          nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
-+          if (globalObject) {
-+            mIntrospector = JS_GetIntrospector(globalObject->GetGlobalJSObject());
-+          }
++        nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
++        if (globalObject) {
++          mIntrospector = JS_GetIntrospector(globalObject->GetGlobalJSObject());
 +        }
 +      }
-+      request->mIntrospector = mIntrospector;
++    }
++    request->mIntrospector = mIntrospector;
 +#endif
+ 
+     if (aElement->GetScriptAsync()) {
        mAsyncRequests.AppendElement(request);
-       if (!request->mLoading) {
-         // The script is available already. Run it ASAP when the event
 @@ -738,6 +760,20 @@
    request->mURI = mDocument->GetDocumentURI();
    request->mLineNo = aElement->GetScriptLineNumber();

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-02-04 22:04:24.837949760 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter-inl.h	2015-03-30 10:11:36.866656846 -0500
 @@ -13,6 +13,10 @@
  #include "jsinfer.h"
  #include "jsnum.h"
@@ -50,17 +50,17 @@
 +#endif
      if (!shape) {
          if (TypeOf) {
-+#ifdef TxJS
              vp.setUndefined();
++#ifdef TxJS
 +            if (tx) {
-+                // Update the already-created read set node to reflect the value
-+                // and the scope in which it was found.
-+                //node->obj = pobj.get();
-+                // Add the property to the read set, with the head of the scope
-+                // chain as the object, and an undefined value.
-+                // %%% Need to root?
++                // Add the property to the read set, with the global as
++                // as the object, and an undefined value.
++                // %%% Might should use a |with|-scope as the object, if
++                // %%% active.
++                // %%% Shouldn't use the global if we're in strict mode.
 +                RootedId id(cx, NameToId(name));
-+                tx->recordAction(cx, obj, id, vp, AX_READ);
++                RootedObject gobj(cx, cx->global());
++                tx->recordAction(cx, gobj, id, vp, AX_READ);
 +            }
 +#endif
              return true;
