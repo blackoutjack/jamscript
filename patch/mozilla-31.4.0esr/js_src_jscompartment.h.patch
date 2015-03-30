@@ -1,0 +1,26 @@
+--- ff-orig/mozilla-31.4.0esr/js/src/jscompartment.h	2015-01-05 23:08:03.000000000 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jscompartment.h	2015-03-23 14:39:56.270941008 -0500
+@@ -142,6 +142,9 @@
+     friend struct JSContext;
+     friend class js::ExclusiveContext;
+     js::ReadBarriered<js::GlobalObject> global_;
++#ifdef TxJS
++    js::Value introspector_;
++#endif
+ 
+     unsigned                     enterCompartmentDepth;
+ 
+@@ -154,6 +157,12 @@
+     const JS::Zone *zone() const { return zone_; }
+     JS::CompartmentOptions &options() { return options_; }
+     const JS::CompartmentOptions &options() const { return options_; }
++#ifdef TxJS
++    inline const js::Value getIntrospector() { return introspector_; }
++    inline void setIntrospector(const js::Value &ispect) {
++        introspector_ = ispect;
++    }
++#endif
+ 
+     JSRuntime *runtimeFromMainThread() {
+         JS_ASSERT(CurrentThreadCanAccessRuntime(runtime_));
+

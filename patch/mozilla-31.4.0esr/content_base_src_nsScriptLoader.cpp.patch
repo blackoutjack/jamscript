@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-01-05 23:07:58.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-03-01 10:44:36.231011865 -0600
++++ ff-dev/mozilla-31.4.0esr/content/base/src/nsScriptLoader.cpp	2015-03-23 18:01:47.966806411 -0500
 @@ -80,6 +80,9 @@
        mScriptTextLength(0),
        mJSVersion(aVersion),
@@ -30,29 +30,48 @@
      mDocumentParsingDone(false),
      mBlockingDOMContentLoaded(false)
  {
-@@ -643,6 +652,10 @@
+@@ -643,6 +652,19 @@
      request->mJSVersion = version;
  
      if (aElement->GetScriptAsync()) {
 +#ifdef TxJS
-+      JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
-+      request->mIntrospector = JS_GetIntrospector(cx);
++      if (mIntrospector.isUndefined()) {
++        JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
++        mIntrospector = JS_GetIntrospector(cx);
++        if (mIntrospector.isUndefined()) {
++          nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
++          if (globalObject) {
++            mIntrospector = JS_GetIntrospector(globalObject->GetGlobalJSObject());
++          }
++        }
++      }
++      request->mIntrospector = mIntrospector;
 +#endif
        mAsyncRequests.AppendElement(request);
        if (!request->mLoading) {
          // The script is available already. Run it ASAP when the event
-@@ -738,6 +751,10 @@
+@@ -738,6 +760,20 @@
    request->mURI = mDocument->GetDocumentURI();
    request->mLineNo = aElement->GetScriptLineNumber();
  
 +#ifdef TxJS
++  if (mIntrospector.isUndefined()) {
++    JSContext *cx = nsContentUtils::GetContextFromDocument(mDocument);
++    mIntrospector = JS_GetIntrospector(cx);
++    if (mIntrospector.isUndefined()) {
++      nsCOMPtr<nsIScriptGlobalObject> globalObject = GetScriptGlobalObject();
++      if (globalObject) {
++        mIntrospector = JS_GetIntrospector(globalObject->GetGlobalJSObject());
++      }
++    }
++  }
 +  request->mIntrospector = mIntrospector;
 +#endif
 +
    if (aElement->GetParserCreated() == FROM_PARSER_XSLT &&
        (!ReadyToExecuteScripts() || !mXSLTRequests.IsEmpty())) {
      // Need to maintain order for XSLT-inserted scripts
-@@ -1067,6 +1084,20 @@
+@@ -1067,6 +1103,20 @@
      MOZ_ASSERT(elementVal.isObject());
      aOptions->setElement(&elementVal.toObject());
    }

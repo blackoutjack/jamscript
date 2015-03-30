@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-02-16 22:43:11.617621053 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-03-23 18:01:16.694807325 -0500
 @@ -1003,7 +1003,14 @@
   */
  #define JSFUN_GENERIC_NATIVE   0x800
@@ -15,19 +15,25 @@
  
  /*
   * The first call to JS_CallOnce by any thread in a process will call 'func'.
-@@ -1036,6 +1043,11 @@
+@@ -1036,6 +1043,17 @@
  extern JS_PUBLIC_API(JSString *)
  JS_GetEmptyString(JSRuntime *rt);
  
 +#ifdef TxJS
 +extern JS_PUBLIC_API(jsval)
 +JS_GetIntrospector(JSContext *cx);
++
++extern JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSObject *obj);
++
++extern JS_PUBLIC_API(bool)
++JS_SetIntrospector(JSContext *cx, const JS::Value &ispect);
 +#endif
 +
  /*
   * Format is a string of the following characters (spaces are insignificant),
   * specifying the tabulated type conversions:
-@@ -3446,6 +3458,9 @@
+@@ -3446,6 +3464,9 @@
      const char *filename_;
      const char *introducerFilename_;
      const jschar *sourceMapURL_;
@@ -37,7 +43,7 @@
  
      // This constructor leaves 'version' set to JSVERSION_UNKNOWN. The structure
      // is unusable until that's set to something more specific; the derived
-@@ -3456,6 +3471,9 @@
+@@ -3456,6 +3477,9 @@
          filename_(nullptr),
          introducerFilename_(nullptr),
          sourceMapURL_(nullptr),
@@ -47,7 +53,7 @@
          version(JSVERSION_UNKNOWN),
          versionSet(false),
          utf8(false),
-@@ -3491,6 +3509,9 @@
+@@ -3491,6 +3515,9 @@
      const char *filename() const { return filename_; }
      const char *introducerFilename() const { return introducerFilename_; }
      const jschar *sourceMapURL() const { return sourceMapURL_; }
@@ -57,7 +63,7 @@
      virtual JSObject *element() const = 0;
      virtual JSString *elementAttributeName() const = 0;
      virtual JSScript *introductionScript() const = 0;
-@@ -3573,6 +3594,9 @@
+@@ -3573,6 +3600,9 @@
      bool setIntroducerFilename(JSContext *cx, const char *s);
  
      /* These setters are infallible, and can be chained. */
@@ -67,7 +73,7 @@
      OwningCompileOptions &setLine(unsigned l)             { lineno = l;              return *this; }
      OwningCompileOptions &setElement(JSObject *e) {
          elementRoot = e;
-@@ -3650,6 +3674,9 @@
+@@ -3650,6 +3680,9 @@
          originPrincipals_ = rhs.originPrincipals_;
          filename_ = rhs.filename();
          sourceMapURL_ = rhs.sourceMapURL();
@@ -77,7 +83,7 @@
          elementRoot = rhs.element();
          elementAttributeNameRoot = rhs.elementAttributeName();
          introductionScriptRoot = rhs.introductionScript();
-@@ -3665,6 +3692,9 @@
+@@ -3665,6 +3698,9 @@
          filename_ = f; lineno = l; return *this;
      }
      CompileOptions &setSourceMapURL(const jschar *s) { sourceMapURL_ = s;       return *this; }

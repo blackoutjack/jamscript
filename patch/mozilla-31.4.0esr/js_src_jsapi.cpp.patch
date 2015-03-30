@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-02-16 17:58:39.837776642 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.cpp	2015-03-23 18:01:30.510806921 -0500
 @@ -44,6 +44,10 @@
  #include "jsworkers.h"
  #endif
@@ -11,7 +11,7 @@
  #include "prmjtime.h"
  
  #if ENABLE_YARR_JIT
-@@ -2678,6 +2682,14 @@
+@@ -2678,6 +2682,33 @@
      return true;
  }
  
@@ -21,12 +21,31 @@
 +{
 +  return cx->getIntrospector();
 +}
++
++JS_PUBLIC_API(jsval)
++JS_GetIntrospector(JSObject *obj)
++{
++  if (!obj)
++      return JS::UndefinedValue();
++  JSCompartment *c = obj->compartment();
++  if (!c)
++      return JS::UndefinedValue();
++  return c->getIntrospector();
++}
++
++JS_PUBLIC_API(bool)
++JS_SetIntrospector(JSContext *cx, const JS::Value &ispect)
++{
++  cx->setIntrospector(ispect);
++  return true;
++}
++
 +#endif
 +
  static bool
  LookupPropertyById(JSContext *cx, HandleObject obj, HandleId id,
                     MutableHandleObject objp, MutableHandleShape propp)
-@@ -2954,7 +2966,6 @@
+@@ -2954,7 +2985,6 @@
                                               zeroFlags, global, atom);
              if (!setobj)
                  return false;
@@ -34,7 +53,7 @@
              if (set.info)
                  setobj->setJitInfo(set.info);
  
-@@ -4084,7 +4095,6 @@
+@@ -4084,7 +4114,6 @@
                  if (!ctor)
                      return false;
              }
@@ -42,7 +61,7 @@
              flags &= ~JSFUN_GENERIC_NATIVE;
              JSFunction *fun = DefineFunction(cx, ctor, id,
                                               js_generic_native_method_dispatcher,
-@@ -4350,6 +4360,9 @@
+@@ -4350,6 +4379,9 @@
      setElement(rhs.element());
      setElementAttributeName(rhs.elementAttributeName());
      setIntroductionScript(rhs.introductionScript());
@@ -52,7 +71,7 @@
  
      return (setFileAndLine(cx, rhs.filename(), rhs.lineno) &&
              setSourceMapURL(cx, rhs.sourceMapURL()) &&
-@@ -4858,6 +4871,9 @@
+@@ -4858,6 +4890,9 @@
                                                      srcBuf, nullptr, 0, &sct));
      if (!script)
          return false;

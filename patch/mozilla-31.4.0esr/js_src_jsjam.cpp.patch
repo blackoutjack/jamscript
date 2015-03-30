@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-02-05 00:57:20.137624348 -0600
-@@ -0,0 +1,1137 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-03-23 15:52:36.582813520 -0500
+@@ -0,0 +1,1139 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -798,12 +798,14 @@
 +    CallArgs args = CallArgsFromVp(argc, vp);
 +
 +    if (argc == 0) {
-+        cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(JSVAL_VOID);
++        cx->compartment()->setIntrospector(JSVAL_VOID);
++        //cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(JSVAL_VOID);
 +        args.rval().setBoolean(true);
 +        return true;
 +    }
 +
-+    cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(args[0]);
++    JS_SetIntrospector(cx, args[0]);
++    //cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(args[0]);
 +    vp->setBoolean(true);
 +    return true;
 +}

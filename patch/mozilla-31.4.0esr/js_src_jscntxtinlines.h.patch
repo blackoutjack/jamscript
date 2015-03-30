@@ -1,22 +1,33 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jscntxtinlines.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jscntxtinlines.h	2015-02-05 00:03:31.681725605 -0600
-@@ -502,6 +502,22 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jscntxtinlines.h	2015-03-23 16:58:54.553211602 -0500
+@@ -502,6 +502,33 @@
      return script;
  }
  
 +#ifdef TxJS
 +inline const js::Value
 +JSContext::getIntrospector() {
++    JSCompartment *c = compartment();
++    if (!c)
++        return js::UndefinedValue();
++    return c->getIntrospector();
++    /*
 +    JSScript *s = currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT);
 +    if (!s)
 +        return js::UndefinedValue();
 +    return s->getIntrospector();
++    */
 +}
 +inline void
 +JSContext::setIntrospector(const js::Value &ispect) {
++    JSCompartment *c = compartment();
++    JS_ASSERT(c);
++    c->setIntrospector(ispect);
++    /*
 +    JSScript *s = currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT);
 +    JS_ASSERT(s);
 +    s->setIntrospector(ispect);
++    */
 +}
 +#endif
 +
