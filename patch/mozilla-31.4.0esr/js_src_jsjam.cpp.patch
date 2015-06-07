@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsjam.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-03-23 15:52:36.582813520 -0500
-@@ -0,0 +1,1139 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jsjam.cpp	2015-04-10 10:17:38.295163756 -0500
+@@ -0,0 +1,1140 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -768,7 +768,7 @@
 +    JSString *profid = ToString<CanGC>(cx, arg);
 +    bool ok = profiler.startProfile(cx, profid);
 +
-+    vp->setBoolean(ok);
++    args.rval().setBoolean(ok);
 +    return true;
 +}
 +
@@ -788,7 +788,7 @@
 +    if (ok) ok = profiler.printProfile(cx, profid);
 +    if (ok) ok = profiler.removeProfile(cx, profid);
 +
-+    vp->setBoolean(ok);
++    args.rval().setBoolean(ok);
 +    return true;
 +}
 +
@@ -798,15 +798,22 @@
 +    CallArgs args = CallArgsFromVp(argc, vp);
 +
 +    if (argc == 0) {
-+        cx->compartment()->setIntrospector(JSVAL_VOID);
-+        //cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(JSVAL_VOID);
++        JS_SetIntrospector(cx, JSVAL_VOID);
 +        args.rval().setBoolean(true);
 +        return true;
 +    }
 +
 +    JS_SetIntrospector(cx, args[0]);
-+    //cx->currentScript(nullptr, JSContext::ALLOW_CROSS_COMPARTMENT)->setIntrospector(args[0]);
-+    vp->setBoolean(true);
++    args.rval().setBoolean(true);
++    return true;
++}
++
++bool
++js_jam_getDynamicIntrospector(JSContext *cx, unsigned argc, Value *vp)
++{
++    CallArgs args = CallArgsFromVp(argc, vp);
++
++    args.rval().set(JS_GetIntrospector(cx));
 +    return true;
 +}
 +
@@ -956,9 +963,7 @@
 +        }
 +
 +        bool checkStrict = false;
-+        while (IsFunctionObject(lval)) {
-+            if (!lobj->isBoundFunction())
-+                break;
++        while (lobj->isBoundFunction()) {
 +            // For some reason, using |getBoundFunctionTarget|
 +            // produces linking errors. It's simple enough to
 +            // replicate: the target is stored in parent.
@@ -966,9 +971,7 @@
 +            lval.set(ObjectValue(*lobj));
 +            checkStrict = true;
 +        }
-+        while (IsFunctionObject(rval)) {
-+            if (!robj->isBoundFunction())
-+                break;
++        while (robj->isBoundFunction()) {
 +            // See comment for |lobj| above.
 +            robj = robj->getParent();
 +            rval.set(ObjectValue(*robj));
@@ -976,7 +979,7 @@
 +        }
 +
 +        if (checkStrict) {
-+            // Recheck strict identify after the root bound
++            // Recheck strict identity after the root bound
 +            // functions are located.
 +            if (!StrictlyEqual(cx, lval, rval, &stricteq))
 +                return false;
@@ -987,19 +990,16 @@
 +            }
 +        }
 +
-+        if (checkStrict || lobj->global() != robj->global()) {
-+
-+            // %%% What about prototypes and other native objects?
-+            JSFunction *lfun, *rfun;
-+            if (IsFunctionObject(lval, &lfun) && IsFunctionObject(rval, &rfun)) {
-+                if (lfun->isNative() && rfun->isNative()) {
-+                    bool eq;
-+                    if (!EqualStrings(cx, JS_GetFunctionId(lfun), JS_GetFunctionId(rfun), &eq))
-+                        return false;
-+                    if (eq) {
-+                        args.rval().setBoolean(true);
-+                        return true;
-+                    }
++        // %%% What about prototypes and other native objects?
++        JSFunction *lfun, *rfun;
++        if (IsFunctionObject(lval, &lfun) && IsFunctionObject(rval, &rfun)) {
++            if (lfun->isNative() && rfun->isNative()) {
++                bool eq;
++                if (!EqualStrings(cx, JS_GetFunctionId(lfun), JS_GetFunctionId(rfun), &eq))
++                    return false;
++                if (eq) {
++                    args.rval().setBoolean(true);
++                    return true;
 +                }
 +            }
 +        }
@@ -1109,6 +1109,7 @@
 +    JS_FN("startProfile",   js_jam_startProfile,  1, JSFUN_TX_NOSUSPEND),
 +    JS_FN("stopProfile",    js_jam_stopProfile,   1, JSFUN_TX_NOSUSPEND),
 +    JS_FN("setDynamicIntrospector", js_jam_setDynamicIntrospector, 1, JSFUN_TX_NOSUSPEND),
++    JS_FN("getDynamicIntrospector", js_jam_getDynamicIntrospector, 0, JSFUN_TX_NOSUSPEND),
 +    JS_FN("instanceof", js_jam_instanceof, 2, JSFUN_TX_NOSUSPEND),
 +    JS_FN("identical", js_jam_identical, 2, JSFUN_TX_NOSUSPEND),
 +    JS_FN("isNativeFunction", js_jam_isNativeFunction, 1, JSFUN_TX_NOSUSPEND),

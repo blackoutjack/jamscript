@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-01-05 23:08:07.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-03-02 10:16:10.261292982 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/vm/Interpreter.cpp	2015-05-06 18:51:41.765726892 -0500
 @@ -29,6 +29,11 @@
  #include "jsprf.h"
  #include "jsscript.h"
@@ -1179,10 +1179,11 @@
 +            }
 +                      
 +            wasObject = true;
++            RootedObject &pobj = rootObject1;
 +            if (lobj->is<ArrayObject>() && name == cx->names().length) {
 +                uint32_t len = tx->getArrayLength(cx, lobj);
 +                lval.setNumber(len);
-+            } else if (tx->getProperty(cx, lobj, id, lval)) {
++            } else if (tx->lookupProperty(cx, lobj, id, &pobj, lval)) {
 +            } else {
 +                // Suspend on getters.
 +                bool hasGetter = false;
@@ -1227,7 +1228,6 @@
 +                    }
 +                } else {
 +                    RootedShape &shape = rootShape0;
-+                    RootedObject &pobj = rootObject1;
 +                    if (!JSObject::lookupProperty(cx, lobj, name, &pobj, &shape))
 +                        goto error;
 +                    if (shape && (IsImplicitDenseOrTypedArrayElement(shape) || shape->hasGetterValue())) {
@@ -1387,7 +1387,8 @@
 +
 +                RootedId id(cx);
 +                ValueToId<CanGC>(cx, rval, &id);
-+                if (tx->getProperty(cx, lobj, id, res)) {
++                RootedObject &pobj = rootObject1;
++                if (tx->lookupProperty(cx, lobj, id, &pobj, res)) {
 +                    done = true;
 +                } else {
 +                    // Suspend on getters.
@@ -1429,7 +1430,6 @@
 +                        }
 +                    } else {
 +                        RootedShape &shape = rootShape0;
-+                        RootedObject &pobj = rootObject1;
 +                        if (!JSObject::lookupGeneric(cx, lobj, id, &pobj, &shape))
 +                            goto error;
 +                        // The typedArray.js test case demonstrates that the

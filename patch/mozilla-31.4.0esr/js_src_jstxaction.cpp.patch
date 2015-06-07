@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstxaction.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-02-26 13:40:24.784469748 -0600
++++ ff-dev/mozilla-31.4.0esr/js/src/jstxaction.cpp	2015-04-30 17:28:54.475212658 -0500
 @@ -0,0 +1,280 @@
 +#include "jsversion.h"
 +#ifdef TxJS
@@ -153,7 +153,7 @@
 +    act->prop.object.init(obj);
 +    act->prop.id.init(id);
 +    act->active = true;
-+    act->value = val;
++    act->value.init(val);
 +    act->argv = NULL;
 +    act->argc = 0;
 +    //act->prev = NULL;
@@ -208,7 +208,7 @@
 +    act->prop.object.init(rec);
 +    act->prop.id.init(fnid);
 +    act->active = true;
-+    act->value = fnval.get();
++    act->value.init(fnval);
 +    act->argc = args->length();
 +    if (act->argc > 0) {
 +        act->argv = (Value*)cx->malloc_(act->argc * sizeof(Value));

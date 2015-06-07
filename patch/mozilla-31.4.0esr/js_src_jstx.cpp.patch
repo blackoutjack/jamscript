@@ -1,6 +1,6 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jstx.cpp	1969-12-31 18:00:00.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-02-26 13:40:18.324469821 -0600
-@@ -0,0 +1,746 @@
++++ ff-dev/mozilla-31.4.0esr/js/src/jstx.cpp	2015-04-09 15:12:49.512661271 -0500
+@@ -0,0 +1,751 @@
 +/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*-
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -14,9 +14,10 @@
 +#include <string.h>     /* for memcpy */
 +#include "jscntxt.h"
 +#include "jsfun.h"
-+#include "jsscriptinlines.h"
 +#include "jsjam.h"
 +#include "vm/ArrayObject-inl.h"
++#include "jsscriptinlines.h"
++#include "jsobjinlines.h"
 +
 +using namespace js;
 +
@@ -400,7 +401,8 @@
 +            return true;
 +        }
 +        // %%% Lookup the |__proto__| member in the transaction!
-+        pobj.set(pobj->getProto());
++        // %%% Alternatively, always suspend on writes to |__proto__|.
++        JSObject::getProto(cx, pobj, pobj);
 +    }
 +    return false;
 +}
@@ -421,28 +423,31 @@
 +        }
 +#endif
 +#ifdef TxJS_HASH
-+        JSObject *sobj = obj;
-+        // See comment in |recordAction| for reasoning behind the
-+        // second condition here.
-+        while (IsProxy(sobj) && GetProxyPrivate(sobj).isObjectOrNull()) {
-+            sobj = GetProxyTargetObject(sobj);
-+        }
 +        if (tx->values_ != nullptr) {
-+            TxProperty prop;
-+            prop.id = id;
-+            prop.object.init(sobj);
-+            Values::Ptr node = tx->values_->lookup(prop);
-+            if (node) {
++            JSObject *sobj = obj;
++            // See comment in |recordAction| for reasoning behind the
++            // second condition here.
++            while (sobj != nullptr && IsProxy(sobj) && GetProxyPrivate(sobj).isObjectOrNull()) {
++                sobj = GetProxyTargetObject(sobj);
++            }
++            // Check this in case the proxy contained the null value.
++            if (sobj != nullptr) {
++                TxProperty prop;
++                prop.id = id;
++                prop.object.init(sobj);
++                Values::Ptr node = tx->values_->lookup(prop);
++                if (node) {
 +#ifdef TxJS_PROFILE_ACTIONS
-+                js_jam_profileActionLookup(cx, 1, AX_WRITE);
-+                if (missCount) {
-+                    js_jam_profileActionLookup(cx, missCount, AX_NULL);
-+                    //fprintf(stderr, "MISS 1: %d ", missCount);
-+                    //js_DumpId(id);
-+                }
++                    js_jam_profileActionLookup(cx, 1, AX_WRITE);
++                    if (missCount) {
++                        js_jam_profileActionLookup(cx, missCount, AX_NULL);
++                        //fprintf(stderr, "MISS 1: %d ", missCount);
++                        //js_DumpId(id);
++                    }
 +#endif
-+                vp.set(node->value());
-+                return true;
++                    vp.set(node->value());
++                    return true;
++                }
 +            }
 +        }
 +#ifdef TxJS_PROFILE_ACTIONS
@@ -452,10 +457,10 @@
 +        // %%% Profiling not implemented yet.
 +        TxAction *node;
 +        JSObject *objp = obj.get();
-+        while (IsProxy(objp) && GetProxyPrivate(objp).isObjectOrNull()) {
++        while (sobj != nullptr && IsProxy(objp) && GetProxyPrivate(objp).isObjectOrNull()) {
 +          objp = GetProxyTargetObject(objp);
 +        }
-+        if ((node = get_action_node(cx, tx->getActionSequence(), objp, id, tx->seqsize_, AX_MODIFY)) != nullptr) {
++        if (objp != nullptr && (node = get_action_node(cx, tx->getActionSequence(), objp, id, tx->seqsize_, AX_MODIFY)) != nullptr) {
 +            vp.set(get_node_val(node));
 +            return true;
 +        }

@@ -1,5 +1,5 @@
 --- ff-orig/mozilla-31.4.0esr/js/src/jsapi.h	2015-01-05 23:08:03.000000000 -0600
-+++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-03-23 18:01:16.694807325 -0500
++++ ff-dev/mozilla-31.4.0esr/js/src/jsapi.h	2015-04-08 12:54:14.215076549 -0500
 @@ -1003,7 +1003,14 @@
   */
  #define JSFUN_GENERIC_NATIVE   0x800
