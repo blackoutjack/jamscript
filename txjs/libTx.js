@@ -2,7 +2,7 @@
 // tag in the HTML page, and then this file, followed by all others.
 
 const PERFORMANCE_TESTING = false;
-const DEFAULT_ALLOW = false;
+const DEFAULT_ALLOW = true;
 const MIMIC = false;
 
 // Allow testing scripts with |alert| in the JS shell.
@@ -15,25 +15,27 @@ if (typeof alert === "undefined" && typeof print === "function") {
 if (typeof policy !== "object") {
   // See file txjs/policy.template.js for documentation of the format
   // of policy objects.
-  function process(tx) {
-    if (DEFAULT_ALLOW) {
-      JAM.process(tx);
-    } else {
-      JAM.prevent(tx);
-    }
-  }
   var policy = (function () {
-    return { pFull: process };
+    return {
+      pFull: function (tx) {
+        if (DEFAULT_ALLOW) {
+          JAM.process(tx);
+        } else {
+          JAM.prevent(tx);
+        }
+      },
+    }
   }());
 }
 
 // Define the JAM property to be read-only.
 Object.defineProperty(this, 'JAM', { 'value': (function() {
-
   var pFull = policy.pFull;
 
   // Close over some native values and objects that may be needed.
+  var _policy = policy;
   var _global = this;
+  delete _global.policy;
   var _undefined = undefined;
   var _eval = eval;
   var _Function = Function;
@@ -153,6 +155,19 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
     return frag.innerHTML;
   }
 
+  // Invoke the given function in a context protected by a dynamic
+  // introspector. Use the |finally| block to disable dynamic
+  // introspection even if an exception occurs.
+  function invokeWithDynamicProtection(fun, obj, args) {
+    var di = JAM.getDynamicIntrospector();
+    JAM.setDynamicIntrospector(pFull);
+    try {
+      return _apply_apply(fun, [obj, args]);
+    } finally {
+      JAM.setDynamicIntrospector(di);
+    }
+  }
+
   function commitSuspendFine(tx) {
 
     // Get the cause of the suspend.
@@ -212,6 +227,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
       // Mark this false if special invocation is done in place.
       var invoke = true;
       if (len > 0) {
+        var fname = fun.name;
         if (JAM.identical(fun, _Array_prototype_sort)) {
           // Array.prototype.sort may invoke a user-provided
           // comparison function.
@@ -219,7 +235,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             args[0] = wrapMethod(pFull, args[0]);
           }
         } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
-          if (JAM.isNativeFunction(args[0])) {
+          if (typeof args[0] === "function") {
             args[0] = wrapMethod(pFull, args[0]);
           } else if (typeof args[0] === "string") {
             args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
@@ -239,21 +255,23 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           // Per MDN, SpiderMonkey no longer supports |eval| with
           // more than 1 argument.
           // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-          JAM.setDynamicIntrospector(pFull);
-          ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
-          invoke = false;
+
+          var typ = typeof args[0];
+          if (typ === "object" || typ === "function") {
+            // Calling |eval| on these types just returns the value.
+            // Testing indicates there's no implicit function invocation
+            // of |toString| or |valueOf|.
+          } else {
+            args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
+          }
+
         } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
-          JAM.setDynamicIntrospector(pFull);
-          ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
+          ret = invokeWithDynamicProtection(fun, obj, args);
           invoke = false;
-        } else if (fun.name === "appendChild" || fun.name === "replaceChild" || fun.name === "insertBefore" || fun.name === "setAttributeNode") {
+        } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttributeNode") {
           // For |appendChild|, |replaceChild| and |insertBefore|,
           // the first argument is the element to be inserted.
-          JAM.setDynamicIntrospector(pFull);
-          ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
+          ret = invokeWithDynamicProtection(fun, obj, args);
           invoke = false;
         } else if (len > 1) {
           if (JAM.identical(fun, _String_prototype_replace)) {
@@ -262,16 +280,18 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             if (JAM.isNativeFunction(args[1])) {
               args[1] = wrapMethod(pFull, args[1]);
             }
-          } else if (fun.name === "addEventListener") {
+          } else if (fname === "addEventListener") {
             // For |addEventListener|, the first argument is the type
             // of event and the second (index 1) is the event handler.
             // There may be optional further arguments.
             // %%% What if the second argument is an |EventListener|
             // %%% rather than a simple |Function|?
-            if (JAM.isNativeFunction(args[1])) {
+            //if (JAM.isNativeFunction(args[1])) {
+            if (args[1].name === "") {
+              console.log(args[1].toString());
               args[1] = wrapMethod(pFull, args[1]);
             }
-          } else if (fun.name === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
+          } else if (fname === "removeEventListener" || JAM.identical(fun, _clearInterval)) {
             // The second argument must specify the |Function| or
             // |EventListener| to remove, so we need to maintain a
             // mapping from the "original" functions to their
@@ -288,12 +308,10 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             if (JAM.isNativeFunction(args[1])) {
               args[1] = wrapMethod(pFull, args[1]);
             }
-          } else if (fun.name === "setAttribute") {
+          } else if (fname === "setAttribute") {
             if (args[0] === "src") {
               if (JAM.instanceof(obj, _HTMLScriptElement)) {
-                JAM.setDynamicIntrospector(pFull);
-                ret = _apply_apply(fun, [obj, args]);
-                JAM.setDynamicIntrospector();
+                ret = invokeWithDynamicProtection(fun, obj, args);
                 invoke = false;
               }
             } else if (_String_startsWith(args[0], "on")) {
@@ -423,7 +441,6 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           // comparison function.
           args[0] = wrapMethod(pFull, args[0]);
         } else if (JAM.identical(fun, _setTimeout) || JAM.identical(fun, _setInterval)) {
-          // %%% Currently assumes args[0] is a function object
           var typ = typeof args[0];
           if (typ === "function") {
             args[0] = wrapMethod(pFull, args[0]);
@@ -438,26 +455,30 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           }
           invoke = false;
         } else if (JAM.identical(fun, _eval)) {
+          // Given that the callsite transformation will handle all
+          // direct calls to |eval|, we can assume this is indirect.
+          // %%% What about the modular case?
+
           // Per MDN, SpiderMonkey no longer supports |eval| with
           // more than 1 argument.
           // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-          // %%% |setDynamicIntrospector| doesn't work here currently
-          // %%% because the introspector value isn't propagated.
-          // %%% Semantics differ for direct eval with free variables.
-          args[0] = 'introspect(JAM.policy.pFull) {' + args[0] + '}';
-          ret = _apply_apply(fun, [obj, args]);
-          invoke = false;
+
+          var typ = typeof args[0];
+          if (typ === "object" || typ === "function") {
+            // Calling |eval| on these types just returns the value.
+            // Testing indicates there's no implicit function invocation
+            // of |toString| or |valueOf|.
+          } else {
+            args[0] = "introspect(JAM.policy.pFull) { " + args[0] + " }";
+          }
+
         } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
-          JAM.setDynamicIntrospector(pFull);
-          ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
+          ret = invokeWithDynamicProtection(fun, obj, args);
           invoke = false;
         } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttributeNode") {
           // For |appendChild|, |replaceChild| and |insertBefore|,
           // the first argument is the element to be inserted.
-          JAM.setDynamicIntrospector(pFull);
-          ret = _apply_apply(fun, [obj, args]);
-          JAM.setDynamicIntrospector();
+          ret = invokeWithDynamicProtection(fun, obj, args);
           invoke = false;
         } else if (len > 1) {
           if (JAM.identical(fun, _String_prototype_replace)) {
@@ -491,9 +512,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           } else if (fun.name === "setAttribute") {
             if (args[0] === "src") {
               if (JAM.instanceof(obj, _HTMLScriptElement)) {
-                JAM.setDynamicIntrospector(pFull);
-                ret = _apply_apply(fun, [obj, args]);
-                JAM.setDynamicIntrospector();
+                ret = invokeWithDynamicProtection(fun, obj, args);
                 invoke = false;
               }
             } else if (_String_startsWith(args[0], "on")) {
@@ -574,7 +593,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
   }
 
   return {
-    policy: policy,
+    policy: _policy,
 
     // Commandeer the native JAM utility functions.
     __proto__: JAM,
@@ -742,8 +761,9 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
           if (JAM.identical(f, _String_prototype_replace)
               || JAM.identical(f, ___defineGetter__)
               || JAM.identical(f, ___defineSetter__)) {
-            // Array.prototype.sort may invoke a user-provided
-            // comparison function.
+            // String.prototype.replace may invoke a callback.
+            if (JAM.isNativeFunction(args[1])) ispect = pFull;
+          } else if (fname === "addEventListener") {
             if (JAM.isNativeFunction(args[1])) ispect = pFull;
           } else if (fname === "setAttribute" && JAM.instanceof(rec, Element)) {
             // We check |name| because each subclass of |Element|
@@ -996,21 +1016,15 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             // Per MDN, SpiderMonkey no longer supports |eval| with
             // more than 1 argument.
             // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
+            ret = invokeWithDynamicProtection(fun, obj, args);
             invoke = false;
           } else if (JAM.identical(fun, _HTMLDocument_prototype_write) || JAM.identical(fun, _HTMLDocument_prototype_writeln)) {
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
+            ret = invokeWithDynamicProtection(fun, obj, args);
             invoke = false;
           } else if (fname === "appendChild" || fname === "replaceChild" || fname === "insertBefore" || fname === "setAttributeNode") {
             // For |appendChild|, |replaceChild| and |insertBefore|,
             // the first argument is the element to be inserted.
-            JAM.setDynamicIntrospector(pFull);
-            ret = _apply_apply(fun, [obj, args]);
-            JAM.setDynamicIntrospector();
+            ret = invokeWithDynamicProtection(fun, obj, args);
             invoke = false;
           } else if (len > 1) {
             if (JAM.identical(fun, _String_prototype_replace)) {
@@ -1048,9 +1062,7 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
             } else if (fun.name === "setAttribute") {
               if (args[0] === "src") {
                 if (JAM.instanceof(obj, _HTMLScriptElement)) {
-                  JAM.setDynamicIntrospector(pFull);
-                  ret = _apply_apply(fun, [obj, args]);
-                  JAM.setDynamicIntrospector();
+                  ret = invokeWithDynamicProtection(fun, obj, args);
                   invoke = false;
                 }
               } else if (_String_startsWith(args[0], "on")) {
@@ -1112,10 +1124,10 @@ Object.defineProperty(this, 'JAM', { 'value': (function() {
         alert("Unhandled suspend type: " + type);
       }
 
-      return;
+      return undefined;
     },
 
-    commitSuspend: policy.woven ? commitSuspendFine : commitSuspendCoarse,
+    commitSuspend: commitSuspendCoarse,
 
     // Additional methods useful for debugging.
     dump: function(obj, depth) {
@@ -1166,6 +1178,3 @@ if (PERFORMANCE_TESTING) {
 
 Object.freeze(JAM);
 Object.freeze(JAM.policy);
-
-// Prevent access to the policy except within the JAM object.
-delete policy;

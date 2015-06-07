@@ -1,0 +1,32 @@
+===== micro =====
+attribute1 | what's expected?
+eval6 | what's expected?
+eval7 | what's expected?
+eval8 | what's expected?
+eval9 | what's expected?
+eval10 | what's expected?
+eval11 | what's expected?
+exfil_test_concat-mega2 | allows XMLHttpRequest by design
+exfil_test_data6 | allows violation via injected link (out-of-scope?)
+exfil_test_link | allows violation via injected link (out-of-scope?)
+exfil_test_jscrambler | error (all cases, due to expired code): m0W is null
+hanoi | transformed code is very slow!
+library | check for existence of functions
+throw* | catch exception and check state
+
+===== bench =====
+googlemaps | semantic deviation due to variable renaming and direct eval
+jsbeautifier | errors due to lack of document
+jsbench-twitter-chrome-urem | error
+jsbench-yahoo-chrome-urem | error
+jsbench-yahoo-firefox-urem | error
+jsbench-yahoo-safari-urem | error
+jsqrcode-mal | error due to lack of document setup
+jssec | lack of document
+jssec-bad | lack of document
+jswidgets-menu | appropriate violation when hovering over right menu?
+kraken/kraken-results.js | fix up or remove
+midori | appropriate violation?
+piwik | should a violation be detected?
+puzzle | appropriate violation?
+snote-mini | supporting files not provided
